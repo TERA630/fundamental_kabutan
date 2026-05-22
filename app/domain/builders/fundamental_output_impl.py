@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from app.domain.models.metrics import calc_metrics
@@ -57,11 +58,27 @@ def _build_market_cap_rank(v: float | None) -> str:
 
 
 
-def build_indicator_lines(*, price: float | None, market_cap: float | None, industry: str, per: float | None, pbr: float | None) -> list[str]:
+def build_indicator_lines(
+    *,
+    price: float | None,
+    market_cap: float | None,
+    industry: str,
+    pbr: float | None,
+    roe: float | None,
+    per_actual: float | None,
+    per_current_forecast: float | None,
+    per_next_forecast: float | None,
+    div_actual: float | None,
+    div_current_forecast: float | None,
+    div_next_forecast: float | None,
+    base_year: int,
+) -> list[str]:
     return [
         "■指標",
-        f"株価：{_fmt_num(price,0)}円 / PER：{_fmt_num(per)} / PBR：{_fmt_num(pbr)}",
+        f"株価：{_fmt_num(price,0)}円 / PBR {_fmt_num(pbr)} / ROE {_fmt_plain_pct(roe)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
+        f"PER：{base_year}年実績 {_fmt_num(per_actual,1)}倍／{base_year + 1}年末予想 {_fmt_num(per_current_forecast,1)}倍／{base_year + 2}年来期予想 {_fmt_num(per_next_forecast,1)}倍",
+        f"配当利回り：{base_year}年実績 {_fmt_plain_pct(div_actual)}／{base_year + 1}年末予想 {_fmt_plain_pct(div_current_forecast)}／{base_year + 2}年来季予想 {_fmt_plain_pct(div_next_forecast)}",
     ]
 
 def _build_periods(summary_rows: list[dict[str, Any]]):
@@ -74,13 +91,22 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
+    base_year = int((market_snapshot or {}).get("base_year") or date.today().year)
+
     if periods.latest_fy is None:
         indicator_lines = build_indicator_lines(
             price=price,
             market_cap=market_cap,
             industry=industry_name,
-            per=(market_snapshot or {}).get("per"),
             pbr=(market_snapshot or {}).get("pbr"),
+            roe=(market_snapshot or {}).get("roe"),
+            per_actual=(market_snapshot or {}).get("per"),
+            per_current_forecast=None,
+            per_next_forecast=None,
+            div_actual=(market_snapshot or {}).get("div_yield"),
+            div_current_forecast=None,
+            div_next_forecast=None,
+            base_year=base_year,
         )
         return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
 
@@ -91,8 +117,15 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         price=price,
         market_cap=market_cap,
         industry=industry_name,
-        per=(market_snapshot or {}).get("per") or metrics.get("per"),
         pbr=(market_snapshot or {}).get("pbr") or metrics.get("pbr"),
+        roe=(market_snapshot or {}).get("roe"),
+        per_actual=(market_snapshot or {}).get("per") or metrics.get("per"),
+        per_current_forecast=metrics.get("per_forecast"),
+        per_next_forecast=metrics.get("per_next"),
+        div_actual=(market_snapshot or {}).get("div_yield"),
+        div_current_forecast=metrics.get("div_yield"),
+        div_next_forecast=metrics.get("next_div_yield"),
+        base_year=base_year,
     )
 
     lines = [

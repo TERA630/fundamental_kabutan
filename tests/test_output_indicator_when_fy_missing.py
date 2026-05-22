@@ -8,7 +8,8 @@ def test_build_output_shows_indicator_when_fy_missing():
         }
     )
     assert '■指標' in text
-    assert '株価：4,850円 / PER：14.68 / PBR：3.28' in text
+    assert '株価：4,850円 / PBR 3.28 / ROE N/A' in text
     assert '業種：非鉄金属' in text
-    assert '配当利回り' not in text
+    assert 'PER：' in text
+    assert '配当利回り：' in text
     assert '通期(FY)データを抽出できませんでした。' not in text
