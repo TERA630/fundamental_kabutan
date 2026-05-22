@@ -91,7 +91,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         market = FakeMarketProvider()
         cache = InMemoryCache()
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=cache,
             client=client,
             fetch_market_snapshot=market,
@@ -126,7 +125,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
 
         market = EmptyPriceProvider()
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=cache,
             client=client,
             fetch_market_snapshot=market,
@@ -135,8 +133,9 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         snap1 = service.fetch_price_snapshot("5803")
         snap2 = service.fetch_price_snapshot("5803")
 
-        self.assertEqual(snap1, {"price": None, "market_cap": None})
-        self.assertEqual(snap2, {"price": None, "market_cap": None})
+        expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
+        self.assertEqual(snap1, expected)
+        self.assertEqual(snap2, expected)
         self.assertEqual(market.calls, 2)
 
     def test_fetch_kabutan_forecast_pair_returns_none_when_html_dir_is_none(self):
@@ -145,7 +144,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
                 self.repository = object()
 
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=InMemoryCache(),
             client=FakeClient(),
             fetch_market_snapshot=FakeMarketProvider(),
