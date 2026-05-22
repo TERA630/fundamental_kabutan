@@ -5,8 +5,10 @@ import pytest
 from app.domain.models.fundamental_display import PeriodFundamentalRow, PriceSnapshot, StockProfile, ValuationMetrics
 from app.domain.usecases.fundamental_display import (
     BuildFundamentalDisplaySnapshotUseCase,
+    calc_dividend_yield_pct,
     calc_operating_growth_yoy_pct,
     calc_operating_margin_pct,
+    calc_per_times,
     calc_ordinary_margin_pct,
     grade_company_scale,
 )
@@ -42,6 +44,8 @@ def test_calc_metrics_functions():
     assert calc_operating_margin_pct(curr) == 10
     assert calc_ordinary_margin_pct(curr) == 7.5
     assert calc_operating_growth_yoy_pct(curr, prev) == pytest.approx(20.0)
+    assert calc_per_times(1200, 80) == pytest.approx(15.0)
+    assert calc_dividend_yield_pct(1200, 24) == pytest.approx(2.0)
 
 
 def test_grade_company_scale():
@@ -61,3 +65,8 @@ def test_get_fundamental_display_snapshot_builds_filled_rows():
     assert len(snapshot.rows) == 5
     assert snapshot.rows[0].operating_growth_yoy_pct is None
     assert snapshot.rows[1].operating_growth_yoy_pct == pytest.approx(20.0)
+    assert snapshot.metrics_actual is not None
+    assert snapshot.metrics_actual.per == pytest.approx(1234.0 / 80)
+    assert snapshot.metrics_actual.dividend_yield_pct == pytest.approx(24 / 1234.0 * 100)
+    assert snapshot.metrics_current_forecast is not None
+    assert snapshot.metrics_current_forecast.per == pytest.approx(1234.0 / 90)

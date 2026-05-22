@@ -53,6 +53,18 @@ def calc_operating_growth_yoy_pct(current: PeriodFundamentalRow, previous: Perio
     return (current_op / prev_op - 1) * 100
 
 
+def calc_per_times(price_yen: float | None, eps_yen: float | None) -> float | None:
+    if price_yen in (None, 0) or eps_yen in (None, 0):
+        return None
+    return price_yen / eps_yen
+
+
+def calc_dividend_yield_pct(price_yen: float | None, dividend_yen: float | None) -> float | None:
+    if price_yen in (None, 0) or dividend_yen is None:
+        return None
+    return dividend_yen / price_yen * 100
+
+
 def grade_company_scale(market_cap_billion_yen: float | None) -> str | None:
     if market_cap_billion_yen is None:
         return None
@@ -72,6 +84,15 @@ class BuildFundamentalDisplaySnapshotUseCase:
     fundamental_repository: FundamentalRepositoryPort
     market_repository: MarketRepositoryPort
     valuation_repository: ValuationRepositoryPort
+
+    def _get_valuation_from_row(self, *, row: PeriodFundamentalRow | None, price_yen: float | None) -> ValuationMetrics | None:
+        if row is None:
+            return None
+        return ValuationMetrics(
+            per=calc_per_times(price_yen, row.eps_yen),
+            eps_yen=row.eps_yen,
+            dividend_yield_pct=calc_dividend_yield_pct(price_yen, row.dividend_yen),
+        )
 
     def get_fundamental_display_snapshot(self, code4: str, base_year: int) -> FundamentalDisplaySnapshot:
         years = (base_year - 2, base_year - 1, base_year, base_year + 1, base_year + 2)
@@ -102,6 +123,11 @@ class BuildFundamentalDisplaySnapshotUseCase:
             )
             previous_row = row
 
+        row_by_year = {row.fiscal_year: row for row in normalized_rows}
+        metrics_actual = self._get_valuation_from_row(row=row_by_year.get(base_year), price_yen=price.price_yen)
+        metrics_current_forecast = self._get_valuation_from_row(row=row_by_year.get(base_year + 1), price_yen=price.price_yen)
+        metrics_next_forecast = self._get_valuation_from_row(row=row_by_year.get(base_year + 2), price_yen=price.price_yen)
+
         return FundamentalDisplaySnapshot(
             profile=StockProfile(
                 code4=profile.code4,
@@ -111,9 +137,9 @@ class BuildFundamentalDisplaySnapshotUseCase:
                 size_class_label=profile.size_class_label or grade_company_scale(profile.market_cap_billion_yen),
             ),
             price=price,
-            metrics_actual=self.valuation_repository.fetch_valuation_metrics(code4, base_year, "actual"),
-            metrics_current_forecast=self.valuation_repository.fetch_valuation_metrics(code4, base_year + 1, "forecast"),
-            metrics_next_forecast=self.valuation_repository.fetch_valuation_metrics(code4, base_year + 2, "forecast"),
+            metrics_actual=metrics_actual,
+            metrics_current_forecast=metrics_current_forecast,
+            metrics_next_forecast=metrics_next_forecast,
             rows=tuple(normalized_rows),
         )
 
@@ -125,6 +151,8 @@ __all__ = [
     "calc_operating_margin_pct",
     "calc_ordinary_margin_pct",
     "calc_operating_growth_yoy_pct",
+    "calc_per_times",
+    "calc_dividend_yield_pct",
     "grade_company_scale",
     "BuildFundamentalDisplaySnapshotUseCase",
 ]

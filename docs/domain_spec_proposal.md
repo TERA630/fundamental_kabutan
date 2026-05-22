@@ -88,6 +88,13 @@
 - `calc_operating_margin_pct(row)`
 - `calc_ordinary_margin_pct(row)`
 - `calc_operating_growth_yoy_pct(current, previous)`
+- `calc_per_times(price_yen, revised_eps_yen)`
+- `calc_dividend_yield_pct(price_yen, revised_dividend_yen)`
+
+#### 年次評価指標の算出方針
+- 実績・今期予想・来期予想の各 `PeriodFundamentalRow` を基点に `ValuationMetrics` を算出する。
+- `ValuationMetrics.per` と `ValuationMetrics.dividend_yield_pct` は、外部API値ではなくドメイン計算値を優先する。
+- 行データ欠損時は `None` を保持し、Builderで `N/A` 表示する。
 
 #### `GradeCompanyScaleUseCase`（任意）
 責務：時価総額→サイズラベル判定。
@@ -103,6 +110,8 @@
 - ヘッダブロック（銘柄名、コード、業種、時価総額）
 - 株価ブロック
 - 指標ブロック（2025実績 / 2026期末予想 / 2027来季予想）
+  - `PER：{base_year}年実績 ... ／ {base_year+1}年末予想 ... ／ {base_year+2}年来期予想 ...`
+  - `配当利回り：{base_year}年実績 ... ／ {base_year+1}年末予想 ... ／ {base_year+2}年来季予想 ...`
 - 実績・予想テーブル
 
 > 命名ポリシーに合わせ、出力生成は `build_*`。
