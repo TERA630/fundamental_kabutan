@@ -5,6 +5,7 @@ from app.presenters import build_kabutan_forecast_output
 def test_build_kabutan_forecast_output_appends_section():
     base = "base output"
     pair = KabutanForecastPair(
+        previous2_actual=None,
         previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80),
         current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110),
         next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1350, 150, 140, 120),
@@ -23,6 +24,7 @@ def test_build_kabutan_forecast_output_appends_section():
 def test_build_kabutan_forecast_output_chain_includes_eps_and_dividend():
     base = "base output"
     pair = KabutanForecastPair(
+        previous2_actual=None,
         previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80, revised_eps=50.5, dividend=20.0),
         current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110, revised_eps=65.2, dividend=24.0),
         next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1350, 150, 140, 120, revised_eps=70.1, dividend=26.0),

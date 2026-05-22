@@ -27,6 +27,7 @@ class KabutanForecastSnapshot:
 
 @dataclass(frozen=True)
 class KabutanForecastPair:
+    previous2_actual: KabutanForecastRow | None
     previous_actual: KabutanForecastRow | None
     current_forecast: KabutanForecastRow
     next_forecast: KabutanForecastRow | None
