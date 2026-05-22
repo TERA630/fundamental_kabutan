@@ -8,7 +8,6 @@ from pathlib import Path
 import re
 
 from app.data.file_cache import FileCache
-from app.data.jquants_client import JQuantsClient
 from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.data.utils import normalize_code
 from app.domain.models.kabutan_forecast import KabutanForecastPair
@@ -25,8 +24,29 @@ class JQuantsClientPort(Protocol):
 
 
 class MarketDataProviderPort(Protocol):
-    def __call__(self, code4: str) -> dict[str, float | None]: ...
+    def __call__(self, code4: str) -> dict[str, float | str | None]: ...
 
+
+class NullJQuantsClient:
+    def get_master(self, code: str) -> dict[str, Any] | None:
+        return None
+
+    def get_summary(self, code: str) -> list[dict[str, Any]]:
+        return []
+
+
+
+
+def build_empty_market_snapshot() -> dict[str, float | str | None]:
+    return {
+        "price": None,
+        "market_cap": None,
+        "per": None,
+        "pbr": None,
+        "industry": None,
+        "div_yield": None,
+        "payout_ratio": None,
+    }
 
 class KabutanForecastRepositoryPort(Protocol):
     def fetch_kabutan_forecast_pair(
@@ -50,13 +70,12 @@ class FundamentalAnalysisService:
 
     def __init__(
         self,
-        api_key: str,
         file_cache: FileCache | None = None,
         client: JQuantsClientPort | None = None,
         fetch_market_snapshot: MarketDataProviderPort | None = None,
         fetch_kabutan_forecast_usecase: FetchKabutanForecastUseCase | None = None,
     ):
-        self.client = client or JQuantsClient(api_key)
+        self.client = client or NullJQuantsClient()
         self.cache = file_cache or FileCache()
         self.fetch_market_snapshot = fetch_market_snapshot or fetch_yfinance_snapshot
         self.fetch_kabutan_forecast_usecase = fetch_kabutan_forecast_usecase
@@ -85,13 +104,18 @@ class FundamentalAnalysisService:
         )
         return rows if isinstance(rows, list) else []
 
-    def fetch_price_snapshot(self, code4: str) -> dict[str, float | None]:
+    def fetch_price_snapshot(self, code4: str) -> dict[str, float | str | None]:
         cache_key = self.build_cache_key_price_snapshot(code4)
         cached = self.cache.get(cache_key, CACHE_TTL_YF_SEC)
         if isinstance(cached, dict):
             return {
                 "price": cached.get("price"),
                 "market_cap": cached.get("market_cap"),
+                "per": cached.get("per"),
+                "pbr": cached.get("pbr"),
+                "industry": cached.get("industry"),
+                "div_yield": cached.get("div_yield"),
+                "payout_ratio": cached.get("payout_ratio"),
             }
 
         snapshot = self.fetch_market_snapshot(code4)
@@ -100,8 +124,13 @@ class FundamentalAnalysisService:
             return {
                 "price": snapshot.get("price"),
                 "market_cap": snapshot.get("market_cap"),
+                "per": snapshot.get("per"),
+                "pbr": snapshot.get("pbr"),
+                "industry": snapshot.get("industry"),
+                "div_yield": snapshot.get("div_yield"),
+                "payout_ratio": snapshot.get("payout_ratio"),
             }
-        return {"price": None, "market_cap": None}
+        return build_empty_market_snapshot()
 
     def build_analysis_output(
         self,
@@ -124,6 +153,7 @@ class FundamentalAnalysisService:
             summary_rows=summary_rows,
             price=price_snapshot.get("price"),
             market_cap=price_snapshot.get("market_cap"),
+            market_snapshot=price_snapshot,
             kabutan_forecast_pair=kabutan_fetch_result.pair,
             kabutan_source=kabutan_fetch_result.source,
             kabutan_source_message=kabutan_fetch_result.message,

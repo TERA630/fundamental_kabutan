@@ -15,7 +15,7 @@ class DummyService:
 def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
     dummy_service = DummyService()
 
-    def build_service(_api_key: str, _cache):
+    def build_service(_cache):
         return dummy_service
 
     controller = FundamentalGuiController(build_fundamental_service=build_service)
@@ -23,7 +23,6 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
     cache_key = "k1"
 
     out1 = controller.fetch_analysis_output(
-        api_key="token",
         name="トヨタ",
         code4="7203",
         output_cache=output_cache,
@@ -31,7 +30,6 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
         kabutan_html_dir=tmp_path,
     )
     out2 = controller.fetch_analysis_output(
-        api_key="token",
         name="トヨタ",
         code4="7203",
         output_cache=output_cache,

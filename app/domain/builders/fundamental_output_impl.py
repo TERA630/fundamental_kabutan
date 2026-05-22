@@ -60,7 +60,7 @@ def _build_periods(summary_rows: list[dict[str, Any]]):
     return fetch_period_set(summary_rows)
 
 
-def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, summary_rows: list[dict[str, Any]], price: float | None, market_cap: float | None) -> str:
+def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, summary_rows: list[dict[str, Any]], price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None) -> str:
     periods = _build_periods(summary_rows)
     if periods.latest_fy is None:
         return f"【銘柄】{name} ({code4})\n\n通期(FY)データを抽出できませんでした。"
@@ -68,14 +68,14 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
     metrics = calc_metrics(periods, price)
     actual_score, forecast_score, total_score, total_max, grade = grade_summary(metrics)
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
-    sector33 = str(_first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
+    sector33 = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
     lines = [
         f"【銘柄】{company_name} ({code4})",
         "■指標",
-        f"株価：{_fmt_num(price,0)}円 / PER：{_fmt_num(metrics.get('per'))} / PBR：{_fmt_num(metrics.get('pbr'))}",
+        f"株価：{_fmt_num(price,0)}円 / PER：{_fmt_num((market_snapshot or {}).get('per') or metrics.get('per'))} / PBR：{_fmt_num((market_snapshot or {}).get('pbr') or metrics.get('pbr'))}",
         f"業種：{sector33}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
-        f"配当利回り：{_fmt_plain_pct(metrics.get('div_yield'))}(配当性向 {_fmt_plain_pct(metrics.get('payout'))})",
+        f"配当利回り：{_fmt_plain_pct((market_snapshot or {}).get('div_yield') or metrics.get('div_yield'))}(配当性向 {_fmt_plain_pct((market_snapshot or {}).get('payout_ratio') or metrics.get('payout'))})",
         "",
         f"スコア：実績 {actual_score}/7 / 予想進捗 {forecast_score}/5 / 総合 {total_score}/{total_max}",
         f"総合評価：{grade}",
