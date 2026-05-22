@@ -1,53 +1,5 @@
-import sys
-import types
 import unittest
-
-
-def _install_stub_modules() -> None:
-    if "requests" not in sys.modules:
-        requests = types.ModuleType("requests")
-
-        class DummySession:
-            def __init__(self):
-                self.headers = {}
-
-            def mount(self, *_args, **_kwargs):
-                return None
-
-            def get(self, *_args, **_kwargs):
-                raise RuntimeError("network disabled in test")
-
-        requests.Session = DummySession
-        requests.RequestException = Exception
-        sys.modules["requests"] = requests
-
-        adapters = types.ModuleType("requests.adapters")
-        class HTTPAdapter:
-            def __init__(self, *args, **kwargs):
-                pass
-        adapters.HTTPAdapter = HTTPAdapter
-        sys.modules["requests.adapters"] = adapters
-
-    if "urllib3" not in sys.modules:
-        urllib3 = types.ModuleType("urllib3")
-        sys.modules["urllib3"] = urllib3
-
-    if "urllib3.util" not in sys.modules:
-        urllib3_util = types.ModuleType("urllib3.util")
-        sys.modules["urllib3.util"] = urllib3_util
-
-    if "urllib3.util.retry" not in sys.modules:
-        retry_mod = types.ModuleType("urllib3.util.retry")
-        class Retry:
-            def __init__(self, *args, **kwargs):
-                pass
-        retry_mod.Retry = Retry
-        sys.modules["urllib3.util.retry"] = retry_mod
-
-
-_install_stub_modules()
-
-from fundamental_jquants_v7 import build_period_index
+from app.domain.models.periods import fetch_period_set
 
 
 class TestPeriodMerge(unittest.TestCase):
@@ -58,7 +10,7 @@ class TestPeriodMerge(unittest.TestCase):
             {"Code": "80580", "CurPerType": "FY", "CurPerSt": "2024-04-01", "CurPerEn": "2025-03-31", "DisclosedDate": "2025-05-08", "Sales": "1100", "OP": "120", "OdP": "100", "NP": "70", "EPS": "55"},
         ]
 
-        periods = build_period_index(rows)
+        periods = fetch_period_set(rows)
 
         self.assertIsNotNone(periods.latest_fy)
         self.assertIsNotNone(periods.prev_fy)

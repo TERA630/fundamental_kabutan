@@ -1,1 +1,1 @@
-"""Application package for layered fundamental_jquants app."""
+"""Application package for layered fundamental analysis app."""

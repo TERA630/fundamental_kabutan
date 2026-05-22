@@ -1,7 +1,7 @@
 # 表示仕様書（現行実装準拠）
 
 ## 1. 目的
-本仕様書は、現行GUIでの表示内容を「株探（HTML優先）を主表示、J-Quantsを補完表示」とする仕様として整理する。
+本仕様書は、現行GUIでの表示内容を「株探（HTML優先）を主表示、指標はyFinance表示」とする仕様として整理する。
 
 ## 2. 対象範囲
 - GUI画面上の固定ラベル、ステータスメッセージ
@@ -12,8 +12,6 @@
 
 ### 3.1 データ層
 - 監視銘柄読み込み: `app/data/watchlist_repository.py`
-- APIキー解決/補完: `app/data/api_key_provider.py`, `app/data/api_key_resolver.py`
-- J-Quants財務データ取得: `app/data/jquants_client.py`
 - yFinance株価取得: `app/data/market_data_provider.py`
 - 株探データ取得（HTML解析・Web取得）: `app/data/kabutan_repository.py`
 - キャッシュ: `app/data/file_cache.py`
@@ -37,8 +35,6 @@
 ## 4. GUI表示仕様
 
 ### 4.1 固定表示
-- APIキーラベル: `J-Quants APIキー`
-- 補助ラベル: `環境変数 JQUANTS_API_KEY も可`
 - ボタン:
   - `監視銘柄ファイルを開く`
   - `株探HTMLフォルダを選択`
@@ -53,9 +49,9 @@
 - 銘柄選択: `銘柄を選択しました。取得ボタンを押してください。`
 - 必須不足: `先に監視銘柄ファイルと銘柄を選んでください。`
 - 取得中（株探表示優先を明示）:
-  - `取得中: {name} ({code4}) / 業績=株探(HTML優先) / 財務補完=J-Quants / 株価=yFinance`
+  - `取得中: {name} ({code4}) / 業績=株探(HTML優先) / 指標=yFinance`
 - 生成完了（株探表示優先を明示）:
-  - `生成完了: {name} ({code4}) / 業績=株探(HTML優先) / 財務補完=J-Quants / 株価=yFinance`
+  - `生成完了: {name} ({code4}) / 業績=株探(HTML優先) / 指標=yFinance`
 - キャッシュ表示: `キャッシュ表示: {name} ({code4})`
 - コピー不可: `コピーするテキストがありません。`
 - コピー完了: `クリップボードにコピーしました。`
