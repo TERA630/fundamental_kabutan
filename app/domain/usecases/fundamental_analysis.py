@@ -8,7 +8,6 @@ from pathlib import Path
 import re
 
 from app.data.file_cache import FileCache
-from app.data.jquants_client import JQuantsClient
 from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.data.utils import normalize_code
 from app.domain.models.kabutan_forecast import KabutanForecastPair
@@ -26,6 +25,14 @@ class JQuantsClientPort(Protocol):
 
 class MarketDataProviderPort(Protocol):
     def __call__(self, code4: str) -> dict[str, float | None]: ...
+
+
+class NullJQuantsClient:
+    def get_master(self, code: str) -> dict[str, Any] | None:
+        return None
+
+    def get_summary(self, code: str) -> list[dict[str, Any]]:
+        return []
 
 
 class KabutanForecastRepositoryPort(Protocol):
@@ -50,13 +57,12 @@ class FundamentalAnalysisService:
 
     def __init__(
         self,
-        api_key: str,
         file_cache: FileCache | None = None,
         client: JQuantsClientPort | None = None,
         fetch_market_snapshot: MarketDataProviderPort | None = None,
         fetch_kabutan_forecast_usecase: FetchKabutanForecastUseCase | None = None,
     ):
-        self.client = client or JQuantsClient(api_key)
+        self.client = client or NullJQuantsClient()
         self.cache = file_cache or FileCache()
         self.fetch_market_snapshot = fetch_market_snapshot or fetch_yfinance_snapshot
         self.fetch_kabutan_forecast_usecase = fetch_kabutan_forecast_usecase
