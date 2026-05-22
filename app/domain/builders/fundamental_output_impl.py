@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
