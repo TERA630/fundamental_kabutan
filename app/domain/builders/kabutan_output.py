@@ -60,6 +60,21 @@ def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
     )
 
 
+
+
+def fetch_growth_target_rows(rows: list[KabutanForecastRow]) -> list[KabutanForecastRow]:
+    """成長率計算対象行を返す（同年実績→同年予想の比較を避ける）。"""
+    targets: list[KabutanForecastRow] = []
+    for row in rows:
+        if row.section == "実績":
+            targets.append(row)
+            continue
+        if row.section == "予想":
+            if targets and targets[-1].section == "実績" and targets[-1].year == row.year:
+                continue
+            targets.append(row)
+    return targets
+
 def _build_kabutan_chain_row(metric_label: str, rows: list[KabutanForecastRow], attr: str) -> str:
     parts: list[str] = []
     for row in rows:
@@ -119,9 +134,10 @@ def build_kabutan_forecast_output(
 
     growth_lines: list[str] = []
     if rows:
+        growth_rows = fetch_growth_target_rows(rows)
         growth_lines.append("　　　　　　前年度営業利益成長率(%)")
-        for index, row in enumerate(rows):
-            previous_row = rows[index - 1] if index > 0 else None
+        for index, row in enumerate(growth_rows):
+            previous_row = growth_rows[index - 1] if index > 0 else None
             growth_rate = calc_operating_growth_rate(
                 previous_row.operating_profit if previous_row else None,
                 row.operating_profit,
