@@ -17,24 +17,19 @@ class FundamentalGuiController:
     def __init__(
         self,
         file_cache: FileCache | None = None,
-        build_fundamental_service: Callable[[str, FileCache], FundamentalAnalysisService] | None = None,
+        build_fundamental_service: Callable[[FileCache], FundamentalAnalysisService] | None = None,
     ):
         self.file_cache = file_cache or FileCache()
         self.build_fundamental_service = build_fundamental_service or (
-            lambda api_key, cache: FundamentalAnalysisService(api_key=api_key, file_cache=cache)
+            lambda cache: FundamentalAnalysisService(file_cache=cache)
         )
 
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
         return fetch_watchlist_entries(path)
 
-    def fetch_api_key(self, raw_api_key: str) -> str | None:
-        normalized_api_key = raw_api_key.strip()
-        return normalized_api_key or None
-
     def fetch_analysis_output(
         self,
         *,
-        api_key: str,
         name: str,
         code4: str,
         output_cache: dict[str, str],
@@ -45,7 +40,7 @@ class FundamentalGuiController:
         if cached_output is not None:
             return cached_output
 
-        service = self.build_fundamental_service(api_key, self.file_cache)
+        service = self.build_fundamental_service(self.file_cache)
         output = service.build_analysis_output(
             name,
             code4,

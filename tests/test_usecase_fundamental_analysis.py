@@ -91,7 +91,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         market = FakeMarketProvider()
         cache = InMemoryCache()
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=cache,
             client=client,
             fetch_market_snapshot=market,
@@ -126,7 +125,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
 
         market = EmptyPriceProvider()
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=cache,
             client=client,
             fetch_market_snapshot=market,
@@ -145,7 +143,6 @@ class TestFundamentalAnalysisService(unittest.TestCase):
                 self.repository = object()
 
         service = FundamentalAnalysisService(
-            api_key="dummy",
             file_cache=InMemoryCache(),
             client=FakeClient(),
             fetch_market_snapshot=FakeMarketProvider(),

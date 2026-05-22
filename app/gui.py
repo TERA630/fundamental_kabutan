@@ -116,7 +116,6 @@ class FundamentalApp:
     def _fetch_worker(self, name: str, code4: str, cache_key: str):
         try:
             output = self.controller.fetch_analysis_output(
-                api_key="",
                 name=name,
                 code4=code4,
                 output_cache=self.state.output_cache,
