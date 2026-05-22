@@ -97,6 +97,7 @@ def build_kabutan_forecast_output(
             for row in (
                 kabutan_forecast_pair.previous2_actual,
                 kabutan_forecast_pair.previous_actual,
+                kabutan_forecast_pair.current_actual,
                 kabutan_forecast_pair.current_forecast,
                 kabutan_forecast_pair.next_forecast,
             )
@@ -108,6 +109,7 @@ def build_kabutan_forecast_output(
         [_build_kabutan_row_line(row) for row in rows]
         if rows
         else [
+            _build_kabutan_na_row_line("実績(N/A)"),
             _build_kabutan_na_row_line("実績(N/A)"),
             _build_kabutan_na_row_line("実績(N/A)"),
             _build_kabutan_na_row_line("今期予想(N/A)"),

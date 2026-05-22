@@ -200,9 +200,12 @@ def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years:
         raise ValueError("予想行が見つかりません")
 
     current_forecast = rows[forecast_idx]
-    previous2_actual = rows[forecast_idx - 2] if forecast_idx > 1 and rows[forecast_idx - 2].section == "実績" else None
-    previous_actual = rows[forecast_idx - 1] if forecast_idx > 0 else None
     next_forecast = rows[forecast_idx + 1] if len(rows) > forecast_idx + 1 and rows[forecast_idx + 1].section == "予想" else None
+    current_actual = next((row for row in rows if row.section == "実績" and row.year == current_forecast.year), None)
+    anchor_year = current_actual.year if current_actual is not None else current_forecast.year
+    prior_actuals = sorted([row for row in rows if row.section == "実績" and row.year < anchor_year], key=lambda x: x.year)
+    previous_actual = prior_actuals[-1] if prior_actuals else None
+    previous2_actual = prior_actuals[-2] if len(prior_actuals) >= 2 else None
 
     if target_years is not None:
         year_set = set(target_years)
@@ -214,6 +217,7 @@ def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years:
     return KabutanForecastPair(
         previous2_actual=previous2_actual,
         previous_actual=previous_actual,
+        current_actual=current_actual,
         current_forecast=current_forecast,
         next_forecast=next_forecast,
     )
@@ -258,7 +262,7 @@ class KabutanForecastRepository:
     @staticmethod
     def get_kabutan_cache_payload(pair: KabutanForecastPair) -> dict[str, object]:
         rows = []
-        for row in (pair.previous2_actual, pair.previous_actual, pair.current_forecast, pair.next_forecast):
+        for row in (pair.previous2_actual, pair.previous_actual, pair.current_actual, pair.current_forecast, pair.next_forecast):
             if row is None:
                 continue
             rows.append(build_kabutan_cache_row(row))

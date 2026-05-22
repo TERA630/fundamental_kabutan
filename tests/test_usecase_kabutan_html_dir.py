@@ -76,6 +76,7 @@ def _build_pair() -> KabutanForecastPair:
     return KabutanForecastPair(
         previous2_actual=None,
         previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80),
+        current_actual=None,
         current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110),
         next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1350, 150, 140, 120),
     )

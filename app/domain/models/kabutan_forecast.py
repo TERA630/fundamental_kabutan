@@ -29,6 +29,7 @@ class KabutanForecastSnapshot:
 class KabutanForecastPair:
     previous2_actual: KabutanForecastRow | None
     previous_actual: KabutanForecastRow | None
+    current_actual: KabutanForecastRow | None
     current_forecast: KabutanForecastRow
     next_forecast: KabutanForecastRow | None
 
