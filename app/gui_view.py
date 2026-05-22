@@ -12,14 +12,12 @@ class FundamentalView:
     def __init__(
         self,
         master: tk.Tk,
-        api_key_var: tk.StringVar,
         path_var: tk.StringVar,
         stock_var: tk.StringVar,
         status_var: tk.StringVar,
         kabutan_dir_var: tk.StringVar,
     ):
         self.master = master
-        self.api_key_var = api_key_var
         self.path_var = path_var
         self.stock_var = stock_var
         self.status_var = status_var
@@ -28,13 +26,6 @@ class FundamentalView:
     def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir) -> None:
         root = ttk.Frame(self.master, padding=10)
         root.pack(fill="both", expand=True)
-
-        api_frame = ttk.Frame(root)
-        api_frame.pack(fill="x", pady=(0, 8))
-        ttk.Label(api_frame, text="J-Quants APIキー").pack(side="left")
-        self.api_entry = ttk.Entry(api_frame, textvariable=self.api_key_var, show="*", width=56)
-        self.api_entry.pack(side="left", padx=(8, 8))
-        ttk.Label(api_frame, text="環境変数 JQUANTS_API_KEY も可").pack(side="left")
 
         top = ttk.Frame(root)
         top.pack(fill="x", pady=(0, 8))
@@ -83,7 +74,6 @@ class FundamentalView:
         self.fetch_button.configure(state=state)
         self.copy_button.configure(state=state)
         self.save_button.configure(state=state)
-        self.api_entry.configure(state=state)
         self.stock_combo.configure(state=readonly_state)
         if status is not None:
             self.status_var.set(status)
