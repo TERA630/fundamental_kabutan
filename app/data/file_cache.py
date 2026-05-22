@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-CACHE_DIR_NAME = ".jquants_cache"
+CACHE_DIR_NAME = ".fundamental_cache"
 
 
 class FileCache:
