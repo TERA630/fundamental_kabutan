@@ -92,17 +92,20 @@ def build_kabutan_forecast_output(
 ) -> str:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
-        rows = [
-            row
-            for row in (
-                kabutan_forecast_pair.previous2_actual,
-                kabutan_forecast_pair.previous_actual,
-                kabutan_forecast_pair.current_actual,
-                kabutan_forecast_pair.current_forecast,
-                kabutan_forecast_pair.next_forecast,
-            )
-            if row is not None
-        ]
+        if kabutan_forecast_pair.all_rows:
+            rows = list(kabutan_forecast_pair.all_rows)
+        else:
+            rows = [
+                row
+                for row in (
+                    kabutan_forecast_pair.previous2_actual,
+                    kabutan_forecast_pair.previous_actual,
+                    kabutan_forecast_pair.current_actual,
+                    kabutan_forecast_pair.current_forecast,
+                    kabutan_forecast_pair.next_forecast,
+                )
+                if row is not None
+            ]
 
     header = "　　　　　　売上　営業益(営業利益率)　経常益(経常利益率)　最終益　1株益　1株配当"
     row_lines = (

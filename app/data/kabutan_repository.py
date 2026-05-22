@@ -56,15 +56,15 @@ def _clean_cell_text(text: str) -> str:
     return re.sub(r"\s+", " ", unescape(text_no_tags)).strip()
 
 
-def _fetch_kabutan_table_html(html: str) -> str:
-    table_match = re.search(
+def fetch_kabutan_table_html_blocks(html: str) -> list[str]:
+    table_blocks = re.findall(
         r'<div[^>]*class="[^"]*fin_year_result_d[^"]*"[^>]*>[\s\S]*?<table[^>]*>([\s\S]*?)</table>',
         html,
         flags=re.DOTALL,
     )
-    if table_match is None:
+    if not table_blocks:
         raise ValueError("通期・業績推移テーブルが見つかりません")
-    return table_match.group(1)
+    return table_blocks
 
 
 def _get_kabutan_header_index(header_cells: list[str], metric_key: str) -> int | None:
@@ -150,22 +150,22 @@ def fetch_kabutan_forecast_rows_from_cache_payload(cached_payload: dict[str, obj
 
 
 def _parse_kabutan_forecast_rows(html: str) -> list[KabutanForecastRow]:
-    block = _fetch_kabutan_table_html(html)
     rows: list[KabutanForecastRow] = []
-    header_cells: list[str] = []
-    header_indices = {"revised_eps": None, "dividend": None}
-    for row_html in re.findall(r"<tr[^>]*>(.*?)</tr>", block, flags=re.DOTALL):
-        cells = re.findall(r"<(?:th|td)[^>]*>(.*?)</(?:th|td)>", row_html, flags=re.DOTALL)
-        if len(cells) < 5:
-            continue
-        cleaned_cells = [_clean_cell_text(cell) for cell in cells]
-        if "売上高" in "".join(cleaned_cells):
-            header_cells = cleaned_cells
-            header_indices = fetch_kabutan_header_indices(header_cells)
-            continue
-        row = build_kabutan_forecast_row_from_cells(cleaned_cells, header_indices)
-        if row is not None:
-            rows.append(row)
+    for block in fetch_kabutan_table_html_blocks(html):
+        header_cells: list[str] = []
+        header_indices = {"revised_eps": None, "dividend": None}
+        for row_html in re.findall(r"<tr[^>]*>(.*?)</tr>", block, flags=re.DOTALL):
+            cells = re.findall(r"<(?:th|td)[^>]*>(.*?)</(?:th|td)>", row_html, flags=re.DOTALL)
+            if len(cells) < 5:
+                continue
+            cleaned_cells = [_clean_cell_text(cell) for cell in cells]
+            if "売上高" in "".join(cleaned_cells):
+                header_cells = cleaned_cells
+                header_indices = fetch_kabutan_header_indices(header_cells)
+                continue
+            row = build_kabutan_forecast_row_from_cells(cleaned_cells, header_indices)
+            if row is not None:
+                rows.append(row)
     return rows
 
 
@@ -220,6 +220,7 @@ def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years:
         current_actual=current_actual,
         current_forecast=current_forecast,
         next_forecast=next_forecast,
+        all_rows=tuple(rows),
     )
 
 
@@ -262,7 +263,14 @@ class KabutanForecastRepository:
     @staticmethod
     def get_kabutan_cache_payload(pair: KabutanForecastPair) -> dict[str, object]:
         rows = []
-        for row in (pair.previous2_actual, pair.previous_actual, pair.current_actual, pair.current_forecast, pair.next_forecast):
+        source_rows = pair.all_rows if pair.all_rows else (
+            pair.previous2_actual,
+            pair.previous_actual,
+            pair.current_actual,
+            pair.current_forecast,
+            pair.next_forecast,
+        )
+        for row in source_rows:
             if row is None:
                 continue
             rows.append(build_kabutan_cache_row(row))
