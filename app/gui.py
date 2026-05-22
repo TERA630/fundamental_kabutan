@@ -27,7 +27,7 @@ class FundamentalApp:
         self.path_var = tk.StringVar(value="監視銘柄ファイル未選択")
         self.kabutan_dir_var = tk.StringVar(value="株探HTMLフォルダ未選択")
         self.stock_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="監視銘柄ファイルを読み込んでください。")
+        self.status_var = tk.StringVar(value=GuiViewModel.build_initial_status())
 
         self.view_model = GuiViewModel()
         self.view = FundamentalView(
@@ -76,7 +76,7 @@ class FundamentalApp:
         self.state.kabutan_html_dir = Path(path)
         self.state.output_cache.clear()
         self.kabutan_dir_var.set(str(self.state.kabutan_html_dir))
-        self.status_var.set("株探HTMLフォルダを設定しました（出力キャッシュをクリア）。")
+        self.status_var.set(self.view_model.build_kabutan_dir_selected_status())
 
     def _populate_stock_choices(self) -> None:
         values, mapping = build_stock_choices(self.state.watchlist)
@@ -89,7 +89,7 @@ class FundamentalApp:
         else:
             self.stock_var.set("")
             self.view.clear_text()
-            self.status_var.set("銘柄が見つかりませんでした。")
+            self.status_var.set(self.view_model.build_no_stock_found_status())
 
     def on_stock_selected(self, _event=None):
         self.status_var.set(self.view_model.build_selected_status())
@@ -110,7 +110,7 @@ class FundamentalApp:
         self.set_busy(False, status)
 
     def _handle_fetch_error(self, message: str):
-        self.set_busy(False, "取得に失敗しました。")
+        self.set_busy(False, self.view_model.build_fetch_failed_status())
         messagebox.showerror("取得失敗", message)
 
     def _fetch_worker(self, name: str, code4: str, cache_key: str):
@@ -175,7 +175,7 @@ class FundamentalApp:
             Path(path).write_text(content + "\n", encoding="utf-8")
         except OSError as exc:
             messagebox.showerror("保存失敗", f"ファイルを書き込めませんでした: {exc}")
-            self.status_var.set("保存に失敗しました。")
+            self.status_var.set(self.view_model.build_save_failed_status())
             return
         self.status_var.set(self.view_model.build_saved_status(path))
 
