@@ -75,21 +75,6 @@ def fetch_growth_target_rows(rows: list[KabutanForecastRow]) -> list[KabutanFore
             targets.append(row)
     return targets
 
-def _build_kabutan_chain_row(metric_label: str, rows: list[KabutanForecastRow], attr: str) -> str:
-    parts: list[str] = []
-    for row in rows:
-        value = getattr(row, attr)
-        if attr in {"revised_eps", "dividend"}:
-            metric_text = "N/A" if value is None else f"{value:,.1f}"
-            suffix = "円"
-        else:
-            metric_text = _fmt_oku(value)
-            suffix = ""
-        year_label = f"予想 {row.year}" if row.section == "予想" else f"実績 {row.year}"
-        parts.append(f"{year_label} {metric_text}{suffix}[KBT]")
-    return f"{metric_label}：" + " -> ".join(parts)
-
-
 def _build_kabutan_na_row_line(label: str) -> str:
     return f"{label:<10}{'N/A':>10}{'N/A':>20}{'N/A':>20}{'N/A':>10}{'N/A':>10}{'N/A':>10}"
 
@@ -145,20 +130,8 @@ def build_kabutan_forecast_output(
             year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
             growth_lines.append(f"{year_label:<10}{_fmt_percent(growth_rate):>10}")
 
-    chain_lines: list[str] = []
-    if rows:
-        chain_lines = [
-            "",
-            "■予想チェーン（通期） [ソース: 株探]",
-            _build_kabutan_chain_row("売上", rows, "sales"),
-            _build_kabutan_chain_row("営業益", rows, "operating_profit"),
-            _build_kabutan_chain_row("最終益", rows, "final_profit"),
-            _build_kabutan_chain_row("修正1株益", rows, "revised_eps"),
-            _build_kabutan_chain_row("配当", rows, "dividend"),
-        ]
-
     section = "\n".join(
-        ["", "■株探 業績推移（通期）", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *chain_lines]
+        ["", "■株探 業績推移（通期）", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines]
     )
     return f"{base_output}\n{section}"
 
