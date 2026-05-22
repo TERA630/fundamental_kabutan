@@ -101,7 +101,6 @@ class FundamentalAnalysisService:
         kabutan_html_dir: Path | None = None,
     ) -> str:
         master: dict[str, Any] | None = None
-        summary_rows: list[dict[str, Any]] = []
         price_snapshot = self.fetch_price_snapshot(code4)
         kabutan_fetch_result = self.fetch_kabutan_forecast_pair(
             code4,
@@ -111,7 +110,6 @@ class FundamentalAnalysisService:
             "name": name,
             "code4": code4,
             "master": master,
-            "summary_rows": summary_rows,
             "price": price_snapshot.get("price"),
             "market_cap": price_snapshot.get("market_cap"),
             "market_snapshot": price_snapshot,
