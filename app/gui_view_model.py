@@ -19,6 +19,14 @@ class GuiViewModel:
         return "先に監視銘柄ファイルと銘柄を選んでください。"
 
     @staticmethod
+    def build_initial_status() -> str:
+        return "監視銘柄ファイルを読み込んでください。"
+
+    @staticmethod
+    def build_no_stock_found_status() -> str:
+        return "銘柄が見つかりませんでした。"
+
+    @staticmethod
     def build_missing_copy_content_status() -> str:
         return "コピーするテキストがありません。"
 
@@ -35,6 +43,10 @@ class GuiViewModel:
         return f"保存完了: {path}"
 
     @staticmethod
+    def build_save_failed_status() -> str:
+        return "保存に失敗しました。"
+
+    @staticmethod
     def build_fetching_status(name: str, code4: str) -> str:
         return f"取得中: {name} ({code4}) / 業績=株探(HTML優先) / 指標=yFinance"
 
@@ -45,6 +57,14 @@ class GuiViewModel:
     @staticmethod
     def build_cached_status(name: str, code4: str) -> str:
         return f"キャッシュ表示: {name} ({code4})"
+
+    @staticmethod
+    def build_fetch_failed_status() -> str:
+        return "取得に失敗しました。"
+
+    @staticmethod
+    def build_kabutan_dir_selected_status() -> str:
+        return "株探HTMLフォルダを設定しました（出力キャッシュをクリア）。"
 
 
 __all__ = ["GuiViewModel"]
