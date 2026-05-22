@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from app.data.api_key_provider import fetch_api_key_fallback
 from app.gui_controller import FundamentalGuiController
 from app.gui_state import GuiState, build_default_output_filename, build_output_cache_key, build_stock_choices, get_selected_stock
 from app.gui_view import FundamentalView
@@ -20,13 +18,12 @@ class FundamentalApp:
 
     def __init__(self, master: tk.Tk):
         self.master = master
-        self.master.title("J-Quants ファンダメンタル評価 v7（プレーンテキスト / 株価yFinance固定）")
+        self.master.title("ファンダメンタル評価 v8（株探/yFinanceベース）")
         self.master.geometry("1040x820")
 
         self.state = GuiState()
         self.controller = FundamentalGuiController()
 
-        self.api_key_var = tk.StringVar(value=os.environ.get("JQUANTS_API_KEY", ""))
         self.path_var = tk.StringVar(value="監視銘柄ファイル未選択")
         self.kabutan_dir_var = tk.StringVar(value="株探HTMLフォルダ未選択")
         self.stock_var = tk.StringVar()
@@ -35,7 +32,6 @@ class FundamentalApp:
         self.view_model = GuiViewModel()
         self.view = FundamentalView(
             self.master,
-            self.api_key_var,
             self.path_var,
             self.stock_var,
             self.status_var,
@@ -108,20 +104,6 @@ class FundamentalApp:
             return None
         return selected
 
-    def _require_api_key(self) -> str | None:
-        api_key = self.controller.fetch_api_key(self.api_key_var.get())
-        if api_key:
-            return api_key
-        fallback_api_key = self._fetch_api_key_fallback()
-        if fallback_api_key:
-            self.api_key_var.set(fallback_api_key)
-            return fallback_api_key
-        messagebox.showerror("APIキー未入力", "J-Quants APIキーを入力してください。")
-        return None
-
-    @staticmethod
-    def _fetch_api_key_fallback() -> str:
-        return fetch_api_key_fallback()
 
     def _render_output(self, output: str, status: str):
         self.view.render_output(output)
@@ -131,10 +113,9 @@ class FundamentalApp:
         self.set_busy(False, "取得に失敗しました。")
         messagebox.showerror("取得失敗", message)
 
-    def _fetch_worker(self, name: str, code4: str, api_key: str, cache_key: str):
+    def _fetch_worker(self, name: str, code4: str, cache_key: str):
         try:
             output = self.controller.fetch_analysis_output(
-                api_key=api_key,
                 name=name,
                 code4=code4,
                 output_cache=self.state.output_cache,
@@ -153,10 +134,6 @@ class FundamentalApp:
         if selected is None:
             return
 
-        api_key = self._require_api_key()
-        if api_key is None:
-            return
-
         name, code4 = selected
         cache_key = build_output_cache_key(code4, self.state.kabutan_html_dir)
         cached_output = self.state.output_cache.get(cache_key)
@@ -165,7 +142,7 @@ class FundamentalApp:
             return
 
         self.set_busy(True, self.view_model.build_fetching_status(name, code4))
-        thread = threading.Thread(target=self._fetch_worker, args=(name, code4, api_key, cache_key), daemon=True)
+        thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
         thread.start()
 
     def copy_text(self):
