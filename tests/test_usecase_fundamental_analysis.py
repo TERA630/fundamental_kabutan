@@ -136,6 +136,9 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
         self.assertEqual(snap1, expected)
         self.assertEqual(snap2, expected)
+        expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
+        self.assertEqual(snap1, expected)
+        self.assertEqual(snap2, expected)
         self.assertEqual(market.calls, 2)
 
     def test_fetch_kabutan_forecast_pair_returns_none_when_html_dir_is_none(self):
