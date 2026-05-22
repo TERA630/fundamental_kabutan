@@ -24,11 +24,8 @@ class JQuantsClientPort(Protocol):
 
 
 class MarketDataProviderPort(Protocol):
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
     def __call__(self, code4: str) -> dict[str, float | str | None]: ...
-=======
-    def __call__(self, code4: str) -> dict[str, float | None]: ...
->>>>>>> main
+
 
 
 class NullJQuantsClient:
@@ -38,6 +35,19 @@ class NullJQuantsClient:
     def get_summary(self, code: str) -> list[dict[str, Any]]:
         return []
 
+
+
+
+def build_empty_market_snapshot() -> dict[str, float | str | None]:
+    return {
+        "price": None,
+        "market_cap": None,
+        "per": None,
+        "pbr": None,
+        "industry": None,
+        "div_yield": None,
+        "payout_ratio": None,
+    }
 
 class KabutanForecastRepositoryPort(Protocol):
     def fetch_kabutan_forecast_pair(
@@ -95,25 +105,19 @@ class FundamentalAnalysisService:
         )
         return rows if isinstance(rows, list) else []
 
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
     def fetch_price_snapshot(self, code4: str) -> dict[str, float | str | None]:
-=======
-    def fetch_price_snapshot(self, code4: str) -> dict[str, float | None]:
->>>>>>> main
+
         cache_key = self.build_cache_key_price_snapshot(code4)
         cached = self.cache.get(cache_key, CACHE_TTL_YF_SEC)
         if isinstance(cached, dict):
             return {
                 "price": cached.get("price"),
                 "market_cap": cached.get("market_cap"),
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
                 "per": cached.get("per"),
                 "pbr": cached.get("pbr"),
                 "industry": cached.get("industry"),
                 "div_yield": cached.get("div_yield"),
                 "payout_ratio": cached.get("payout_ratio"),
-=======
->>>>>>> main
             }
 
         snapshot = self.fetch_market_snapshot(code4)
@@ -122,18 +126,13 @@ class FundamentalAnalysisService:
             return {
                 "price": snapshot.get("price"),
                 "market_cap": snapshot.get("market_cap"),
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
                 "per": snapshot.get("per"),
                 "pbr": snapshot.get("pbr"),
                 "industry": snapshot.get("industry"),
                 "div_yield": snapshot.get("div_yield"),
                 "payout_ratio": snapshot.get("payout_ratio"),
             }
-        return {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
-=======
-            }
-        return {"price": None, "market_cap": None}
->>>>>>> main
+        return build_empty_market_snapshot()
 
     def build_analysis_output(
         self,
@@ -156,10 +155,8 @@ class FundamentalAnalysisService:
             summary_rows=summary_rows,
             price=price_snapshot.get("price"),
             market_cap=price_snapshot.get("market_cap"),
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
             market_snapshot=price_snapshot,
-=======
->>>>>>> main
+            market_snapshot=price_snapshot,
             kabutan_forecast_pair=kabutan_fetch_result.pair,
             kabutan_source=kabutan_fetch_result.source,
             kabutan_source_message=kabutan_fetch_result.message,

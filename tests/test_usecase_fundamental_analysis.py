@@ -133,14 +133,12 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         snap1 = service.fetch_price_snapshot("5803")
         snap2 = service.fetch_price_snapshot("5803")
 
-<<<<<<< k3epe1-codex/remove-jquant-dependencies-from-gui
         expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
         self.assertEqual(snap1, expected)
         self.assertEqual(snap2, expected)
-=======
-        self.assertEqual(snap1, {"price": None, "market_cap": None})
-        self.assertEqual(snap2, {"price": None, "market_cap": None})
->>>>>>> main
+        expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
+        self.assertEqual(snap1, expected)
+        self.assertEqual(snap2, expected)
         self.assertEqual(market.calls, 2)
 
     def test_fetch_kabutan_forecast_pair_returns_none_when_html_dir_is_none(self):
