@@ -127,3 +127,19 @@ def test_fetch_kabutan_header_indices_builds_index_map():
     indices = fetch_kabutan_header_indices(headers)
     assert indices["revised_eps"] == 5
     assert indices["dividend"] == 6
+
+
+def test_parse_kabutan_forecast_rows_collects_all_rows_from_multiple_fin_year_tables():
+    html = """
+    <div class="fin_year_result_d"><table><tbody>
+      <tr><th>2023.03</th><td>900</td><td>80</td><td>70</td><td>60</td></tr>
+      <tr><th>2024.03</th><td>1000</td><td>100</td><td>90</td><td>80</td></tr>
+    </tbody></table></div>
+    <div class="fin_year_result_d"><table><tbody>
+      <tr><th>2025.03</th><td>1100</td><td>110</td><td>100</td><td>90</td></tr>
+      <tr><th>2026.03</th><td>1200</td><td>120</td><td>110</td><td>100</td></tr>
+      <tr><th>2027.03予</th><td>1300</td><td>130</td><td>120</td><td>110</td></tr>
+    </tbody></table></div>
+    """
+    rows = _parse_kabutan_forecast_rows(html)
+    assert [row.year for row in rows] == [2023, 2024, 2025, 2026, 2027]

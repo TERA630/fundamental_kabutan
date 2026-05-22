@@ -32,6 +32,7 @@ class KabutanForecastPair:
     current_actual: KabutanForecastRow | None
     current_forecast: KabutanForecastRow
     next_forecast: KabutanForecastRow | None
+    all_rows: tuple[KabutanForecastRow, ...] = ()
 
 
 __all__ = ["KabutanForecastRow", "KabutanForecastPair", "KabutanForecastSnapshot"]

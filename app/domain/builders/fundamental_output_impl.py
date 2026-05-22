@@ -57,12 +57,11 @@ def _build_market_cap_rank(v: float | None) -> str:
 
 
 
-def build_indicator_lines(*, price: float | None, market_cap: float | None, industry: str, per: float | None, pbr: float | None, div_yield: float | None, payout_ratio: float | None) -> list[str]:
+def build_indicator_lines(*, price: float | None, market_cap: float | None, industry: str, per: float | None, pbr: float | None) -> list[str]:
     return [
         "■指標",
         f"株価：{_fmt_num(price,0)}円 / PER：{_fmt_num(per)} / PBR：{_fmt_num(pbr)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
-        f"配当利回り：{_fmt_plain_pct(div_yield)}(配当性向 {_fmt_plain_pct(payout_ratio)})",
     ]
 
 def _build_periods(summary_rows: list[dict[str, Any]]):
@@ -82,8 +81,6 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
             industry=industry_name,
             per=(market_snapshot or {}).get("per"),
             pbr=(market_snapshot or {}).get("pbr"),
-            div_yield=(market_snapshot or {}).get("div_yield"),
-            payout_ratio=(market_snapshot or {}).get("payout_ratio"),
         )
         return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
 
@@ -96,8 +93,6 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         industry=industry_name,
         per=(market_snapshot or {}).get("per") or metrics.get("per"),
         pbr=(market_snapshot or {}).get("pbr") or metrics.get("pbr"),
-        div_yield=(market_snapshot or {}).get("div_yield") or metrics.get("div_yield"),
-        payout_ratio=(market_snapshot or {}).get("payout_ratio") or metrics.get("payout"),
     )
 
     lines = [
