@@ -9,30 +9,14 @@ import re
 
 from app.data.file_cache import FileCache
 from app.data.market_data_provider import fetch_yfinance_snapshot
-from app.data.utils import normalize_code
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
-CACHE_TTL_MASTER_SEC = 30 * 24 * 60 * 60
-CACHE_TTL_SUMMARY_SEC = 24 * 60 * 60
 CACHE_TTL_YF_SEC = 12 * 60 * 60
-
-
-class JQuantsClientPort(Protocol):
-    def get_master(self, code: str) -> dict[str, Any] | None: ...
-    def get_summary(self, code: str) -> list[dict[str, Any]]: ...
 
 
 class MarketDataProviderPort(Protocol):
     def __call__(self, code4: str) -> dict[str, float | str | None]: ...
-
-
-class NullJQuantsClient:
-    def get_master(self, code: str) -> dict[str, Any] | None:
-        return None
-
-    def get_summary(self, code: str) -> list[dict[str, Any]]:
-        return []
 
 
 
@@ -71,38 +55,15 @@ class FundamentalAnalysisService:
     def __init__(
         self,
         file_cache: FileCache | None = None,
-        client: JQuantsClientPort | None = None,
         fetch_market_snapshot: MarketDataProviderPort | None = None,
         fetch_kabutan_forecast_usecase: FetchKabutanForecastUseCase | None = None,
     ):
-        self.client = client or NullJQuantsClient()
         self.cache = file_cache or FileCache()
         self.fetch_market_snapshot = fetch_market_snapshot or fetch_yfinance_snapshot
         self.fetch_kabutan_forecast_usecase = fetch_kabutan_forecast_usecase
 
-    def build_cache_key_master(self, code4: str) -> str:
-        return f"master_{normalize_code(code4)}"
-
-    def build_cache_key_summary(self, code4: str) -> str:
-        return f"summary_{normalize_code(code4)}"
-
     def build_cache_key_price_snapshot(self, code4: str) -> str:
         return f"yf_{code4}"
-
-    def fetch_master(self, code4: str) -> dict[str, Any] | None:
-        return self.cache.get_or_fetch(
-            self.build_cache_key_master(code4),
-            CACHE_TTL_MASTER_SEC,
-            lambda: self.client.get_master(code4),
-        )
-
-    def fetch_summary_rows(self, code4: str) -> list[dict[str, Any]]:
-        rows = self.cache.get_or_fetch(
-            self.build_cache_key_summary(code4),
-            CACHE_TTL_SUMMARY_SEC,
-            lambda: self.client.get_summary(code4),
-        )
-        return rows if isinstance(rows, list) else []
 
     def fetch_price_snapshot(self, code4: str) -> dict[str, float | str | None]:
         cache_key = self.build_cache_key_price_snapshot(code4)
@@ -139,8 +100,8 @@ class FundamentalAnalysisService:
         build_output_fn: Callable[..., str],
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        master = self.fetch_master(code4)
-        summary_rows = self.fetch_summary_rows(code4)
+        master: dict[str, Any] | None = None
+        summary_rows: list[dict[str, Any]] = []
         price_snapshot = self.fetch_price_snapshot(code4)
         kabutan_fetch_result = self.fetch_kabutan_forecast_pair(
             code4,
