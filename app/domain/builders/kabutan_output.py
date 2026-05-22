@@ -11,14 +11,52 @@ def _fmt_oku(value: int | None) -> str:
     return f"{value / 100:,.1f}億"
 
 
+def _fmt_yen(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,.1f}円"
+
+
+def _fmt_percent(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.1f}%"
+
+
+def calc_operating_margin(sales: int | None, operating_profit: int | None) -> float | None:
+    if sales is None or operating_profit is None or sales == 0:
+        return None
+    return (operating_profit / sales) * 100
+
+
+def calc_ordinary_margin(sales: int | None, ordinary_profit: int | None) -> float | None:
+    if sales is None or ordinary_profit is None or sales == 0:
+        return None
+    return (ordinary_profit / sales) * 100
+
+
+def calc_operating_growth_rate(previous_operating_profit: int | None, current_operating_profit: int | None) -> float | None:
+    if previous_operating_profit is None or current_operating_profit is None or previous_operating_profit == 0:
+        return None
+    return ((current_operating_profit - previous_operating_profit) / previous_operating_profit) * 100
+
+
+def build_profit_with_margin_text(profit: int | None, margin: float | None) -> str:
+    return f"{_fmt_oku(profit)}({_fmt_percent(margin)})"
+
+
 def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
     year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+    operating_margin = calc_operating_margin(row.sales, row.operating_profit)
+    ordinary_margin = calc_ordinary_margin(row.sales, row.ordinary_profit)
     return (
         f"{year_label:<10}"
         f"{_fmt_oku(row.sales):>10}"
-        f"{_fmt_oku(row.operating_profit):>10}"
-        f"{_fmt_oku(row.ordinary_profit):>10}"
+        f"{build_profit_with_margin_text(row.operating_profit, operating_margin):>20}"
+        f"{build_profit_with_margin_text(row.ordinary_profit, ordinary_margin):>20}"
         f"{_fmt_oku(row.final_profit):>10}"
+        f"{_fmt_yen(row.revised_eps):>10}"
+        f"{_fmt_yen(row.dividend):>10}"
     )
 
 
@@ -38,7 +76,7 @@ def _build_kabutan_chain_row(metric_label: str, rows: list[KabutanForecastRow], 
 
 
 def _build_kabutan_na_row_line(label: str) -> str:
-    return f"{label:<10}{'N/A':>10}{'N/A':>10}{'N/A':>10}{'N/A':>10}"
+    return f"{label:<10}{'N/A':>10}{'N/A':>20}{'N/A':>20}{'N/A':>10}{'N/A':>10}{'N/A':>10}"
 
 
 def _build_kabutan_source_label(source: str, message: str | None) -> str:
@@ -57,22 +95,38 @@ def build_kabutan_forecast_output(
         rows = [
             row
             for row in (
+                kabutan_forecast_pair.previous2_actual,
                 kabutan_forecast_pair.previous_actual,
                 kabutan_forecast_pair.current_forecast,
                 kabutan_forecast_pair.next_forecast,
             )
             if row is not None
         ]
-    header = "　　　　　　売上高　　営業利益　　経常利益　　最終利益"
+
+    header = "　　　　　　売上　営業益(営業利益率)　経常益(経常利益率)　最終益　1株益　1株配当"
     row_lines = (
         [_build_kabutan_row_line(row) for row in rows]
         if rows
         else [
             _build_kabutan_na_row_line("実績(N/A)"),
+            _build_kabutan_na_row_line("実績(N/A)"),
             _build_kabutan_na_row_line("今期予想(N/A)"),
             _build_kabutan_na_row_line("来期予想(N/A)"),
         ]
     )
+
+    growth_lines: list[str] = []
+    if rows:
+        growth_lines.append("　　　　　　前年度営業利益成長率(%)")
+        for index, row in enumerate(rows):
+            previous_row = rows[index - 1] if index > 0 else None
+            growth_rate = calc_operating_growth_rate(
+                previous_row.operating_profit if previous_row else None,
+                row.operating_profit,
+            )
+            year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+            growth_lines.append(f"{year_label:<10}{_fmt_percent(growth_rate):>10}")
+
     chain_lines: list[str] = []
     if rows:
         chain_lines = [
@@ -86,7 +140,7 @@ def build_kabutan_forecast_output(
         ]
 
     section = "\n".join(
-        ["", "■株探 業績推移（通期）", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *chain_lines]
+        ["", "■株探 業績推移（通期）", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *chain_lines]
     )
     return f"{base_output}\n{section}"
 
