@@ -5,6 +5,7 @@ __pycache__/
 
 # File cache
 .fundamental_cache/
+.jquants_cache/
 # C extensions
 *.so
 
