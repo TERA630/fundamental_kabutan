@@ -107,9 +107,21 @@
   3. `PER：202x年実績 xx.x倍／202x年末予想 xx.x倍／202x年来期予想 xx.x倍`
   4. `配当利回り：202x年実績 x.xx%／202x年末予想 x.xx%／202x年来季予想 x.xx%`
 - PERおよび配当利回りは、株探の行データに含まれる「修正1株益」「修正1株配当」を基準に算出する。
+  - GUI表示に使用する値は、株探HTML解析結果を保持した `market_snapshot` から取得する。
+  - `market_snapshot` の想定キー:
+    - `per`（実績）
+    - `per_current_forecast`（今期末予想）
+    - `per_next_forecast`（来期予想）
+    - `div_yield`（実績）
+    - `div_yield_current_forecast`（今期末予想）
+    - `div_yield_next_forecast`（来期予想）
   - `PER = 株価 / 修正1株益`
   - `配当利回り(%) = 修正1株配当 / 株価 * 100`
 - 年ラベルは `base_year` を実績年として、`base_year + 1` を今期末予想、`base_year + 2` を来期予想とする。
+
+### 5.8 summary_rows 非依存方針（改訂）
+- 指標ブロック（PER/配当利回り）およびGUI表示文言の算出に `summary_rows` は使用しない。
+- これらの表示は `market_snapshot` と株探セクション行データを表示用に整形したドメイン出力に依存する。
 
 ## 6. 株探データ探索仕様（表示に影響する条件）
 - HTMLフォルダ未設定: `取得不可 (HTMLフォルダ未設定)`
