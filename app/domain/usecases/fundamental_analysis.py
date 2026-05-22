@@ -27,7 +27,6 @@ class MarketDataProviderPort(Protocol):
     def __call__(self, code4: str) -> dict[str, float | str | None]: ...
 
 
-
 class NullJQuantsClient:
     def get_master(self, code: str) -> dict[str, Any] | None:
         return None
@@ -106,7 +105,6 @@ class FundamentalAnalysisService:
         return rows if isinstance(rows, list) else []
 
     def fetch_price_snapshot(self, code4: str) -> dict[str, float | str | None]:
-
         cache_key = self.build_cache_key_price_snapshot(code4)
         cached = self.cache.get(cache_key, CACHE_TTL_YF_SEC)
         if isinstance(cached, dict):
@@ -148,19 +146,19 @@ class FundamentalAnalysisService:
             code4,
             html_dir=kabutan_html_dir,
         )
-        return build_output_fn(
-            name=name,
-            code4=code4,
-            master=master,
-            summary_rows=summary_rows,
-            price=price_snapshot.get("price"),
-            market_cap=price_snapshot.get("market_cap"),
-            market_snapshot=price_snapshot,
-            market_snapshot=price_snapshot,
-            kabutan_forecast_pair=kabutan_fetch_result.pair,
-            kabutan_source=kabutan_fetch_result.source,
-            kabutan_source_message=kabutan_fetch_result.message,
-        )
+        output_context = {
+            "name": name,
+            "code4": code4,
+            "master": master,
+            "summary_rows": summary_rows,
+            "price": price_snapshot.get("price"),
+            "market_cap": price_snapshot.get("market_cap"),
+            "market_snapshot": price_snapshot,
+            "kabutan_forecast_pair": kabutan_fetch_result.pair,
+            "kabutan_source": kabutan_fetch_result.source,
+            "kabutan_source_message": kabutan_fetch_result.message,
+        }
+        return build_output_fn(**output_context)
 
     def fetch_kabutan_forecast_pair(
         self,
