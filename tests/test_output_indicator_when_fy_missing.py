@@ -2,7 +2,7 @@ from app.domain.builders.fundamental_output import build_fundamental_output_text
 
 def test_build_output_shows_indicator_when_fy_missing():
     text = build_fundamental_output_text(
-        name='住友', code4='5802', master=None, summary_rows=[], price=4850.0, market_cap=8_029_950_000_000.0,
+        name='住友', code4='5802', master=None, price=4850.0, market_cap=8_029_950_000_000.0,
         market_snapshot={
             'price':4850.0,'market_cap':8_029_950_000_000.0,'per':14.68,'pbr':3.28,'industry':'非鉄金属','div_yield':2.06,'payout_ratio':30.30
         }

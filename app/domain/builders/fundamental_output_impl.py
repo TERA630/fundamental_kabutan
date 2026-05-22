@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 
+
 def _first_present(data: dict[str, Any] | None, keys: list[str]) -> Any:
     if not data:
         return None
@@ -67,7 +68,8 @@ def build_indicator_lines(
         f"配当利回り：{base_year}年実績 {_fmt_plain_pct(div_actual)}／{base_year + 1}年末予想 {_fmt_plain_pct(div_current_forecast)}／{base_year + 2}年来季予想 {_fmt_plain_pct(div_next_forecast)}",
     ]
 
-def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, summary_rows: list[dict[str, Any]], price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None) -> str:
+
+def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None) -> str:
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
