@@ -36,11 +36,11 @@ class GuiViewModel:
 
     @staticmethod
     def build_fetching_status(name: str, code4: str) -> str:
-        return f"取得中: {name} ({code4}) / 財務=J-Quants / 株価=yFinance"
+        return f"取得中: {name} ({code4}) / 業績=株探(HTML優先) / 財務補完=J-Quants / 株価=yFinance"
 
     @staticmethod
     def build_generated_status(name: str, code4: str) -> str:
-        return f"生成完了: {name} ({code4}) / 財務=J-Quants / 株価=yFinance"
+        return f"生成完了: {name} ({code4}) / 業績=株探(HTML優先) / 財務補完=J-Quants / 株価=yFinance"
 
     @staticmethod
     def build_cached_status(name: str, code4: str) -> str:
