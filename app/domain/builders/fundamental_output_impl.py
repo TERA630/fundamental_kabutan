@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
 
 
@@ -43,6 +44,47 @@ def _build_market_cap_rank(v: float | None) -> str:
     return "小型"
 
 
+def calc_per_times(price: float | None, eps: float | None) -> float | None:
+    if price in (None, 0) or eps in (None, 0):
+        return None
+    return price / eps
+
+
+def calc_dividend_yield_pct(price: float | None, dividend: float | None) -> float | None:
+    if price in (None, 0) or dividend is None:
+        return None
+    return dividend / price * 100
+
+
+def fetch_kabutan_rows(pair: KabutanForecastPair | None) -> list[KabutanForecastRow]:
+    if pair is None:
+        return []
+    if pair.all_rows:
+        return list(pair.all_rows)
+    return [row for row in (pair.previous2_actual, pair.previous_actual, pair.current_actual, pair.current_forecast, pair.next_forecast) if row is not None]
+
+
+def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow]) -> list[KabutanForecastRow]:
+    dividend_rows = [row for row in rows if row.dividend is not None]
+    if not dividend_rows:
+        return []
+    latest_year = max(row.year for row in dividend_rows)
+    target_years = [latest_year - 2, latest_year - 1, latest_year]
+    row_by_year: dict[int, KabutanForecastRow] = {}
+    for year in target_years:
+        year_rows = [row for row in dividend_rows if row.year == year]
+        if not year_rows:
+            continue
+        forecast_row = next((row for row in year_rows if row.section == "予想"), None)
+        row_by_year[year] = forecast_row or year_rows[0]
+    return [row_by_year[year] for year in target_years if year in row_by_year]
+
+
+def build_year_label(row: KabutanForecastRow) -> str:
+    suffix = "(予)" if row.section == "予想" else "(実績)"
+    return f"{row.year}年{suffix}"
+
+
 
 
 def build_indicator_lines(
@@ -52,28 +94,25 @@ def build_indicator_lines(
     industry: str,
     pbr: float | None,
     roe: float | None,
-    per_actual: float | None,
-    per_current_forecast: float | None,
-    per_next_forecast: float | None,
-    div_actual: float | None,
-    div_current_forecast: float | None,
-    div_next_forecast: float | None,
-    base_year: int,
+    per_lines: list[str],
+    dividend_lines: list[str],
 ) -> list[str]:
     return [
         "■指標",
         f"株価：{_fmt_num(price,0)}円 / PBR {_fmt_num(pbr)} / ROE {_fmt_plain_pct(roe)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
-        f"PER：{base_year}年実績 {_fmt_num(per_actual,1)}倍／{base_year + 1}年末予想 {_fmt_num(per_current_forecast,1)}倍／{base_year + 2}年来期予想 {_fmt_num(per_next_forecast,1)}倍",
-        f"配当利回り：{base_year}年実績 {_fmt_plain_pct(div_actual)}／{base_year + 1}年末予想 {_fmt_plain_pct(div_current_forecast)}／{base_year + 2}年来季予想 {_fmt_plain_pct(div_next_forecast)}",
+        f"PER：{'／'.join(per_lines) if per_lines else 'N/A'}",
+        f"配当利回り：{'／'.join(dividend_lines) if dividend_lines else 'N/A'}",
     ]
 
 
-def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None) -> str:
+def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> str:
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
-    base_year = int((market_snapshot or {}).get("base_year") or date.today().year)
+    indicator_rows = fetch_display_rows_for_indicator(fetch_kabutan_rows(kabutan_forecast_pair))
+    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in indicator_rows]
+    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in indicator_rows]
 
     indicator_lines = build_indicator_lines(
         price=price,
@@ -81,12 +120,7 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         industry=industry_name,
         pbr=(market_snapshot or {}).get("pbr"),
         roe=(market_snapshot or {}).get("roe"),
-        per_actual=(market_snapshot or {}).get("per"),
-        per_current_forecast=(market_snapshot or {}).get("per_current_forecast"),
-        per_next_forecast=(market_snapshot or {}).get("per_next_forecast"),
-        div_actual=(market_snapshot or {}).get("div_yield"),
-        div_current_forecast=(market_snapshot or {}).get("div_yield_current_forecast"),
-        div_next_forecast=(market_snapshot or {}).get("div_yield_next_forecast"),
-        base_year=base_year,
+        per_lines=per_lines,
+        dividend_lines=dividend_lines,
     )
     return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
