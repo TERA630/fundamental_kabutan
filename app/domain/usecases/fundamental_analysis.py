@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 from pathlib import Path
-import re
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
@@ -152,23 +151,7 @@ class FundamentalAnalysisService:
 
     @staticmethod
     def _build_kabutan_html_candidates(code4: str, html_dir: Path) -> list[Path]:
-        direct_candidates = [html_dir / f"{code4}.html", html_dir / f"{code4}.htm"]
-        regex = re.compile(rf"(?<!\d){re.escape(code4)}(?!\d)")
-        matched_candidates = sorted(
-            [
-                path
-                for path in html_dir.iterdir()
-                if path.is_file()
-                and path.suffix.lower() in {".html", ".htm"}
-                and regex.search(path.stem) is not None
-            ]
-        )
-
-        candidates: list[Path] = []
-        for path in [*direct_candidates, *matched_candidates]:
-            if path not in candidates:
-                candidates.append(path)
-        return candidates
+        return [html_dir / f"kt_finance_{code4}.html", html_dir / f"kt_finance_{code4}.htm"]
 
 
 __all__ = ["FundamentalAnalysisService"]
