@@ -46,6 +46,18 @@ _install_stub_modules()
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 
 
+class StubCache:
+    def get(self, _key: str, _ttl_sec: int):
+        return None
+
+    def set(self, _key: str, _value):
+        return None
+
+
+def fetch_empty_market_snapshot(_code4: str):
+    return {"price": None}
+
+
 @dataclass
 class StubRepository:
     result: KabutanForecastPair
@@ -72,6 +84,14 @@ class StubUseCase:
         return self.repository.fetch_kabutan_forecast_pair(code, target_years)
 
 
+def _build_service(repo: StubRepository) -> FundamentalAnalysisService:
+    return FundamentalAnalysisService(
+        file_cache=StubCache(),
+        fetch_market_snapshot=fetch_empty_market_snapshot,
+        fetch_kabutan_forecast_usecase=StubUseCase(repository=repo),
+    )
+
+
 def _build_pair() -> KabutanForecastPair:
     return KabutanForecastPair(
         previous2_actual=None,
@@ -85,7 +105,7 @@ def _build_pair() -> KabutanForecastPair:
 def test_fetch_kabutan_forecast_pair_prefers_html_dir(tmp_path: Path):
     pair = _build_pair()
     repo = StubRepository(result=pair)
-    service = FundamentalAnalysisService(fetch_kabutan_forecast_usecase=StubUseCase(repository=repo))
+    service = _build_service(repo)
 
     html_dir = tmp_path / "kabutan"
     html_dir.mkdir()
@@ -102,7 +122,7 @@ def test_fetch_kabutan_forecast_pair_prefers_html_dir(tmp_path: Path):
 def test_fetch_kabutan_forecast_pair_returns_none_source_when_web_opt_out_and_html_missing(tmp_path: Path):
     pair = _build_pair()
     repo = StubRepository(result=pair)
-    service = FundamentalAnalysisService(fetch_kabutan_forecast_usecase=StubUseCase(repository=repo))
+    service = _build_service(repo)
     html_dir = tmp_path / "kabutan"
     html_dir.mkdir()
 
@@ -116,7 +136,7 @@ def test_fetch_kabutan_forecast_pair_returns_none_source_when_web_opt_out_and_ht
 def test_fetch_kabutan_forecast_pair_supports_partial_filename_match(tmp_path: Path):
     pair = _build_pair()
     repo = StubRepository(result=pair)
-    service = FundamentalAnalysisService(fetch_kabutan_forecast_usecase=StubUseCase(repository=repo))
+    service = _build_service(repo)
 
     html_dir = tmp_path / "kabutan"
     html_dir.mkdir()
@@ -133,7 +153,7 @@ def test_fetch_kabutan_forecast_pair_supports_partial_filename_match(tmp_path: P
 def test_fetch_kabutan_forecast_pair_try_htm_after_html_parse_failure(tmp_path: Path):
     pair = _build_pair()
     repo = StubRepository(result=pair, fail_suffixes=(".html",))
-    service = FundamentalAnalysisService(fetch_kabutan_forecast_usecase=StubUseCase(repository=repo))
+    service = _build_service(repo)
 
     html_dir = tmp_path / "kabutan"
     html_dir.mkdir()

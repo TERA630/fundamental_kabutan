@@ -7,8 +7,6 @@ from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
 
-from app.data.file_cache import FileCache
-from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
@@ -28,6 +26,10 @@ class MarketDataProviderPort(Protocol):
     def __call__(self, code4: str) -> dict[str, float | str | None]: ...
 
 
+class MarketSnapshotCachePort(Protocol):
+    def get(self, key: str, ttl_sec: int) -> Any: ...
+
+    def set(self, key: str, value: Any) -> None: ...
 
 
 def build_empty_market_snapshot() -> dict[str, float | str | None]:
@@ -60,12 +62,12 @@ class FundamentalAnalysisService:
 
     def __init__(
         self,
-        file_cache: FileCache | None = None,
-        fetch_market_snapshot: MarketDataProviderPort | None = None,
+        file_cache: MarketSnapshotCachePort,
+        fetch_market_snapshot: MarketDataProviderPort,
         fetch_kabutan_forecast_usecase: FetchKabutanForecastUseCase | None = None,
     ):
-        self.cache = file_cache or FileCache()
-        self.fetch_market_snapshot = fetch_market_snapshot or fetch_yfinance_snapshot
+        self.cache = file_cache
+        self.fetch_market_snapshot = fetch_market_snapshot
         self.fetch_kabutan_forecast_usecase = fetch_kabutan_forecast_usecase
 
     def build_cache_key_price_snapshot(self, code4: str) -> str:
@@ -115,12 +117,13 @@ class FundamentalAnalysisService:
         html_dir: Path | None = None,
         allow_kabutan_web_fallback: bool = False,
     ) -> KabutanFetchResult:
-        repository = self._get_kabutan_repository()
         if html_dir is None:
             if allow_kabutan_web_fallback:
+                repository = self._get_kabutan_repository()
                 return self._fetch_kabutan_forecast_pair_from_web(repository, code4)
             return KabutanFetchResult(pair=None, source="none", message="HTMLフォルダ未設定")
 
+        repository = self._get_kabutan_repository()
         html_candidates = self._build_kabutan_html_candidates(code4=code4, html_dir=html_dir)
         for html_path in html_candidates:
             if html_path.exists():
@@ -137,11 +140,7 @@ class FundamentalAnalysisService:
 
     def _get_kabutan_repository(self) -> KabutanForecastRepositoryPort:
         if self.fetch_kabutan_forecast_usecase is None:
-            from app.data.kabutan_repository import KabutanForecastRepository
-
-            self.fetch_kabutan_forecast_usecase = FetchKabutanForecastUseCase(
-                repository=KabutanForecastRepository()
-            )
+            raise RuntimeError("Kabutan forecast use case is not configured")
         return self.fetch_kabutan_forecast_usecase.repository
 
     @staticmethod

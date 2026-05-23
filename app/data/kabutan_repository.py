@@ -9,7 +9,8 @@ from typing import TypedDict
 from urllib.request import Request, urlopen
 
 from app.data.file_cache import FileCache
-from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow, KabutanForecastSnapshot
+from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.policies.kabutan_forecast_snapshot import build_kabutan_forecast_snapshot
 
 
 KABUTAN_HEADER_ALIASES = {
@@ -167,20 +168,6 @@ def _parse_kabutan_forecast_rows(html: str) -> list[KabutanForecastRow]:
             if row is not None:
                 rows.append(row)
     return rows
-
-
-def build_kabutan_forecast_snapshot(rows: list[KabutanForecastRow], base_year: int) -> KabutanForecastSnapshot:
-    has_current_year_actual = any(row.section == "実績" and row.year == base_year for row in rows)
-    if has_current_year_actual:
-        actual_years = {base_year - 2, base_year - 1, base_year}
-        forecast_years = {base_year + 1}
-    else:
-        actual_years = {base_year - 2, base_year - 1}
-        forecast_years = {base_year, base_year + 1}
-
-    actual_rows = tuple(row for row in rows if row.section == "実績" and row.year in actual_years)
-    forecast_rows = tuple(row for row in rows if row.section == "予想" and row.year in forecast_years)
-    return KabutanForecastSnapshot(actual_rows=actual_rows, forecast_rows=forecast_rows)
 
 
 def _extract_kabutan_visible_body(html: str) -> str:

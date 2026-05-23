@@ -6,10 +6,24 @@ from pathlib import Path
 from typing import Callable
 
 from app.data.file_cache import FileCache
+from app.data.kabutan_repository import KabutanForecastRepository
+from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.data.watchlist_repository import fetch_watchlist_entries
 from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
+from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.presenters import build_fundamental_output
+
+
+def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
+    kabutan_repository = KabutanForecastRepository(file_cache=file_cache)
+    return FundamentalAnalysisService(
+        file_cache=file_cache,
+        fetch_market_snapshot=fetch_yfinance_snapshot,
+        fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
+            repository=kabutan_repository
+        ),
+    )
 
 
 class FundamentalGuiController:
@@ -22,9 +36,7 @@ class FundamentalGuiController:
     ):
         self.file_cache = file_cache or FileCache()
         self.resolve_kabutan_html_dir_usecase = ResolveKabutanHtmlDirUseCase()
-        self.build_fundamental_service = build_fundamental_service or (
-            lambda cache: FundamentalAnalysisService(file_cache=cache)
-        )
+        self.build_fundamental_service = build_fundamental_service or build_default_fundamental_service
 
     def fetch_resolved_kabutan_html_dir(self) -> ResolvedKabutanHtmlDir:
         cached_dir = self.file_cache.fetch_kabutan_html_dir_cache()
