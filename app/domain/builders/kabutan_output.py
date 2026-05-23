@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.policies.growth_metrics import (
+    calc_eps_growth_acceleration,
+    calc_eps_growth_rate,
+    calc_operating_growth_rate,
+)
+from app.domain.policies.growth_rows import build_growth_rows
 
 
 def _fmt_oku(value: int | None) -> str:
@@ -35,12 +41,6 @@ def calc_ordinary_margin(sales: int | None, ordinary_profit: int | None) -> floa
     return (ordinary_profit / sales) * 100
 
 
-def calc_operating_growth_rate(previous_operating_profit: int | None, current_operating_profit: int | None) -> float | None:
-    if previous_operating_profit is None or current_operating_profit is None or previous_operating_profit == 0:
-        return None
-    return ((current_operating_profit - previous_operating_profit) / previous_operating_profit) * 100
-
-
 def build_profit_with_margin_text(profit: int | None, margin: float | None) -> str:
     return f"{_fmt_oku(profit)}({_fmt_percent(margin)})"
 
@@ -60,20 +60,6 @@ def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
     )
 
 
-
-
-def fetch_growth_target_rows(rows: list[KabutanForecastRow]) -> list[KabutanForecastRow]:
-    """成長率計算対象行を返す（同年実績→同年予想の比較を避ける）。"""
-    targets: list[KabutanForecastRow] = []
-    for row in rows:
-        if row.section == "実績":
-            targets.append(row)
-            continue
-        if row.section == "予想":
-            if targets and targets[-1].section == "実績" and targets[-1].year == row.year:
-                continue
-            targets.append(row)
-    return targets
 
 def _build_kabutan_na_row_line(label: str) -> str:
     return f"{label:<10}{'N/A':>10}{'N/A':>20}{'N/A':>20}{'N/A':>10}{'N/A':>10}{'N/A':>10}"
@@ -112,16 +98,46 @@ def build_kabutan_forecast_output(
 
     growth_lines: list[str] = []
     if rows:
-        growth_rows = fetch_growth_target_rows(rows)
-        growth_lines.append("　　　　　　前年度営業利益成長率(%)")
+        growth_rows = build_growth_rows(rows)
+
+        operating_growth_rates: list[float | None] = []
+        eps_growth_rates: list[float | None] = []
+        eps_accelerations: list[float | None] = []
+
         for index, row in enumerate(growth_rows):
             previous_row = growth_rows[index - 1] if index > 0 else None
-            growth_rate = calc_operating_growth_rate(
-                previous_row.operating_profit if previous_row else None,
-                row.operating_profit,
+            operating_growth_rates.append(
+                calc_operating_growth_rate(
+                    previous_row.operating_profit if previous_row else None,
+                    row.operating_profit,
+                )
             )
-            year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
-            growth_lines.append(f"{year_label:<10}{_fmt_percent(growth_rate):>10}")
+            eps_growth_rates.append(
+                calc_eps_growth_rate(
+                    previous_row.revised_eps if previous_row else None,
+                    row.revised_eps,
+                )
+            )
+
+        for index, eps_growth in enumerate(eps_growth_rates):
+            previous_eps_growth = eps_growth_rates[index - 1] if index > 0 else None
+            eps_accelerations.append(calc_eps_growth_acceleration(previous_eps_growth, eps_growth))
+
+        def _build_growth_metric_line(title: str, values: list[float | None]) -> str:
+            parts = [title]
+            for row, value in zip(growth_rows, values):
+                year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+                parts.append(f"{year_label} {_fmt_percent(value)}")
+            return "　".join(parts)
+
+        growth_lines.extend(
+            [
+                "■成長性",
+                _build_growth_metric_line("営業利益成長率", operating_growth_rates),
+                _build_growth_metric_line("EPS成長率", eps_growth_rates),
+                _build_growth_metric_line("EPS成長加速率", eps_accelerations),
+            ]
+        )
 
     section = "\n".join(
         ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines]

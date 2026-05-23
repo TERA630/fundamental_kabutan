@@ -90,3 +90,85 @@
 - `summary_rows` は使用しない。
 - FY/四半期データを前提にした表示補完は行わない。
 - `FundamentalDisplaySnapshot` / `PeriodFundamentalRow` へ寄せる段階移管案は廃止する。
+
+---
+
+## 7. 追加提案：成長性ブロック（5.3 / 5.6）をドメイン層で実装する設計
+
+結論：**実装可能**。ただし、表示仕様を安定して満たすために「比較対象行の選定ルール」をValue Objectとして分離する。
+
+### 7.1 追加するドメインルール
+
+1. **成長率計算対象行の前処理（比較系列の確定）**
+   - 入力：株探行 `all_rows`（年・実績/予想・EPS・営業利益を含む）
+   - ルール：
+     - 年次昇順で走査する。
+     - 同一年に `実績` と `予想` が共存する場合、**成長率計算の系列には同年予想を含めない**。
+     - それ以外の年は、当該年の代表行（通常は実績、実績が無ければ予想）を採用する。
+   - 出力：比較系列 `growth_rows`。
+
+2. **営業利益成長率(%)**
+   - `op_growth[i] = ((op[i] - op[i-1]) / abs(op[i-1])) * 100`
+   - `i=0` は比較元が無いため `N/A`。
+   - 前年値欠損・0のときは `N/A`。
+
+3. **EPS成長率(%)（新仕様）**
+   - 仕様文をそのまま採用：
+     - `eps_growth[i] = (1 - (eps[i] - eps[i-1])) * 100`
+   - `i=0` は `N/A`。
+   - 前年EPS欠損時は `N/A`。
+
+4. **EPS成長加速率(%)**
+   - `eps_accel[i] = eps_growth[i] - eps_growth[i-1]`
+   - `i=0` は `N/A`。
+   - `eps_growth[i]` または `eps_growth[i-1]` が `N/A` の場合は `N/A`。
+
+5. **成長性ブロック表示順（5.6）**
+   1. 営業利益成長率
+   2. EPS成長率
+   3. EPS成長加速率
+
+### 7.2 ドメイン層の責務分割（クリーンアーキテクチャ準拠）
+
+- `app/domain/policies/growth_rows.py`（新規）
+  - 比較系列 `growth_rows` の構築責務のみ。
+  - UI/Repository非依存。
+
+- `app/domain/policies/growth_metrics.py`（新規）
+  - 営業利益成長率、EPS成長率、EPS成長加速率の純計算。
+  - 欠損時 `None` を返す。
+
+- `app/domain/builders/fundamental_output_impl.py`（既存拡張）
+  - 上記policyを呼び、表示文字列（`N/A`/`+xx.x%`）へ整形。
+
+### 7.3 追加するValue Object案
+
+- `GrowthPoint`
+  - `year: int`
+  - `operating_growth_pct: float | None`
+  - `eps_growth_pct: float | None`
+  - `eps_acceleration_pct: float | None`
+
+- `GrowthBlock`
+  - `points: tuple[GrowthPoint, ...]`
+  - Builderは `GrowthBlock` を受けて表示行を作るだけにする。
+
+### 7.4 実装時の注意点
+
+- **同年 実績→予想の比較禁止**は、計算関数内部ではなく、必ず比較系列の前処理で保証する。
+- 5.3のEPS式は一般的な前年比式と異なるため、domain_specに「仕様固定式」であることを明記する。
+- `%`付き表示はBuilder責務、計算値はdomain policyで数値として保持する。
+
+### 7.5 テスト観点（ドメイン中心）
+
+1. 同年に実績/予想があるケースで、同年予想が比較系列から除外されること。
+2. 先頭行が常に `N/A` になること。
+3. 欠損・0除算相当で `N/A` になること。
+4. EPS成長加速率が「当年EPS成長率 - 前年EPS成長率」であること。
+5. 成長性ブロックの表示順が仕様通りであること。
+
+### 7.6 段階導入案
+
+- Phase 1: policy関数 + 単体テスト追加（表示は未接続でも可）
+- Phase 2: builderへ接続し、成長性ブロック出力を有効化
+- Phase 3: スナップショット差分テストで表示フォーマット固定
