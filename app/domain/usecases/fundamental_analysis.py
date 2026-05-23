@@ -13,6 +13,15 @@ from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
+MARKET_SNAPSHOT_KEYS = (
+    "price",
+    "market_cap",
+    "per",
+    "pbr",
+    "industry",
+    "div_yield",
+    "payout_ratio",
+)
 
 
 class MarketDataProviderPort(Protocol):
@@ -22,15 +31,12 @@ class MarketDataProviderPort(Protocol):
 
 
 def build_empty_market_snapshot() -> dict[str, float | str | None]:
-    return {
-        "price": None,
-        "market_cap": None,
-        "per": None,
-        "pbr": None,
-        "industry": None,
-        "div_yield": None,
-        "payout_ratio": None,
-    }
+    return {key: None for key in MARKET_SNAPSHOT_KEYS}
+
+
+def normalize_market_snapshot(snapshot: dict[str, Any]) -> dict[str, float | str | None]:
+    return {key: snapshot.get(key) for key in MARKET_SNAPSHOT_KEYS}
+
 
 class KabutanForecastRepositoryPort(Protocol):
     def fetch_kabutan_forecast_pair(
@@ -69,28 +75,12 @@ class FundamentalAnalysisService:
         cache_key = self.build_cache_key_price_snapshot(code4)
         cached = self.cache.get(cache_key, CACHE_TTL_YF_SEC)
         if isinstance(cached, dict):
-            return {
-                "price": cached.get("price"),
-                "market_cap": cached.get("market_cap"),
-                "per": cached.get("per"),
-                "pbr": cached.get("pbr"),
-                "industry": cached.get("industry"),
-                "div_yield": cached.get("div_yield"),
-                "payout_ratio": cached.get("payout_ratio"),
-            }
+            return normalize_market_snapshot(cached)
 
         snapshot = self.fetch_market_snapshot(code4)
         if isinstance(snapshot, dict) and snapshot.get("price") is not None:
             self.cache.set(cache_key, snapshot)
-            return {
-                "price": snapshot.get("price"),
-                "market_cap": snapshot.get("market_cap"),
-                "per": snapshot.get("per"),
-                "pbr": snapshot.get("pbr"),
-                "industry": snapshot.get("industry"),
-                "div_yield": snapshot.get("div_yield"),
-                "payout_ratio": snapshot.get("payout_ratio"),
-            }
+            return normalize_market_snapshot(snapshot)
         return build_empty_market_snapshot()
 
     def build_analysis_output(
