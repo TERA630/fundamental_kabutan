@@ -64,15 +64,18 @@ def fetch_kabutan_rows(pair: KabutanForecastPair | None) -> list[KabutanForecast
     return [row for row in (pair.previous2_actual, pair.previous_actual, pair.current_actual, pair.current_forecast, pair.next_forecast) if row is not None]
 
 
-def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow]) -> list[KabutanForecastRow]:
-    dividend_rows = [row for row in rows if row.dividend is not None]
-    if not dividend_rows:
+def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow], *, metric: str) -> list[KabutanForecastRow]:
+    if metric == "per":
+        metric_rows = [row for row in rows if row.revised_eps is not None]
+    else:
+        metric_rows = [row for row in rows if row.dividend is not None]
+    if not metric_rows:
         return []
-    latest_year = max(row.year for row in dividend_rows)
+    latest_year = max(row.year for row in metric_rows)
     target_years = [latest_year - 2, latest_year - 1, latest_year]
     row_by_year: dict[int, KabutanForecastRow] = {}
     for year in target_years:
-        year_rows = [row for row in dividend_rows if row.year == year]
+        year_rows = [row for row in metric_rows if row.year == year]
         if not year_rows:
             continue
         forecast_row = next((row for row in year_rows if row.section == "予想"), None)
@@ -110,9 +113,11 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
-    indicator_rows = fetch_display_rows_for_indicator(fetch_kabutan_rows(kabutan_forecast_pair))
-    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in indicator_rows]
-    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in indicator_rows]
+    all_rows = fetch_kabutan_rows(kabutan_forecast_pair)
+    per_rows = fetch_display_rows_for_indicator(all_rows, metric="per")
+    dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
+    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
+    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
 
     indicator_lines = build_indicator_lines(
         price=price,

@@ -21,3 +21,19 @@ def test_build_output_shows_indicator_when_fy_missing():
     assert 'PER：2025年(実績) 24.2倍／2026年(実績) 22.0倍／2027年(予) 19.4倍' in text
     assert '配当利回り：2025年(実績) 1.44%／2026年(実績) 1.65%／2027年(予) 1.86%' in text
     assert '通期(FY)データを抽出できませんでした。' not in text
+
+
+def test_build_output_keeps_per_when_dividend_missing():
+    text = build_fundamental_output_text(
+        name='無配株', code4='9999', master=None, price=1000.0, market_cap=1_000_000_000.0,
+        market_snapshot={'pbr': 1.2, 'industry': 'サービス'},
+        kabutan_forecast_pair=KabutanForecastPair(
+            previous2_actual=KabutanForecastRow("2025/03", 2025, 3, "実績", None, None, None, None, 100.0, None),
+            previous_actual=KabutanForecastRow("2026/03", 2026, 3, "実績", None, None, None, None, 125.0, None),
+            current_actual=None,
+            current_forecast=KabutanForecastRow("2027/03", 2027, 3, "予想", None, None, None, None, 200.0, None),
+            next_forecast=None,
+        ),
+    )
+    assert 'PER：2025年(実績) 10.0倍／2026年(実績) 8.0倍／2027年(予) 5.0倍' in text
+    assert '配当利回り：N/A' in text
