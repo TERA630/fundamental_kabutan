@@ -13,7 +13,6 @@ def build_fundamental_output(
     name: str,
     code4: str,
     master: dict[str, Any] | None,
-    summary_rows: list[dict[str, Any]],
     price: float | None,
     market_cap: float | None,
     market_snapshot: dict[str, Any] | None = None,
@@ -26,9 +25,9 @@ def build_fundamental_output(
         name=name,
         code4=code4,
         master=master,
-        summary_rows=summary_rows,
         price=price,
         market_cap=market_cap,
         market_snapshot=market_snapshot,
+        kabutan_forecast_pair=kabutan_forecast_pair,
     )
     return build_kabutan_forecast_output(base_output, kabutan_forecast_pair, kabutan_source, kabutan_source_message)

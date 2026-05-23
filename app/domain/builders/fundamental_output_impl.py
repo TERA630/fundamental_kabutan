@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
+from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
-from app.domain.models.metrics import calc_metrics
-from app.domain.models.periods import fetch_period_set
-from app.domain.policies.ranking import grade_summary, rank_forecast_yoy, rank_next_yoy, rank_progress, rank_symbol
 
 
 def _first_present(data: dict[str, Any] | None, keys: list[str]) -> Any:
@@ -22,22 +20,12 @@ def _fmt_num(v: float | None, digits: int = 2) -> str:
     return "N/A" if v is None else f"{v:,.{digits}f}"
 
 
-def _fmt_pct(v: float | None) -> str:
-    return "N/A" if v is None else f"{v:+.2f}%"
-
-
 def _fmt_plain_pct(v: float | None) -> str:
     return "N/A" if v is None else f"{v:.2f}%"
 
 
 def _fmt_money(v: float | None) -> str:
     return "N/A" if v is None else f"{v / 100_000_000:,.1f}億円"
-
-
-def _calc_yoy(current: float | None, previous: float | None) -> float | None:
-    if current is None or previous in (None, 0):
-        return None
-    return (current / previous - 1) * 100
 
 
 def _build_market_cap_rank(v: float | None) -> str:
@@ -55,71 +43,88 @@ def _build_market_cap_rank(v: float | None) -> str:
     return "小型"
 
 
+def calc_per_times(price: float | None, eps: float | None) -> float | None:
+    if price in (None, 0) or eps in (None, 0):
+        return None
+    return price / eps
 
 
-def build_indicator_lines(*, price: float | None, market_cap: float | None, industry: str, per: float | None, pbr: float | None) -> list[str]:
+def calc_dividend_yield_pct(price: float | None, dividend: float | None) -> float | None:
+    if price in (None, 0) or dividend is None:
+        return None
+    return dividend / price * 100
+
+
+def fetch_kabutan_rows(pair: KabutanForecastPair | None) -> list[KabutanForecastRow]:
+    if pair is None:
+        return []
+    if pair.all_rows:
+        return list(pair.all_rows)
+    return [row for row in (pair.previous2_actual, pair.previous_actual, pair.current_actual, pair.current_forecast, pair.next_forecast) if row is not None]
+
+
+def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow], *, metric: str) -> list[KabutanForecastRow]:
+    if metric == "per":
+        metric_rows = [row for row in rows if row.revised_eps is not None]
+    else:
+        metric_rows = [row for row in rows if row.dividend is not None]
+    if not metric_rows:
+        return []
+    latest_year = max(row.year for row in metric_rows)
+    target_years = [latest_year - 2, latest_year - 1, latest_year]
+    row_by_year: dict[int, KabutanForecastRow] = {}
+    for year in target_years:
+        year_rows = [row for row in metric_rows if row.year == year]
+        if not year_rows:
+            continue
+        forecast_row = next((row for row in year_rows if row.section == "予想"), None)
+        row_by_year[year] = forecast_row or year_rows[0]
+    return [row_by_year[year] for year in target_years if year in row_by_year]
+
+
+def build_year_label(row: KabutanForecastRow) -> str:
+    suffix = "(予)" if row.section == "予想" else "(実績)"
+    return f"{row.year}年{suffix}"
+
+
+
+
+def build_indicator_lines(
+    *,
+    price: float | None,
+    market_cap: float | None,
+    industry: str,
+    pbr: float | None,
+    roe: float | None,
+    per_lines: list[str],
+    dividend_lines: list[str],
+) -> list[str]:
     return [
         "■指標",
-        f"株価：{_fmt_num(price,0)}円 / PER：{_fmt_num(per)} / PBR：{_fmt_num(pbr)}",
+        f"株価：{_fmt_num(price,0)}円 / PBR {_fmt_num(pbr)} / ROE {_fmt_plain_pct(roe)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
+        f"PER：{'／'.join(per_lines) if per_lines else 'N/A'}",
+        f"配当利回り：{'／'.join(dividend_lines) if dividend_lines else 'N/A'}",
     ]
 
-def _build_periods(summary_rows: list[dict[str, Any]]):
-    """互換API: 期間抽出の本体はmodels.periodsへ移譲。"""
-    return fetch_period_set(summary_rows)
 
-
-def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, summary_rows: list[dict[str, Any]], price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None) -> str:
-    periods = _build_periods(summary_rows)
+def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> str:
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
-    if periods.latest_fy is None:
-        indicator_lines = build_indicator_lines(
-            price=price,
-            market_cap=market_cap,
-            industry=industry_name,
-            per=(market_snapshot or {}).get("per"),
-            pbr=(market_snapshot or {}).get("pbr"),
-        )
-        return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
-
-    metrics = calc_metrics(periods, price)
-    actual_score, forecast_score, total_score, total_max, grade = grade_summary(metrics)
+    all_rows = fetch_kabutan_rows(kabutan_forecast_pair)
+    per_rows = fetch_display_rows_for_indicator(all_rows, metric="per")
+    dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
+    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
+    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
 
     indicator_lines = build_indicator_lines(
         price=price,
         market_cap=market_cap,
         industry=industry_name,
-        per=(market_snapshot or {}).get("per") or metrics.get("per"),
-        pbr=(market_snapshot or {}).get("pbr") or metrics.get("pbr"),
+        pbr=(market_snapshot or {}).get("pbr"),
+        roe=(market_snapshot or {}).get("roe"),
+        per_lines=per_lines,
+        dividend_lines=dividend_lines,
     )
-
-    lines = [
-        f"【銘柄】{company_name} ({code4})",
-        *indicator_lines,
-        "",
-        f"スコア：実績 {actual_score}/7 / 予想進捗 {forecast_score}/5 / 総合 {total_score}/{total_max}",
-        f"総合評価：{grade}",
-        f"■実績比較（最新{getattr(periods.latest_fy, 'fiscal_year', 'N/A')}年FY←{getattr(periods.prev_fy, 'fiscal_year', 'N/A')}年FY）",
-        f"売上高：{_fmt_money(metrics.get('sales'))}(YoY {_fmt_pct(metrics.get('yoy_sales'))})←{_fmt_money(metrics.get('prev_sales'))}",
-        f"営業利益：{_fmt_money(metrics.get('op'))}(YoY {_fmt_pct(metrics.get('op_yoy'))})←{_fmt_money(metrics.get('prev_op'))}",
-        f"営業利益率：{_fmt_plain_pct(metrics.get('op_margin'))} ← {_fmt_plain_pct(metrics.get('prev_op_margin'))}",
-        f"純利益：{_fmt_money(metrics.get('np'))}(YoY {_fmt_pct(_calc_yoy(metrics.get('np'), metrics.get('prev_np')))})←{_fmt_money(metrics.get('prev_np'))}",
-        f"EPS：{_fmt_num(metrics.get('eps'),0)}円(YoY {_fmt_pct(_calc_yoy(metrics.get('eps'), metrics.get('prev_eps')))})←{_fmt_num(metrics.get('prev_eps'),0)}円",
-        "",
-        f"■今期会社予想({getattr(periods.latest_quarter, 'fiscal_year', getattr(periods.latest_fy, 'fiscal_year', 'N/A'))}年{getattr(periods.latest_quarter, 'period_type', 'FY')})",
-        f"売り上げ予想：{_fmt_money(metrics.get('forecast_sales'))}(YoY {_fmt_pct(metrics.get('forecast_sales_yoy'))})",
-        f"営業利益予想：{_fmt_money(metrics.get('forecast_op'))}(YoY {_fmt_pct(metrics.get('forecast_op_yoy'))})",
-        "",
-        "■EPS/PER比較（来期予想・今期末予想・直近四半期）",
-        f"EPS(円)：来期 {_fmt_num(metrics.get('eps_next'),1)} / 今期末 {_fmt_num(metrics.get('eps_forecast'),1)} / 直近四半期 {_fmt_num(metrics.get('eps_quarter'),1)}",
-        f"PER(倍)：来期 {_fmt_num(metrics.get('per_next'))} / 今期末 {_fmt_num(metrics.get('per_forecast'))} / 直近四半期 {_fmt_num(metrics.get('per_quarter'))}",
-        "",
-        f"■売り上げ予想({getattr(periods.latest_fy, 'fiscal_year', 'N/A') + 1 if periods.latest_fy else 'N/A'}年FY)",
-        f"売上予想：{_fmt_money(metrics.get('next_sales'))}（今期比 {_fmt_pct(metrics.get('next_sales_yoy'))}）",
-        f"営業利益予想：{_fmt_money(metrics.get('next_op'))}（今期比 {_fmt_pct(metrics.get('next_op_yoy'))}）",
-        f"予想EPS：{_fmt_num(metrics.get('next_eps'),0)}円(今期比 {_fmt_pct(metrics.get('next_eps_yoy'))})",
-        f"ランク：成長 {rank_symbol(metrics.get('yoy_sales'),'growth')} / 収益 {rank_symbol(metrics.get('op_margin'),'op_margin')} / 進捗 {rank_progress(metrics.get('op_progress'), metrics.get('progress_base'))} / 来期 {rank_next_yoy(metrics.get('next_op_yoy'))}",
-    ]
-    return "\n".join(lines)
+    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
