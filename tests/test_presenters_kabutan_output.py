@@ -39,7 +39,7 @@ def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast
     )
     text = build_kabutan_forecast_output(base, pair, "html", None)
     # 成長率は2024->2025->2026実->2027予で計算し、2026予は成長率行に含めない
-    assert "2026年(予)" not in text.split("前年度営業利益成長率(%)", 1)[1]
+    assert "2026年(予)" not in text.split("営業利益成長率", 1)[1]
     assert "2027年(予)" in text
 
 
