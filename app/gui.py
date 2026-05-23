@@ -45,6 +45,7 @@ class FundamentalApp:
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
         )
+        self._restore_kabutan_html_dir()
 
     def set_busy(self, busy: bool, status: str | None = None):
         self.state.is_fetching = busy
@@ -74,9 +75,17 @@ class FundamentalApp:
         if not path:
             return
         self.state.kabutan_html_dir = Path(path)
+        self.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
         self.state.output_cache.clear()
         self.kabutan_dir_var.set(str(self.state.kabutan_html_dir))
         self.status_var.set(self.view_model.build_kabutan_dir_selected_status())
+
+    def _restore_kabutan_html_dir(self) -> None:
+        resolved = self.controller.fetch_resolved_kabutan_html_dir()
+        if resolved.status == "ok" and resolved.dir_path is not None:
+            self.state.kabutan_html_dir = resolved.dir_path
+            self.kabutan_dir_var.set(str(resolved.dir_path))
+            self.status_var.set(resolved.message)
 
     def _populate_stock_choices(self) -> None:
         values, mapping = build_stock_choices(self.state.watchlist)
@@ -135,6 +144,11 @@ class FundamentalApp:
             return
 
         name, code4 = selected
+        if self.state.kabutan_html_dir is None:
+            self.status_var.set(self.view_model.build_kabutan_dir_restore_required_status())
+            self.open_kabutan_html_dir()
+            if self.state.kabutan_html_dir is None:
+                return
         cache_key = build_output_cache_key(code4, self.state.kabutan_html_dir)
         cached_output = self.state.output_cache.get(cache_key)
         if cached_output is not None:

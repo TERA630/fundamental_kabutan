@@ -39,3 +39,15 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
 
     assert out1 == out2
     assert len(dummy_service.calls) == 1
+
+
+def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
+    controller = FundamentalGuiController()
+    target = tmp_path / "kabutan"
+    target.mkdir()
+
+    controller.save_kabutan_html_dir_cache(target)
+    resolved = controller.fetch_resolved_kabutan_html_dir()
+
+    assert resolved.status == "ok"
+    assert resolved.dir_path == target.resolve()

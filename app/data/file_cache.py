@@ -51,5 +51,14 @@ class FileCache:
         self.set(key, data)
         return data
 
+    def fetch_kabutan_html_dir_cache(self) -> Path | None:
+        cached = self.get("kabutan_last_html_dir", ttl_sec=10**9)
+        if not isinstance(cached, str) or not cached.strip():
+            return None
+        return Path(cached)
+
+    def save_kabutan_html_dir_cache(self, path: Path) -> None:
+        self.set("kabutan_last_html_dir", str(path.resolve()))
+
 
 __all__ = ["FileCache", "CACHE_DIR_NAME"]
