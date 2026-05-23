@@ -104,6 +104,7 @@ def build_indicator_lines(
         "■指標",
         f"株価：{_fmt_num(price,0)}円 / PBR {_fmt_num(pbr)} / ROE {_fmt_plain_pct(roe)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
+        "",
         f"PER：{'／'.join(per_lines) if per_lines else 'N/A'}",
         f"配当利回り：{'／'.join(dividend_lines) if dividend_lines else 'N/A'}",
     ]

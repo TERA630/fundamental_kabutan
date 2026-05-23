@@ -14,20 +14,17 @@ def test_build_kabutan_forecast_output_appends_section():
 
     text = build_kabutan_forecast_output(base, pair, "html", None)
 
-    assert "■株探 業績推移（通期）" in text
+    assert "■株探 通期業績推移" in text
     assert "2025年" in text
     assert "2026年(予)" in text
     assert "2027年(予)" in text
 
 def test_build_kabutan_forecast_output_renders_na_rows_when_none():
     text = build_kabutan_forecast_output("base output", None, "none", "HTML解析に失敗")
-    assert "■株探 業績推移（通期）" in text
+    assert "■株探 通期業績推移" in text
     assert "株探ソース: 取得不可 (HTML解析に失敗)" in text
-    assert "実績(N/A)" in text
-    assert "今期予想(N/A)" in text
-    assert "来期予想(N/A)" in text
+    assert "データーが取得できません" in text
     assert "2025年" not in text
-    assert "N/A" in text
     assert "予想チェーン" not in text
 
 

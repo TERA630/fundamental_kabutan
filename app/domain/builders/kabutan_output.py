@@ -108,17 +108,7 @@ def build_kabutan_forecast_output(
             ]
 
     header = "　　　　　　売上　営業益(営業利益率)　経常益(経常利益率)　最終益　1株益　1株配当"
-    row_lines = (
-        [_build_kabutan_row_line(row) for row in rows]
-        if rows
-        else [
-            _build_kabutan_na_row_line("実績(N/A)"),
-            _build_kabutan_na_row_line("実績(N/A)"),
-            _build_kabutan_na_row_line("実績(N/A)"),
-            _build_kabutan_na_row_line("今期予想(N/A)"),
-            _build_kabutan_na_row_line("来期予想(N/A)"),
-        ]
-    )
+    row_lines = [_build_kabutan_row_line(row) for row in rows] if rows else ["データーが取得できません"]
 
     growth_lines: list[str] = []
     if rows:
@@ -134,7 +124,7 @@ def build_kabutan_forecast_output(
             growth_lines.append(f"{year_label:<10}{_fmt_percent(growth_rate):>10}")
 
     section = "\n".join(
-        ["", "■株探 業績推移（通期）", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines]
+        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines]
     )
     return f"{base_output}\n{section}"
 
