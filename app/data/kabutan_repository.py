@@ -164,10 +164,14 @@ def _parse_kabutan_forecast_rows(html: str) -> list[KabutanForecastRow]:
 
 def _extract_kabutan_visible_body(html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
-    block = soup.select_one("div.fin_year_result_d")
-    if block is None:
+    finance_box = soup.select_one("div#finance_box")
+    if finance_box is None:
         return html
-    return str(block)
+
+    result_block = finance_box.select_one("div.fin_year_result_d")
+    if result_block is not None:
+        return result_block.prettify()
+    return finance_box.prettify()
 
 
 def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years: tuple[int, int] | None = None) -> KabutanForecastPair:
