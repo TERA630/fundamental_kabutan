@@ -41,8 +41,4 @@ def fetch_yfinance_snapshot(code4: str) -> dict[str, float | str | None]:
     return result
 
 
-def get_yfinance_price(code4: str) -> float | None:
-    return fetch_yfinance_snapshot(code4).get("price")
-
-
-__all__ = ["fetch_yfinance_snapshot", "get_yfinance_price"]
+__all__ = ["fetch_yfinance_snapshot"]
