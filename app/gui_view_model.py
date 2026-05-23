@@ -66,5 +66,9 @@ class GuiViewModel:
     def build_kabutan_dir_selected_status() -> str:
         return "株探HTMLフォルダを設定しました（出力キャッシュをクリア）。"
 
+    @staticmethod
+    def build_kabutan_dir_restore_required_status() -> str:
+        return "株探HTMLフォルダが見つかりません。再選択してください。"
+
 
 __all__ = ["GuiViewModel"]
