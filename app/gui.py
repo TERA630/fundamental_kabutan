@@ -113,7 +113,6 @@ class FundamentalApp:
             return None
         return selected
 
-
     def _render_output(self, output: str, status: str):
         self.view.render_output(output)
         self.set_busy(False, status)
@@ -135,6 +134,26 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
+    def _require_kabutan_html_dir(self) -> bool:
+        if self.state.kabutan_html_dir is None:
+            self.status_var.set(self.view_model.build_kabutan_dir_restore_required_status())
+            self.open_kabutan_html_dir()
+            if self.state.kabutan_html_dir is None:
+                return False
+        return True
+
+    def _render_cached_output(self, name: str, code4: str, cache_key: str) -> bool:
+        cached_output = self.state.output_cache.get(cache_key)
+        if cached_output is None:
+            return False
+        self._render_output(cached_output, self.view_model.build_cached_status(name, code4))
+        return True
+
+    def _start_fetch_thread(self, name: str, code4: str, cache_key: str) -> None:
+        self.set_busy(True, self.view_model.build_fetching_status(name, code4))
+        thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
+        thread.start()
+
     def generate_text(self):
         if self.state.is_fetching:
             return
@@ -144,20 +163,14 @@ class FundamentalApp:
             return
 
         name, code4 = selected
-        if self.state.kabutan_html_dir is None:
-            self.status_var.set(self.view_model.build_kabutan_dir_restore_required_status())
-            self.open_kabutan_html_dir()
-            if self.state.kabutan_html_dir is None:
-                return
-        cache_key = build_output_cache_key(code4, self.state.kabutan_html_dir)
-        cached_output = self.state.output_cache.get(cache_key)
-        if cached_output is not None:
-            self._render_output(cached_output, self.view_model.build_cached_status(name, code4))
+        if not self._require_kabutan_html_dir():
             return
 
-        self.set_busy(True, self.view_model.build_fetching_status(name, code4))
-        thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
-        thread.start()
+        cache_key = build_output_cache_key(code4, self.state.kabutan_html_dir)
+        if self._render_cached_output(name, code4, cache_key):
+            return
+
+        self._start_fetch_thread(name, code4, cache_key)
 
     def copy_text(self):
         content = self.view.get_text_content()
