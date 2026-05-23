@@ -20,5 +20,9 @@ def test_build_growth_rows_skips_same_year_forecast_after_actual():
 
 def test_growth_metric_formulas():
     assert calc_operating_growth_rate(100, 120) == 20.0
-    assert calc_eps_growth_rate(10.0, 12.0) == -100.0
+    assert calc_eps_growth_rate(10.0, 12.0) == 20.0
     assert calc_eps_growth_acceleration(5.0, -3.0) == -8.0
+
+
+def test_eps_growth_rate_zero_base_is_na():
+    assert calc_eps_growth_rate(0.0, 12.0) is None
