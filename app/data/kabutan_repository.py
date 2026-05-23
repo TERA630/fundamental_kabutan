@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 
 from bs4 import BeautifulSoup
 from pathlib import Path
@@ -175,6 +176,7 @@ def _normalize_kabutan_cashflow_header(text: str) -> str:
     cleaned = _clean_cell_text(text)
     cleaned = cleaned.replace("(百万円)", "")
     cleaned = cleaned.replace("（百万円）", "")
+    cleaned = cleaned.replace(" ", "").replace("\u3000", "")
     return cleaned
 
 
@@ -243,6 +245,8 @@ def parse_kabutan_cashflow_rows(html: str) -> list[KabutanCashflowRow]:
                 if _is_kabutan_cashflow_header(maybe_indices):
                     header_indices = maybe_indices
                     found_header = True
+                    if header_indices.get("cash_stock") is None:
+                        warnings.warn("CFテーブルに現金等残高列が見つからないため cash_stock は None になります", RuntimeWarning, stacklevel=2)
                 continue
 
             row = _build_kabutan_cashflow_row_from_cells(cleaned, header_indices)
