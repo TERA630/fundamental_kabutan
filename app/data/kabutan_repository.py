@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import re
-from html import unescape
+
+from bs4 import BeautifulSoup
 from pathlib import Path
 from typing import TypedDict
-from urllib.request import Request, urlopen
 
 from app.data.file_cache import FileCache
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
-from app.domain.policies.kabutan_forecast_snapshot import build_kabutan_forecast_snapshot
 
 
 KABUTAN_HEADER_ALIASES = {
@@ -48,24 +47,16 @@ def _parse_period(text: str) -> tuple[str, int, int] | None:
     return match.group(0), int(match.group(1)), int(match.group(2))
 
 
-def _build_kabutan_url(code: str) -> str:
-    return f"https://kabutan.jp/stock/finance?code={code}"
-
-
 def _clean_cell_text(text: str) -> str:
-    text_no_tags = re.sub(r"<[^>]+>", " ", text)
-    return re.sub(r"\s+", " ", unescape(text_no_tags)).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def fetch_kabutan_table_html_blocks(html: str) -> list[str]:
-    table_blocks = re.findall(
-        r'<div[^>]*class="[^"]*fin_year_result_d[^"]*"[^>]*>[\s\S]*?<table[^>]*>([\s\S]*?)</table>',
-        html,
-        flags=re.DOTALL,
-    )
-    if not table_blocks:
+def _find_kabutan_result_blocks(html: str) -> list[BeautifulSoup]:
+    soup = BeautifulSoup(html, "html.parser")
+    blocks = soup.select("div.fin_year_result_d")
+    if not blocks:
         raise ValueError("通期・業績推移テーブルが見つかりません")
-    return table_blocks
+    return blocks
 
 
 def _get_kabutan_header_index(header_cells: list[str], metric_key: str) -> int | None:
@@ -152,33 +143,31 @@ def fetch_kabutan_forecast_rows_from_cache_payload(cached_payload: dict[str, obj
 
 def _parse_kabutan_forecast_rows(html: str) -> list[KabutanForecastRow]:
     rows: list[KabutanForecastRow] = []
-    for block in fetch_kabutan_table_html_blocks(html):
+    for block in _find_kabutan_result_blocks(html):
         header_cells: list[str] = []
         header_indices = {"revised_eps": None, "dividend": None}
-        for row_html in re.findall(r"<tr[^>]*>(.*?)</tr>", block, flags=re.DOTALL):
-            cells = re.findall(r"<(?:th|td)[^>]*>(.*?)</(?:th|td)>", row_html, flags=re.DOTALL)
-            if len(cells) < 5:
-                continue
-            cleaned_cells = [_clean_cell_text(cell) for cell in cells]
-            if "売上高" in "".join(cleaned_cells):
-                header_cells = cleaned_cells
-                header_indices = fetch_kabutan_header_indices(header_cells)
-                continue
-            row = build_kabutan_forecast_row_from_cells(cleaned_cells, header_indices)
-            if row is not None:
-                rows.append(row)
+        for table in block.find_all("table"):
+            for row in table.find_all("tr"):
+                cells = row.find_all(["th", "td"])
+                if len(cells) < 5:
+                    continue
+                cleaned_cells = [_clean_cell_text(cell.get_text(" ", strip=True)) for cell in cells]
+                if "売上高" in "".join(cleaned_cells):
+                    header_cells = cleaned_cells
+                    header_indices = fetch_kabutan_header_indices(header_cells)
+                    continue
+                parsed_row = build_kabutan_forecast_row_from_cells(cleaned_cells, header_indices)
+                if parsed_row is not None:
+                    rows.append(parsed_row)
     return rows
 
 
 def _extract_kabutan_visible_body(html: str) -> str:
-    block_match = re.search(
-        r'(<div[^>]*class="[^"]*fin_year_result_d[^"]*"[^>]*>[\s\S]*?<table[^>]*>[\s\S]*?</table>[\s\S]*?</div>)',
-        html,
-        flags=re.DOTALL,
-    )
-    if block_match is None:
+    soup = BeautifulSoup(html, "html.parser")
+    block = soup.select_one("div.fin_year_result_d")
+    if block is None:
         return html
-    return block_match.group(0)
+    return str(block)
 
 
 def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years: tuple[int, int] | None = None) -> KabutanForecastPair:
@@ -224,14 +213,6 @@ class KabutanForecastRepository:
     def build_cache_key_kabutan_html(path: Path) -> str:
         return f"kabutan_html_{path.resolve()}"
 
-    def fetch_kabutan_html(self, code: str) -> str:
-        url = _build_kabutan_url(code)
-        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(request, timeout=self.timeout_sec) as response:
-            body = response.read()
-            charset = response.headers.get_content_charset() or "utf-8"
-        return body.decode(charset, errors="ignore")
-
     def fetch_kabutan_html_from_file(self, html_path: str | Path) -> str:
         path = Path(html_path)
         cache_key = self.build_cache_key_kabutan_html(path)
@@ -273,15 +254,8 @@ class KabutanForecastRepository:
         if isinstance(cached_payload, dict):
             parsed_rows = fetch_kabutan_forecast_rows_from_cache_payload(cached_payload)
             if parsed_rows:
-                try:
-                    return _build_forecast_pair_from_rows(parsed_rows, target_years=target_years)
-                except ValueError:
-                    pass
-
-        html = self.fetch_kabutan_html(code)
-        pair = self._fetch_forecast_pair_from_html(html, target_years=target_years)
-        self.file_cache.set(cache_key, self.get_kabutan_cache_payload(pair))
-        return pair
+                return _build_forecast_pair_from_rows(parsed_rows, target_years=target_years)
+        raise RuntimeError("Web取得は無効です。HTMLファイル入力を使用してください。")
 
 
 __all__ = ["KabutanForecastRepository", "_parse_kabutan_forecast_rows", "_extract_kabutan_visible_body"]
