@@ -9,6 +9,9 @@ import re
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
+from app.domain.models.financial_snapshot import FinancialMetricInputRow
+from app.domain.policies.financial_rows import FinancialRowCandidate, select_common_financial_rows
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
@@ -42,6 +45,7 @@ def normalize_market_snapshot(snapshot: dict[str, Any]) -> dict[str, float | str
 
 
 class KabutanForecastRepositoryPort(Protocol):
+
     def fetch_kabutan_forecast_pair(
         self, code: str, target_years: tuple[int, int] | None = None
     ) -> KabutanForecastPair: ...
@@ -52,6 +56,8 @@ class KabutanForecastRepositoryPort(Protocol):
 
     def fetch_kabutan_cashflow_rows_from_file(self, html_path: str | Path) -> tuple[KabutanCashflowRow, ...]: ...
 
+    def fetch_kabutan_balance_sheet_rows_from_file(self, html_path: str | Path) -> tuple[KabutanBalanceSheetRow, ...]: ...
+
 
 @dataclass(frozen=True)
 class KabutanFetchResult:
@@ -59,6 +65,7 @@ class KabutanFetchResult:
     source: str
     cashflow_rows: tuple[KabutanCashflowRow, ...] = ()
     message: str | None = None
+    balance_sheet_rows: tuple[KabutanBalanceSheetRow, ...] = ()
 
 
 class FundamentalAnalysisService:
@@ -113,8 +120,72 @@ class FundamentalAnalysisService:
             "kabutan_cashflow_rows": kabutan_fetch_result.cashflow_rows,
             "kabutan_source": kabutan_fetch_result.source,
             "kabutan_source_message": kabutan_fetch_result.message,
+            "financial_metric_rows": self.build_financial_metric_rows(
+                price=price_snapshot.get("price"),
+                forecast_pair=kabutan_fetch_result.pair,
+                balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
+            ),
         }
         return build_output_fn(**output_context)
+
+
+    @staticmethod
+    def build_financial_metric_rows(
+        *,
+        price: float | None,
+        forecast_pair: KabutanForecastPair | None,
+        balance_sheet_rows: tuple[KabutanBalanceSheetRow, ...],
+    ) -> tuple[FinancialMetricInputRow, ...]:
+        if forecast_pair is None or not forecast_pair.all_rows or not balance_sheet_rows:
+            return ()
+
+        forecast_by_year: dict[int, tuple[int | None, int | None]] = {}
+        for row in forecast_pair.all_rows:
+            if row.section != "実績":
+                continue
+            forecast_by_year[row.year] = (row.final_profit, row.operating_profit)
+
+        candidates: list[FinancialRowCandidate] = []
+        by_year_bs: dict[int, list[KabutanBalanceSheetRow]] = {}
+        for bs_row in balance_sheet_rows:
+            by_year_bs.setdefault(bs_row.year, []).append(bs_row)
+
+        selected_bs_by_year: dict[int, KabutanBalanceSheetRow] = {
+            year: max(rows, key=lambda r: r.month) for year, rows in by_year_bs.items()
+        }
+
+        for year, bs_row in selected_bs_by_year.items():
+            final_profit, operating_profit = forecast_by_year.get(year, (None, None))
+            interest_bearing_debt: int | None = None
+            if bs_row.equity is not None and bs_row.interest_bearing_debt_multiple is not None:
+                interest_bearing_debt = int(round(bs_row.equity * bs_row.interest_bearing_debt_multiple))
+            candidates.append(
+                FinancialRowCandidate(
+                    year=year,
+                    net_income=final_profit,
+                    equity=bs_row.equity,
+                    operating_profit=operating_profit,
+                    interest_bearing_debt=interest_bearing_debt,
+                    bps=bs_row.bps,
+                )
+            )
+
+        selected = select_common_financial_rows(candidates, max_years=3)
+
+        out: list[FinancialMetricInputRow] = []
+        for row in selected:
+            out.append(
+                FinancialMetricInputRow(
+                    year=row.year,
+                    net_income=row.net_income,
+                    equity=row.equity,
+                    operating_profit=row.operating_profit,
+                    interest_bearing_debt=row.interest_bearing_debt,
+                    bps=row.bps,
+                    price=price,
+                )
+            )
+        return tuple(out)
 
     def fetch_kabutan_forecast_pair(
         self,
@@ -138,7 +209,11 @@ class FundamentalAnalysisService:
                         cashflow_rows = repository.fetch_kabutan_cashflow_rows_from_file(html_path)
                     except Exception:
                         cashflow_rows = ()
-                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, source="html")
+                    try:
+                        balance_sheet_rows = repository.fetch_kabutan_balance_sheet_rows_from_file(html_path)
+                    except Exception:
+                        balance_sheet_rows = ()
+                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, balance_sheet_rows=balance_sheet_rows, source="html")
                 except Exception:
                     continue
 

@@ -1,4 +1,5 @@
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.presenters import build_kabutan_forecast_output
 
 
@@ -124,3 +125,47 @@ def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_c
     )
 
     assert "2024 | 15.0% | 300.0% | 8.0% | 0.8%" in text
+
+
+def test_build_kabutan_forecast_output_appends_financial_block_with_formats():
+    base = "base output"
+    text = build_kabutan_forecast_output(
+        base,
+        None,
+        "none",
+        None,
+        (),
+        None,
+        (
+            FinancialMetricInputRow(
+                year=2022,
+                net_income=120,
+                equity=600,
+                operating_profit=100,
+                interest_bearing_debt=100,
+                bps=1500.0,
+                price=3000.0,
+            ),
+            FinancialMetricInputRow(
+                year=2023,
+                net_income=None,
+                equity=700,
+                operating_profit=120,
+                interest_bearing_debt=140,
+                bps=0.0,
+                price=3200.0,
+            ),
+        ),
+    )
+
+    assert "■財務ブロック" in text
+    assert "ROE(%)|ROIC(%)|PBR|" in text
+    assert "2022年　20.0%|10.0%|2.00倍" in text
+    assert "2023年　N/A|10.0%|N/A" in text
+
+
+def test_build_kabutan_forecast_output_financial_block_na_when_empty():
+    text = build_kabutan_forecast_output("base", None, "none", None)
+    assert "■財務ブロック" in text
+    assert "ROE(%)|ROIC(%)|PBR|" in text
+    assert "N/A" in text
