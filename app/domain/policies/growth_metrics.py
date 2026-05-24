@@ -17,14 +17,7 @@ def calc_eps_growth_rate(previous_eps: float | None, current_eps: float | None) 
     return ((current_eps - previous_eps) / previous_eps) * 100
 
 
-def calc_eps_growth_acceleration(previous_eps_growth: float | None, current_eps_growth: float | None) -> float | None:
-    if previous_eps_growth is None or current_eps_growth is None:
-        return None
-    return current_eps_growth - previous_eps_growth
-
-
 __all__ = [
     "calc_operating_growth_rate",
     "calc_eps_growth_rate",
-    "calc_eps_growth_acceleration",
 ]

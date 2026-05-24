@@ -26,6 +26,8 @@ def test_build_kabutan_forecast_output_renders_na_rows_when_none():
     assert "データーが取得できません" in text
     assert "2025年" not in text
     assert "予想チェーン" not in text
+    assert "■キャッシュフロー" in text
+    assert "N/A" in text
 
 
 def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast():
@@ -63,3 +65,29 @@ def test_build_kabutan_forecast_output_uses_all_rows_when_available():
     assert "2023年" in text
     assert "2024年" in text
     assert "2027年(予)" in text
+
+
+def test_build_kabutan_forecast_output_appends_cashflow_block_without_acceleration():
+    base = "base output"
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80),
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110),
+        next_forecast=None,
+    )
+
+    from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+
+    text = build_kabutan_forecast_output(
+        base,
+        pair,
+        "html",
+        None,
+        (KabutanCashflowRow("2025.03", 2025, 3, None, 120, -20, 10, 300),),
+        10000.0,
+    )
+
+    assert "■キャッシュフロー" in text
+    assert "Cash Conversion" in text
+    assert "EPS成長加速率" not in text

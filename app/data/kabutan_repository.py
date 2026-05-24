@@ -351,6 +351,10 @@ class KabutanForecastRepository:
         html = self.fetch_kabutan_html_from_file(html_path)
         return self._fetch_forecast_pair_from_html(html, target_years=target_years)
 
+    def fetch_kabutan_cashflow_rows_from_file(self, html_path: str | Path) -> tuple[KabutanCashflowRow, ...]:
+        html = Path(html_path).read_text(encoding="utf-8")
+        return tuple(parse_kabutan_cashflow_rows(html))
+
     @staticmethod
     def get_kabutan_cache_payload(pair: KabutanForecastPair) -> dict[str, object]:
         rows = []

@@ -5,6 +5,7 @@ from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 
 
@@ -19,6 +20,7 @@ def build_fundamental_output(
     kabutan_forecast_pair: KabutanForecastPair | None = None,
     kabutan_source: str = "none",
     kabutan_source_message: str | None = None,
+    kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
 ) -> str:
     """ドメイン層の出力生成ビルダーを呼び出す。"""
     base_output = build_fundamental_output_text(
@@ -30,4 +32,4 @@ def build_fundamental_output(
         market_snapshot=market_snapshot,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
-    return build_kabutan_forecast_output(base_output, kabutan_forecast_pair, kabutan_source, kabutan_source_message)
+    return build_kabutan_forecast_output(base_output, kabutan_forecast_pair, kabutan_source, kabutan_source_message, kabutan_cashflow_rows, market_cap)
