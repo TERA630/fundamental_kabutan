@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
@@ -49,11 +50,14 @@ class KabutanForecastRepositoryPort(Protocol):
         self, html_path: str | Path, target_years: tuple[int, int] | None = None
     ) -> KabutanForecastPair: ...
 
+    def fetch_kabutan_cashflow_rows_from_file(self, html_path: str | Path) -> tuple[KabutanCashflowRow, ...]: ...
+
 
 @dataclass(frozen=True)
 class KabutanFetchResult:
     pair: KabutanForecastPair | None
     source: str
+    cashflow_rows: tuple[KabutanCashflowRow, ...] = ()
     message: str | None = None
 
 
@@ -106,6 +110,7 @@ class FundamentalAnalysisService:
             "market_cap": price_snapshot.get("market_cap"),
             "market_snapshot": price_snapshot,
             "kabutan_forecast_pair": kabutan_fetch_result.pair,
+            "kabutan_cashflow_rows": kabutan_fetch_result.cashflow_rows,
             "kabutan_source": kabutan_fetch_result.source,
             "kabutan_source_message": kabutan_fetch_result.message,
         }
@@ -128,7 +133,12 @@ class FundamentalAnalysisService:
         for html_path in html_candidates:
             if html_path.exists():
                 try:
-                    return KabutanFetchResult(pair=repository.fetch_kabutan_forecast_pair_from_file(html_path), source="html")
+                    pair = repository.fetch_kabutan_forecast_pair_from_file(html_path)
+                    try:
+                        cashflow_rows = repository.fetch_kabutan_cashflow_rows_from_file(html_path)
+                    except Exception:
+                        cashflow_rows = ()
+                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, source="html")
                 except Exception:
                     continue
 

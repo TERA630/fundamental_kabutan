@@ -118,15 +118,9 @@
    - `i=0` は `N/A`。
    - 前年EPS欠損時は `N/A`。
 
-4. **EPS成長加速率(%)**
-   - `eps_accel[i] = eps_growth[i] - eps_growth[i-1]`
-   - `i=0` は `N/A`。
-   - `eps_growth[i]` または `eps_growth[i-1]` が `N/A` の場合は `N/A`。
-
-5. **成長性ブロック表示順（5.6）**
+4. **成長性ブロック表示順（5.6）**
    1. 営業利益成長率
    2. EPS成長率
-   3. EPS成長加速率
 
 ### 7.2 ドメイン層の責務分割（クリーンアーキテクチャ準拠）
 
@@ -135,7 +129,7 @@
   - UI/Repository非依存。
 
 - `app/domain/policies/growth_metrics.py`（新規）
-  - 営業利益成長率、EPS成長率、EPS成長加速率の純計算。
+  - 営業利益成長率、EPS成長率の純計算。
   - 欠損時 `None` を返す。
 
 - `app/domain/builders/fundamental_output_impl.py`（既存拡張）
@@ -147,7 +141,6 @@
   - `year: int`
   - `operating_growth_pct: float | None`
   - `eps_growth_pct: float | None`
-  - `eps_acceleration_pct: float | None`
 
 - `GrowthBlock`
   - `points: tuple[GrowthPoint, ...]`
@@ -164,8 +157,7 @@
 1. 同年に実績/予想があるケースで、同年予想が比較系列から除外されること。
 2. 先頭行が常に `N/A` になること。
 3. 欠損・0除算相当で `N/A` になること。
-4. EPS成長加速率が「当年EPS成長率 - 前年EPS成長率」であること。
-5. 成長性ブロックの表示順が仕様通りであること。
+4. 成長性ブロックの表示順が仕様通りであること。
 
 ### 7.6 段階導入案
 
