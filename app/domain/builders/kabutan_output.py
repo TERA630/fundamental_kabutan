@@ -17,6 +17,12 @@ def _fmt_oku(value: int | None) -> str:
     return f"{value / 100:,.1f}億"
 
 
+def _fmt_million_yen(value: int | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,}"
+
+
 def _fmt_yen(value: float | None) -> str:
     if value is None:
         return "N/A"
@@ -60,29 +66,9 @@ def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
     )
 
 
-
-def _build_kabutan_na_row_line(label: str) -> str:
-    return f"{label:<10}{'N/A':>10}{'N/A':>20}{'N/A':>20}{'N/A':>10}{'N/A':>10}{'N/A':>10}"
-
-
 def _build_kabutan_source_label(source: str, message: str | None) -> str:
     source_label = {"html": "HTML", "none": "取得不可"}.get(source, "取得不可")
     return f"株探ソース: {source_label}" if not message else f"株探ソース: {source_label} ({message})"
-
-
-
-def _cf_value_by_year(rows: tuple[KabutanCashflowRow, ...]) -> KabutanCashflowRow | None:
-    if not rows:
-        return None
-    return max(rows, key=lambda r: (r.year, r.month))
-
-
-def _final_profit_by_year(rows: list[KabutanForecastRow], year: int) -> int | None:
-    candidates = [row for row in rows if row.year == year]
-    if not candidates:
-        return None
-    preferred = next((row for row in candidates if row.section == "実績"), None) or candidates[0]
-    return preferred.final_profit
 
 
 def _safe_div(numerator: float | int | None, denominator: float | int | None) -> float | None:
@@ -91,32 +77,72 @@ def _safe_div(numerator: float | int | None, denominator: float | int | None) ->
     return float(numerator) / float(denominator)
 
 
+def _preferred_forecast_row_by_year(rows: list[KabutanForecastRow]) -> dict[int, KabutanForecastRow]:
+    by_year: dict[int, list[KabutanForecastRow]] = {}
+    for row in rows:
+        by_year.setdefault(row.year, []).append(row)
+    result: dict[int, KabutanForecastRow] = {}
+    for year, candidates in by_year.items():
+        result[year] = next((r for r in candidates if r.section == "実績"), candidates[0])
+    return result
+
+
+def _preferred_cashflow_rows(cashflow_rows: tuple[KabutanCashflowRow, ...], max_years: int = 3) -> list[KabutanCashflowRow]:
+    by_year: dict[int, list[KabutanCashflowRow]] = {}
+    for row in cashflow_rows:
+        by_year.setdefault(row.year, []).append(row)
+
+    selected: list[KabutanCashflowRow] = []
+    for year in sorted(by_year.keys(), reverse=True)[:max_years]:
+        candidates = by_year[year]
+        selected.append(max(candidates, key=lambda r: r.month))
+    return sorted(selected, key=lambda r: r.year)
+
+
+def _calc_fcf_yield_pct(free_cf_million_yen: int | None, market_cap_yen: float | None) -> float | None:
+    if free_cf_million_yen is None or market_cap_yen in (None, 0):
+        return None
+    return ((free_cf_million_yen * 1_000_000) / market_cap_yen) * 100
+
+
 def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[KabutanCashflowRow, ...], market_cap: float | None) -> list[str]:
-    latest = _cf_value_by_year(cashflow_rows)
-    if latest is None:
+    selected_cashflow_rows = _preferred_cashflow_rows(cashflow_rows, max_years=3)
+    if not selected_cashflow_rows:
         return ["■キャッシュフロー", "N/A"]
 
-    fcf = None
-    if latest.operating_cf is not None and latest.investing_cf is not None:
-        fcf = latest.operating_cf + latest.investing_cf
+    forecast_by_year = _preferred_forecast_row_by_year(rows)
 
-    final_profit = _final_profit_by_year(rows, latest.year)
-    sales = next((r.sales for r in rows if r.year == latest.year and r.sales is not None), None)
-
-    cash_conversion = _safe_div(latest.operating_cf, final_profit)
-    fcf_yield = _safe_div(fcf, market_cap)
-    fcf_margin = _safe_div(fcf, sales)
-    operating_cf_margin = _safe_div(latest.operating_cf, sales)
-    investment_intensity = _safe_div(abs(latest.investing_cf) if latest.investing_cf is not None else None, latest.operating_cf)
-
-    return [
+    lines = [
         "■キャッシュフロー",
-        f"営業CF {_fmt_oku(latest.operating_cf)} ／ 投資CF {_fmt_oku(latest.investing_cf)} ／ 財務CF {_fmt_oku(latest.financing_cf)} ／ 現金等残高 {_fmt_oku(latest.cash_stock)}",
-        f"Cash Conversion {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)}",
-        f"FCF Yield {_fmt_percent(fcf_yield * 100 if fcf_yield is not None else None)}",
-        f"FCFマージン {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} ／ 営業CFマージン {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)}",
-        f"投資積極性 {_fmt_percent(investment_intensity * 100 if investment_intensity is not None else None)}",
+        "[A] CF実績（百万円）",
+        "年度 | フリーCF | 営業CF | 投資CF | 財務CF | 現金等残高",
     ]
+
+    for cf_row in selected_cashflow_rows:
+        lines.append(
+            f"{cf_row.year} | {_fmt_million_yen(cf_row.free_cf)} | {_fmt_million_yen(cf_row.operating_cf)} | {_fmt_million_yen(cf_row.investing_cf)} | {_fmt_million_yen(cf_row.financing_cf)} | {_fmt_million_yen(cf_row.cash_stock)}"
+        )
+
+    lines.extend([
+        "",
+        "[B] 指標（%）",
+        "年度 | 営業CFマージン | Cash conversion | FCFマージン | FCF Yield",
+    ])
+
+    for cf_row in selected_cashflow_rows:
+        forecast_row = forecast_by_year.get(cf_row.year)
+        sales = forecast_row.sales if forecast_row else None
+        final_profit = forecast_row.final_profit if forecast_row else None
+        operating_cf_margin = _safe_div(cf_row.operating_cf, sales)
+        cash_conversion = _safe_div(cf_row.operating_cf, final_profit)
+        fcf_margin = _safe_div(cf_row.free_cf, sales)
+        fcf_yield_pct = _calc_fcf_yield_pct(cf_row.free_cf, market_cap)
+
+        lines.append(
+            f"{cf_row.year} | {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)} | {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)} | {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} | {_fmt_percent(fcf_yield_pct)}"
+        )
+
+    return lines
 
 
 def build_kabutan_forecast_output(
