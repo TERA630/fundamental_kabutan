@@ -186,13 +186,20 @@ def _build_kabutan_cashflow_header_indices(header_cells: list[str]) -> dict[str,
     def _find_idx(token: str) -> int | None:
         return next((idx for idx, col in enumerate(normalized) if token in col), None)
 
+    def _find_first_idx(tokens: tuple[str, ...]) -> int | None:
+        for token in tokens:
+            idx = _find_idx(token)
+            if idx is not None:
+                return idx
+        return None
+
     return {
         "period": _find_idx("決算期"),
         "free_cf": _find_idx("フリーCF"),
         "operating_cf": _find_idx("営業CF"),
         "investing_cf": _find_idx("投資CF"),
         "financing_cf": _find_idx("財務CF"),
-        "cash_stock": _find_idx("現金等残高"),
+        "cash_stock": _find_first_idx(("現金等残高", "現金等")),
     }
 
 
