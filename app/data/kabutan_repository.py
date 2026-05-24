@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from app.data.file_cache import FileCache
+from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
@@ -31,6 +32,15 @@ KABUTAN_CASH_STOCK_EXCLUDE_TOKENS = (
     "前年差",
     "前期比",
 )
+
+KABUTAN_BALANCE_SHEET_HEADER_ALIASES = {
+    "bps": ("1株純資産", "１株純資産"),
+    "equity_ratio": ("自己資本比率",),
+    "total_assets": ("総資産",),
+    "equity": ("自己資本",),
+    "retained_earnings": ("剰余金",),
+    "interest_bearing_debt_multiple": ("有利子負債倍率",),
+}
 
 
 class KabutanCacheRow(TypedDict):
@@ -291,6 +301,161 @@ def parse_kabutan_cashflow_rows(html: str) -> list[KabutanCashflowRow]:
     if not found_header:
         raise ValueError("キャッシュフロー(CF)テーブルのヘッダが見つかりません")
     raise ValueError("キャッシュフロー(CF)テーブルに有効な決算期データがありません")
+
+
+def _normalize_kabutan_balance_sheet_header(text: str) -> str:
+    cleaned = _clean_cell_text(text)
+    cleaned = cleaned.replace("(百万円)", "").replace("（百万円）", "")
+    cleaned = cleaned.replace("（％）", "").replace("(%)", "")
+    cleaned = cleaned.replace(" ", "").replace("\u3000", "")
+    cleaned = cleaned.replace("１", "1")
+    return cleaned
+
+
+def _build_kabutan_balance_sheet_header_indices(header_cells: list[str]) -> dict[str, int | None]:
+    normalized = [_normalize_kabutan_balance_sheet_header(x) for x in header_cells]
+
+    def _find_idx_by_aliases(aliases: tuple[str, ...], *, exclude: tuple[str, ...] = ()) -> int | None:
+        for idx, col in enumerate(normalized):
+            if not any(alias in col for alias in aliases):
+                continue
+            if exclude and any(token in col for token in exclude):
+                continue
+            return idx
+        return None
+
+    equity_ratio_idx = _find_idx_by_aliases(KABUTAN_BALANCE_SHEET_HEADER_ALIASES["equity_ratio"])
+    equity_idx = _find_idx_by_aliases(KABUTAN_BALANCE_SHEET_HEADER_ALIASES["equity"], exclude=("比率",))
+
+    return {
+        "period": next((idx for idx, col in enumerate(normalized) if "決算期" in col), None),
+        "bps": _find_idx_by_aliases(KABUTAN_BALANCE_SHEET_HEADER_ALIASES["bps"]),
+        "equity_ratio": equity_ratio_idx,
+        "total_assets": _find_idx_by_aliases(KABUTAN_BALANCE_SHEET_HEADER_ALIASES["total_assets"]),
+        "equity": equity_idx,
+        "retained_earnings": _find_idx_by_aliases(KABUTAN_BALANCE_SHEET_HEADER_ALIASES["retained_earnings"]),
+        "interest_bearing_debt_multiple": _find_idx_by_aliases(
+            KABUTAN_BALANCE_SHEET_HEADER_ALIASES["interest_bearing_debt_multiple"]
+        ),
+    }
+
+
+def _count_kabutan_balance_sheet_coverage(indices: dict[str, int | None]) -> int:
+    metric_keys = (
+        "bps",
+        "equity_ratio",
+        "total_assets",
+        "equity",
+        "retained_earnings",
+        "interest_bearing_debt_multiple",
+    )
+    return sum(1 for key in metric_keys if indices.get(key) is not None)
+
+
+def _is_kabutan_balance_sheet_header(indices: dict[str, int | None]) -> bool:
+    if indices.get("period") is None:
+        return False
+    return _count_kabutan_balance_sheet_coverage(indices) >= 4
+
+
+def _build_kabutan_balance_sheet_row_from_cells(cells: list[str], indices: dict[str, int | None]) -> KabutanBalanceSheetRow | None:
+    period_idx = indices.get("period")
+    if period_idx is None or len(cells) <= period_idx:
+        return None
+    parsed_period = _parse_period(cells[period_idx])
+    if parsed_period is None:
+        return None
+    period_label, year, month = parsed_period
+
+    def _int_val(key: str) -> int | None:
+        idx = indices.get(key)
+        if idx is None or len(cells) <= idx:
+            return None
+        return _to_int(cells[idx])
+
+    def _float_val(key: str) -> float | None:
+        idx = indices.get(key)
+        if idx is None or len(cells) <= idx:
+            return None
+        return _to_float(cells[idx])
+
+    return KabutanBalanceSheetRow(
+        period_label=period_label,
+        year=year,
+        month=month,
+        bps=_float_val("bps"),
+        equity_ratio=_float_val("equity_ratio"),
+        total_assets=_int_val("total_assets"),
+        equity=_int_val("equity"),
+        retained_earnings=_int_val("retained_earnings"),
+        interest_bearing_debt_multiple=_float_val("interest_bearing_debt_multiple"),
+    )
+
+
+def _select_kabutan_balance_sheet_table(soup: BeautifulSoup) -> BeautifulSoup | None:
+    selectors = ("#wrapper_main>#container>#main>#finance_box table", "#finance_box table")
+    seen_ids: set[int] = set()
+    tables: list[BeautifulSoup] = []
+    for selector in selectors:
+        for table in soup.select(selector):
+            table_id = id(table)
+            if table_id in seen_ids:
+                continue
+            seen_ids.add(table_id)
+            tables.append(table)
+
+    best: tuple[int, int, int, BeautifulSoup] | None = None
+    for order, table in enumerate(tables):
+        header_indices: dict[str, int | None] | None = None
+        row_count = 0
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["th", "td"])
+            if not cells:
+                continue
+            cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
+            if header_indices is None:
+                maybe_indices = _build_kabutan_balance_sheet_header_indices(cleaned)
+                if _is_kabutan_balance_sheet_header(maybe_indices):
+                    header_indices = maybe_indices
+                continue
+            if _build_kabutan_balance_sheet_row_from_cells(cleaned, header_indices) is not None:
+                row_count += 1
+
+        if header_indices is None:
+            continue
+        score = (_count_kabutan_balance_sheet_coverage(header_indices), row_count, -order)
+        if best is None or score > (best[0], best[1], best[2]):
+            best = (score[0], score[1], score[2], table)
+
+    return None if best is None else best[3]
+
+
+def parse_kabutan_balance_sheet_rows(html: str) -> list[KabutanBalanceSheetRow]:
+    soup = BeautifulSoup(html, "html.parser")
+    table = _select_kabutan_balance_sheet_table(soup)
+    if table is None:
+        raise ValueError("バランスシート(BS)テーブルのヘッダが見つかりません")
+
+    header_indices: dict[str, int | None] | None = None
+    result: list[KabutanBalanceSheetRow] = []
+    for tr in table.find_all("tr"):
+        cells = tr.find_all(["th", "td"])
+        if not cells:
+            continue
+        cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
+        if header_indices is None:
+            maybe_indices = _build_kabutan_balance_sheet_header_indices(cleaned)
+            if _is_kabutan_balance_sheet_header(maybe_indices):
+                header_indices = maybe_indices
+            continue
+
+        row = _build_kabutan_balance_sheet_row_from_cells(cleaned, header_indices)
+        if row is not None:
+            result.append(row)
+
+    if not result:
+        raise ValueError("バランスシート(BS)テーブルに有効な決算期データがありません")
+    return result
 
 
 def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years: tuple[int, int] | None = None) -> KabutanForecastPair:
