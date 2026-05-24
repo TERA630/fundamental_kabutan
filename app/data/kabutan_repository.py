@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import warnings
 
 from bs4 import BeautifulSoup
 from pathlib import Path
 from typing import TypedDict
 
 from app.data.file_cache import FileCache
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
 
@@ -168,6 +170,102 @@ def _extract_kabutan_visible_body(html: str) -> str:
     if block is None:
         return html
     return str(block)
+
+
+def _normalize_kabutan_cashflow_header(text: str) -> str:
+    cleaned = _clean_cell_text(text)
+    cleaned = cleaned.replace("(百万円)", "")
+    cleaned = cleaned.replace("（百万円）", "")
+    cleaned = cleaned.replace(" ", "").replace("\u3000", "")
+    return cleaned
+
+
+def _build_kabutan_cashflow_header_indices(header_cells: list[str]) -> dict[str, int | None]:
+    normalized = [_normalize_kabutan_cashflow_header(x) for x in header_cells]
+
+    def _find_idx(token: str) -> int | None:
+        return next((idx for idx, col in enumerate(normalized) if token in col), None)
+
+    def _find_first_idx(tokens: tuple[str, ...]) -> int | None:
+        for token in tokens:
+            idx = _find_idx(token)
+            if idx is not None:
+                return idx
+        return None
+
+    return {
+        "period": _find_idx("決算期"),
+        "free_cf": _find_idx("フリーCF"),
+        "operating_cf": _find_idx("営業CF"),
+        "investing_cf": _find_idx("投資CF"),
+        "financing_cf": _find_idx("財務CF"),
+        "cash_stock": _find_first_idx(("現金等残高", "現金等")),
+    }
+
+
+def _is_kabutan_cashflow_header(indices: dict[str, int | None]) -> bool:
+    required = ("period", "free_cf", "operating_cf", "investing_cf", "financing_cf")
+    return all(indices.get(k) is not None for k in required)
+
+
+def _build_kabutan_cashflow_row_from_cells(cells: list[str], indices: dict[str, int | None]) -> KabutanCashflowRow | None:
+    period_idx = indices.get("period")
+    if period_idx is None or len(cells) <= period_idx:
+        return None
+    parsed_period = _parse_period(cells[period_idx])
+    if parsed_period is None:
+        return None
+    period_label, year, month = parsed_period
+
+    def _val(key: str) -> int | None:
+        idx = indices.get(key)
+        if idx is None or len(cells) <= idx:
+            return None
+        return _to_int(cells[idx])
+
+    return KabutanCashflowRow(
+        period_label=period_label,
+        year=year,
+        month=month,
+        free_cf=_val("free_cf"),
+        operating_cf=_val("operating_cf"),
+        investing_cf=_val("investing_cf"),
+        financing_cf=_val("financing_cf"),
+        cash_stock=_val("cash_stock"),
+    )
+
+
+def parse_kabutan_cashflow_rows(html: str) -> list[KabutanCashflowRow]:
+    soup = BeautifulSoup(html, "html.parser")
+    result: list[KabutanCashflowRow] = []
+    found_header = False
+
+    for table in soup.find_all("table"):
+        header_indices: dict[str, int | None] | None = None
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["th", "td"])
+            if not cells:
+                continue
+            cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
+            if header_indices is None:
+                maybe_indices = _build_kabutan_cashflow_header_indices(cleaned)
+                if _is_kabutan_cashflow_header(maybe_indices):
+                    header_indices = maybe_indices
+                    found_header = True
+                    if header_indices.get("cash_stock") is None:
+                        warnings.warn("CFテーブルに現金等残高列が見つからないため cash_stock は None になります", RuntimeWarning, stacklevel=2)
+                continue
+
+            row = _build_kabutan_cashflow_row_from_cells(cleaned, header_indices)
+            if row is not None:
+                result.append(row)
+
+        if result:
+            return result
+
+    if not found_header:
+        raise ValueError("キャッシュフロー(CF)テーブルのヘッダが見つかりません")
+    raise ValueError("キャッシュフロー(CF)テーブルに有効な決算期データがありません")
 
 
 def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years: tuple[int, int] | None = None) -> KabutanForecastPair:
