@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.policies.growth_metrics import (
     calc_eps_growth_rate,
     calc_operating_growth_rate,
 )
 from app.domain.policies.growth_rows import build_growth_rows
+from app.domain.policies.financial_metrics import calc_pbr, calc_roe, calc_roic_approx
 
 
 def _fmt_oku(value: int | None) -> str:
@@ -154,6 +156,25 @@ def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[K
     return lines
 
 
+
+
+def _fmt_multiplier(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.2f}倍"
+
+
+def _build_financial_lines(financial_metric_rows: tuple[FinancialMetricInputRow, ...]) -> list[str]:
+    if not financial_metric_rows:
+        return ["■財務ブロック", "　　　ROE(%)|ROIC(%)|PBR|", "N/A"]
+
+    lines = ["■財務ブロック", "　　　ROE(%)|ROIC(%)|PBR|"]
+    for row in financial_metric_rows:
+        roe = calc_roe(row.net_income, row.equity)
+        roic = calc_roic_approx(row.operating_profit, row.equity, row.interest_bearing_debt)
+        pbr = calc_pbr(row.price, row.bps)
+        lines.append(f"{row.year}年　{_fmt_percent(roe)}|{_fmt_percent(roic)}|{_fmt_multiplier(pbr)}")
+    return lines
 def build_kabutan_forecast_output(
     base_output: str,
     kabutan_forecast_pair: KabutanForecastPair | None,
@@ -161,6 +182,7 @@ def build_kabutan_forecast_output(
     kabutan_source_message: str | None,
     kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
     market_cap: float | None = None,
+    financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
 ) -> str:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
@@ -220,7 +242,7 @@ def build_kabutan_forecast_output(
         )
 
     section = "\n".join(
-        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap)]
+        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap), *_build_financial_lines(financial_metric_rows)]
     )
     return f"{base_output}\n{section}"
 

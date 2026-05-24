@@ -34,4 +34,12 @@ def build_fundamental_output(
         market_snapshot=market_snapshot,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
-    return build_kabutan_forecast_output(base_output, kabutan_forecast_pair, kabutan_source, kabutan_source_message, kabutan_cashflow_rows, market_cap)
+    return build_kabutan_forecast_output(
+        base_output,
+        kabutan_forecast_pair,
+        kabutan_source,
+        kabutan_source_message,
+        kabutan_cashflow_rows,
+        market_cap,
+        financial_metric_rows,
+    )
