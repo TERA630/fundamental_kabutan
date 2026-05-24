@@ -520,6 +520,10 @@ class KabutanForecastRepository:
         html = Path(html_path).read_text(encoding="utf-8")
         return tuple(parse_kabutan_cashflow_rows(html))
 
+    def fetch_kabutan_balance_sheet_rows_from_file(self, html_path: str | Path) -> tuple[KabutanBalanceSheetRow, ...]:
+        html = Path(html_path).read_text(encoding="utf-8")
+        return tuple(parse_kabutan_balance_sheet_rows(html))
+
     @staticmethod
     def get_kabutan_cache_payload(pair: KabutanForecastPair) -> dict[str, object]:
         rows = []

@@ -7,6 +7,7 @@ from app.domain.builders.fundamental_output import build_fundamental_output_text
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
+from app.domain.models.financial_snapshot import FinancialMetricInputRow
 
 
 def build_fundamental_output(
@@ -21,6 +22,7 @@ def build_fundamental_output(
     kabutan_source: str = "none",
     kabutan_source_message: str | None = None,
     kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
+    financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
 ) -> str:
     """ドメイン層の出力生成ビルダーを呼び出す。"""
     base_output = build_fundamental_output_text(
