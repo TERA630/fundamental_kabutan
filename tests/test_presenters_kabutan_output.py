@@ -100,3 +100,27 @@ def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_y
     assert "2023 | -50 | 120 | -170 | 20 | 280" in text
     assert "2024 | 80 | 150 | -70 | 30 | 350" in text
     assert "2023 | 13.3% | 300.0% | -5.6% | -0.5%" in text
+
+
+def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_cf_missing():
+    base = "base output"
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2023.03", 2023, 3, "実績", 900, 90, 80, 40),
+        current_actual=KabutanForecastRow("2024.03", 2024, 3, "実績", 1000, 110, 100, 50),
+        current_forecast=KabutanForecastRow("2024.03", 2024, 3, "予想", 1010, 112, 101, 51),
+        next_forecast=None,
+    )
+
+    from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+
+    text = build_kabutan_forecast_output(
+        base,
+        pair,
+        "html",
+        None,
+        (KabutanCashflowRow("2024.03", 2024, 3, None, 150, -70, 30, 350),),
+        10_000_000_000.0,
+    )
+
+    assert "2024 | 15.0% | 300.0% | 8.0% | 0.8%" in text

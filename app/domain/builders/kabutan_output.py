@@ -99,6 +99,14 @@ def _preferred_cashflow_rows(cashflow_rows: tuple[KabutanCashflowRow, ...], max_
     return sorted(selected, key=lambda r: r.year)
 
 
+def _resolve_fcf_million_yen(cf_row: KabutanCashflowRow) -> int | None:
+    if cf_row.free_cf is not None:
+        return cf_row.free_cf
+    if cf_row.operating_cf is None or cf_row.investing_cf is None:
+        return None
+    return cf_row.operating_cf + cf_row.investing_cf
+
+
 def _calc_fcf_yield_pct(free_cf_million_yen: int | None, market_cap_yen: float | None) -> float | None:
     if free_cf_million_yen is None or market_cap_yen in (None, 0):
         return None
@@ -135,8 +143,9 @@ def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[K
         final_profit = forecast_row.final_profit if forecast_row else None
         operating_cf_margin = _safe_div(cf_row.operating_cf, sales)
         cash_conversion = _safe_div(cf_row.operating_cf, final_profit)
-        fcf_margin = _safe_div(cf_row.free_cf, sales)
-        fcf_yield_pct = _calc_fcf_yield_pct(cf_row.free_cf, market_cap)
+        resolved_fcf = _resolve_fcf_million_yen(cf_row)
+        fcf_margin = _safe_div(resolved_fcf, sales)
+        fcf_yield_pct = _calc_fcf_yield_pct(resolved_fcf, market_cap)
 
         lines.append(
             f"{cf_row.year} | {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)} | {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)} | {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} | {_fmt_percent(fcf_yield_pct)}"
