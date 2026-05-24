@@ -8,6 +8,7 @@ from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.policies.growth_metrics import (
     calc_eps_growth_rate,
     calc_operating_growth_rate,
+    calc_cagr,
 )
 from app.domain.policies.growth_rows import build_growth_rows
 from app.domain.policies.financial_metrics import calc_pbr, calc_roe, calc_roic_approx
@@ -175,6 +176,36 @@ def _build_financial_lines(financial_metric_rows: tuple[FinancialMetricInputRow,
         pbr = calc_pbr(row.price, row.bps)
         lines.append(f"{row.year}年　{_fmt_percent(roe)}|{_fmt_percent(roic)}|{_fmt_multiplier(pbr)}")
     return lines
+
+
+def _build_growth_metric_line(title: str, growth_rows: list[KabutanForecastRow], values: list[float | None]) -> str:
+    parts = [title]
+    for row, value in zip(growth_rows, values):
+        year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+        parts.append(f"{year_label} {_fmt_percent(value)}")
+    return "　".join(parts)
+
+
+def _select_cagr_row_by_year(growth_rows: list[KabutanForecastRow]) -> dict[int, KabutanForecastRow]:
+    return {row.year: row for row in growth_rows}
+
+
+def _build_cagr_line(title: str, growth_rows: list[KabutanForecastRow], metric_getter) -> str:
+    row_by_year = _select_cagr_row_by_year(growth_rows)
+    if not row_by_year:
+        return f"{title} N/A"
+
+    end_year = max(row_by_year.keys())
+    start_year = end_year - 3
+    start_row = row_by_year.get(start_year)
+    end_row = row_by_year.get(end_year)
+    cagr = calc_cagr(
+        metric_getter(start_row) if start_row else None,
+        metric_getter(end_row) if end_row else None,
+        years=3,
+    )
+    return f"{title} {start_year}→{end_year} {_fmt_percent(cagr)}"
+
 def build_kabutan_forecast_output(
     base_output: str,
     kabutan_forecast_pair: KabutanForecastPair | None,
@@ -226,18 +257,13 @@ def build_kabutan_forecast_output(
                 )
             )
 
-        def _build_growth_metric_line(title: str, values: list[float | None]) -> str:
-            parts = [title]
-            for row, value in zip(growth_rows, values):
-                year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
-                parts.append(f"{year_label} {_fmt_percent(value)}")
-            return "　".join(parts)
-
         growth_lines.extend(
             [
                 "■成長性",
-                _build_growth_metric_line("営業利益成長率", operating_growth_rates),
-                _build_growth_metric_line("EPS成長率", eps_growth_rates),
+                _build_growth_metric_line("営業利益成長率", growth_rows, operating_growth_rates),
+                _build_growth_metric_line("EPS成長率", growth_rows, eps_growth_rates),
+                _build_cagr_line("3年営業利益CAGR", growth_rows, lambda row: row.operating_profit if row else None),
+                _build_cagr_line("3年EPS CAGR", growth_rows, lambda row: row.revised_eps if row else None),
             ]
         )
 

@@ -169,3 +169,28 @@ def test_build_kabutan_forecast_output_financial_block_na_when_empty():
     assert "■財務ブロック" in text
     assert "ROE(%)|ROIC(%)|PBR|" in text
     assert "N/A" in text
+
+
+def test_build_kabutan_output_includes_3y_cagr_lines():
+    from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+    from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+
+    rows = (
+        KabutanForecastRow("2023.03", 2023, 3, "実績", 1000, 100, 90, 80, 100.0, 20.0),
+        KabutanForecastRow("2024.03", 2024, 3, "実績", 1100, 110, 100, 90, 110.0, 22.0),
+        KabutanForecastRow("2025.03", 2025, 3, "実績", 1200, 121, 110, 95, 121.0, 24.0),
+        KabutanForecastRow("2026.03", 2026, 3, "予想", 1300, 133, 120, 100, 133.0, 26.0),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=rows[0],
+        previous_actual=rows[1],
+        current_actual=rows[2],
+        current_forecast=rows[3],
+        next_forecast=None,
+        all_rows=rows,
+    )
+
+    out = build_kabutan_forecast_output("base", pair, "html", None)
+
+    assert "3年営業利益CAGR 2023→2026" in out
+    assert "3年EPS CAGR 2023→2026" in out

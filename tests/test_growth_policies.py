@@ -2,6 +2,7 @@ from app.domain.models.kabutan_forecast import KabutanForecastRow
 from app.domain.policies.growth_metrics import (
     calc_eps_growth_rate,
     calc_operating_growth_rate,
+    calc_cagr,
 )
 from app.domain.policies.growth_rows import build_growth_rows
 
@@ -24,3 +25,20 @@ def test_growth_metric_formulas():
 
 def test_eps_growth_rate_zero_base_is_na():
     assert calc_eps_growth_rate(0.0, 12.0) is None
+
+
+def test_calc_cagr_3y_positive():
+    result = calc_cagr(100, 133.1, 3)
+    assert result is not None
+    assert round(result, 1) == 10.0
+
+
+def test_calc_cagr_returns_none_for_negative_or_zero_base():
+    assert calc_cagr(0, 120, 3) is None
+    assert calc_cagr(-100, 120, 3) is None
+    assert calc_cagr(100, -120, 3) is None
+
+
+def test_calc_cagr_returns_none_for_missing_values():
+    assert calc_cagr(None, 120, 3) is None
+    assert calc_cagr(100, None, 3) is None
