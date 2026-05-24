@@ -19,6 +19,19 @@ KABUTAN_HEADER_ALIASES = {
     "dividend": ("配当", "1株配"),
 }
 
+KABUTAN_CASH_STOCK_BALANCE_TOKENS = (
+    "現金等期末残高",
+    "期末現金等残高",
+    "現金等残高",
+    "現金等期末",
+)
+
+KABUTAN_CASH_STOCK_EXCLUDE_TOKENS = (
+    "増減",
+    "前年差",
+    "前期比",
+)
+
 
 class KabutanCacheRow(TypedDict):
     fiscal_year: str
@@ -193,13 +206,25 @@ def _build_kabutan_cashflow_header_indices(header_cells: list[str]) -> dict[str,
                 return idx
         return None
 
+    def _find_cash_stock_idx() -> int | None:
+        by_balance_token = _find_first_idx(KABUTAN_CASH_STOCK_BALANCE_TOKENS)
+        if by_balance_token is not None:
+            return by_balance_token
+        for idx, col in enumerate(normalized):
+            if "現金等" not in col:
+                continue
+            if any(token in col for token in KABUTAN_CASH_STOCK_EXCLUDE_TOKENS):
+                continue
+            return idx
+        return None
+
     return {
         "period": _find_idx("決算期"),
         "free_cf": _find_idx("フリーCF"),
         "operating_cf": _find_idx("営業CF"),
         "investing_cf": _find_idx("投資CF"),
         "financing_cf": _find_idx("財務CF"),
-        "cash_stock": _find_first_idx(("現金等残高", "現金等")),
+        "cash_stock": _find_cash_stock_idx(),
     }
 
 
