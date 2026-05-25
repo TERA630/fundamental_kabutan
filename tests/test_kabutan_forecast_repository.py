@@ -175,6 +175,29 @@ def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_bloc
     assert rows[0].operating_margin == 10.0
 
 
+def test_parse_kabutan_quarterly_actual_rows_skips_unsupported_month_with_warning():
+    html = """
+    <div id="wrapper_main"><div id="container"><div id="main"><div id="finance_box">
+      <div class="fin_quarter_result_d">
+        <table>
+          <thead><tr>
+            <th>決算期</th><th>売上高</th><th>営業益</th><th>経常益</th><th>最終益</th><th>修正1株益</th><th>売上営業損益率</th>
+          </tr></thead>
+          <tbody>
+            <tr><th>2025.05</th><td>1,000</td><td>100</td><td>90</td><td>80</td><td>10.1</td><td>10.0%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div></div></div>
+    """
+    import pytest
+
+    with pytest.warns(RuntimeWarning, match="Unsupported fiscal period-end month"):
+        rows = parse_kabutan_quarterly_actual_rows(html, ticker="1234")
+
+    assert rows == []
+
+
 def test_parse_kabutan_quarterly_actual_rows_returns_empty_when_block_missing():
     rows = parse_kabutan_quarterly_actual_rows("<html><body><table></table></body></html>", ticker="1234")
     assert rows == []

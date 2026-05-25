@@ -93,14 +93,14 @@ def _normalize_quarterly_header(text: str) -> str:
     return cleaned
 
 
-def _resolve_quarter_from_month(month: int) -> Quarter:
+def _resolve_quarter_from_month(month: int) -> Quarter | None:
     mapping = {
         3: Quarter.Q4,
         6: Quarter.Q1,
         9: Quarter.Q2,
         12: Quarter.Q3,
     }
-    return mapping.get(month, Quarter.Q4)
+    return mapping.get(month)
 
 
 def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | None]:
@@ -142,10 +142,19 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
         text = cells[idx].replace("%", "")
         return _to_float(text)
 
+    quarter = _resolve_quarter_from_month(month)
+    if quarter is None:
+        warnings.warn(
+            f"Unsupported fiscal period-end month for quarterly parsing: {month:02d} (ticker={ticker}, fiscal_year={year})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return None
+
     return QuarterlyActual(
         ticker=ticker,
         fiscal_year=year,
-        quarter=_resolve_quarter_from_month(month),
+        quarter=quarter,
         sales=_int_val("sales"),
         ordinary_profit=_int_val("ordinary_profit"),
         operating_profit=_int_val("operating_profit"),
