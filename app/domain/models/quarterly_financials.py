@@ -51,6 +51,23 @@ class QuarterlyGrowthMetrics:
     revised_eps_yoy: YoYMetric
 
 
+
+
+@dataclass(frozen=True)
+class QuarterlyMetricRow:
+    fiscal_year: int
+    quarter: Quarter
+    quarter_end_month: int | None
+    sales: int | None
+    operating_profit: int | None
+    ordinary_profit: int | None
+    final_profit: int | None
+    revised_eps: float | None
+    operating_profit_yoy_pct: float | None
+    revised_eps_yoy_pct: float | None
+    operating_margin_pct: float | None
+
+
 @dataclass(frozen=True)
 class QuarterlyActualWithGrowth:
     current: QuarterlyActual
@@ -63,6 +80,7 @@ __all__ = [
     "Quarter",
     "QuarterlyActual",
     "QuarterlyActualWithGrowth",
+    "QuarterlyMetricRow",
     "QuarterlyGrowthMetrics",
     "YoYMetric",
     "YoYStatus",

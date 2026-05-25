@@ -1,0 +1,73 @@
+"""Domain use-case for building quarterly financial metric rows."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from app.domain.models.quarterly_financials import Quarter, QuarterlyActual, QuarterlyMetricRow
+from app.domain.models.quarterly_financials import GrowthMetricKind
+from app.domain.policies.quarterly_growth_metrics import assign_quarter, calc_yoy_change, resolve_operating_margin
+
+
+@dataclass(frozen=True)
+class BuildQuarterlyFinancialTableUseCase:
+    fiscal_end_month: int | None = None
+    max_quarters: int = 5
+
+    def execute(self, rows: tuple[QuarterlyActual, ...]) -> tuple[QuarterlyMetricRow, ...]:
+        if not rows:
+            return ()
+
+        resolved = [self._resolve_quarter_row(row) for row in rows]
+        actual_only = [row for row in resolved if row.quarter is not None]
+        actual_only.sort(key=lambda r: (r.fiscal_year, _quarter_order(r.quarter)))
+
+        latest = actual_only[-self.max_quarters :]
+        prior_lookup = {(row.fiscal_year, row.quarter): row for row in actual_only}
+
+        out: list[QuarterlyMetricRow] = []
+        for row in latest:
+            previous = prior_lookup.get((row.fiscal_year - 1, row.quarter))
+            operating_yoy = calc_yoy_change(
+                previous_value=previous.operating_profit if previous else None,
+                current_value=row.operating_profit,
+                metric_kind=GrowthMetricKind.OPERATING_PROFIT
+            )
+            eps_yoy = calc_yoy_change(
+                previous_value=previous.revised_eps if previous else None,
+                current_value=row.revised_eps,
+                metric_kind=GrowthMetricKind.REVISED_EPS
+            )
+            operating_margin = resolve_operating_margin(
+                row.operating_margin,
+                sales=row.sales,
+                operating_profit=row.operating_profit if row.operating_profit is not None else row.ordinary_profit,
+            )
+            out.append(
+                QuarterlyMetricRow(
+                    fiscal_year=row.fiscal_year,
+                    quarter=row.quarter,
+                    quarter_end_month=row.quarter_end_month,
+                    sales=row.sales,
+                    operating_profit=row.operating_profit,
+                    ordinary_profit=row.ordinary_profit,
+                    final_profit=None,
+                    revised_eps=row.revised_eps,
+                    operating_profit_yoy_pct=operating_yoy.value_pct,
+                    revised_eps_yoy_pct=eps_yoy.value_pct,
+                    operating_margin_pct=operating_margin,
+                )
+            )
+        return tuple(out)
+
+    def _resolve_quarter_row(self, row: QuarterlyActual) -> QuarterlyActual:
+        if row.quarter is not None:
+            return row
+        return assign_quarter(row=row, fiscal_end_month=self.fiscal_end_month)
+
+
+def _quarter_order(quarter: Quarter) -> int:
+    return {Quarter.Q1: 1, Quarter.Q2: 2, Quarter.Q3: 3, Quarter.Q4: 4}[quarter]
+
+
+__all__ = ["BuildQuarterlyFinancialTableUseCase"]
