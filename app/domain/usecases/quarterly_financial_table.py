@@ -18,7 +18,7 @@ class BuildQuarterlyFinancialTableUseCase:
         if not rows:
             return ()
 
-        resolved = [assign_quarter(row=row, fiscal_end_month=self.fiscal_end_month) for row in rows]
+        resolved = [self._resolve_quarter_row(row) for row in rows]
         actual_only = [row for row in resolved if row.quarter is not None]
         actual_only.sort(key=lambda r: (r.fiscal_year, _quarter_order(r.quarter)))
 
@@ -59,6 +59,11 @@ class BuildQuarterlyFinancialTableUseCase:
                 )
             )
         return tuple(out)
+
+    def _resolve_quarter_row(self, row: QuarterlyActual) -> QuarterlyActual:
+        if row.quarter is not None:
+            return row
+        return assign_quarter(row=row, fiscal_end_month=self.fiscal_end_month)
 
 
 def _quarter_order(quarter: Quarter) -> int:

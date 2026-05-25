@@ -34,10 +34,13 @@
 `app/domain/models/quarterly_financials.py` を拡張、または同階層に専用 VO を追加:
 
 - `QuarterKey`
-  - `year: int`
-  - `month: int`（3/6/9/12）
+  - `fiscal_year: int`
+  - `quarter_end_month: int | None`（任意月。3/6/9/12 に固定しない）
+  - `quarter: Quarter | None`（`fiscal_end_month` 相対で解決）
 - `QuarterlyMetricRow`
-  - `quarter: QuarterKey`
+  - `fiscal_year: int`
+  - `quarter_end_month: int | None`
+  - `quarter: Quarter`
   - `sales: int | None`
   - `operating_profit: int | None`
   - `ordinary_profit: int | None`
@@ -51,7 +54,8 @@
 `app/domain/policies/quarterly_growth_metrics.py` を中心に、以下を純関数で定義。
 
 1. **前年同期比（営業益）**
-   - 対象四半期 `Q(y,m)` に対して `Q(y-1,m)` を比較元にする。
+   - 対象四半期 `Q(fiscal_year, quarter)` に対して `Q(fiscal_year-1, same quarter)` を比較元にする。
+   - `quarter` は決算月相対で解決する（非3月/非12月決算に対応）。
    - `((current - prev) / abs(prev)) * 100`
    - `prev` が `None` または `0` の場合は `None`。
 

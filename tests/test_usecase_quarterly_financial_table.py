@@ -42,3 +42,25 @@ def test_execute_operating_margin_uses_ordinary_profit_when_operating_missing() 
     )
     out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=3).execute(rows)
     assert out[0].operating_margin_pct == 20.0
+
+
+def test_execute_keeps_existing_quarter_when_fiscal_end_month_is_none() -> None:
+    rows = (
+        QuarterlyActual("1234", 2025, Quarter.Q2, 8, 120, 12, 11, 1.2, None),
+    )
+    out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=None).execute(rows)
+    assert len(out) == 1
+    assert out[0].quarter == Quarter.Q2
+
+
+def test_execute_resolves_non_march_fiscal_cycle_for_yoy_pairing() -> None:
+    rows = (
+        QuarterlyActual("1234", 2024, None, 12, 100, 10, 10, 1.0, None),
+        QuarterlyActual("1234", 2025, None, 12, 150, 15, 15, 1.5, None),
+    )
+    out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=9).execute(rows)
+
+    assert len(out) == 2
+    assert out[0].quarter == Quarter.Q1
+    assert out[1].quarter == Quarter.Q1
+    assert out[1].operating_profit_yoy_pct == 50.0
