@@ -194,3 +194,26 @@ def test_build_kabutan_output_includes_3y_cagr_lines():
 
     assert "3年営業利益CAGR 2023→2026" in out
     assert "3年EPS CAGR 2023→2026" in out
+
+
+from app.domain.models.quarterly_financials import Quarter, QuarterlyMetricRow
+
+
+def test_build_kabutan_forecast_output_includes_quarterly_block():
+    text = build_kabutan_forecast_output(
+        "base",
+        None,
+        "none",
+        None,
+        (),
+        None,
+        (),
+        (
+            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),
+            QuarterlyMetricRow(2026, Quarter.Q1, 3, 1200, 120, 100, 90, 12.0, 20.0, 20.0, 10.0),
+        ),
+    )
+    assert "■四半期業績推移" in text
+    assert "売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|" in text
+    assert "2025.3" in text
+    assert "2026.3" in text

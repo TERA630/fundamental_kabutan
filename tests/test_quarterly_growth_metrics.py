@@ -52,6 +52,7 @@ def test_build_quarterly_growth_metrics() -> None:
         sales=1_000,
         ordinary_profit=100,
         operating_profit=-50,
+        final_profit=-40,
         revised_eps=-10.0,
         operating_margin=5.0,
     )
@@ -63,6 +64,7 @@ def test_build_quarterly_growth_metrics() -> None:
         sales=1_100,
         ordinary_profit=120,
         operating_profit=25,
+        final_profit=20,
         revised_eps=3.0,
         operating_margin=7.0,
     )
@@ -83,6 +85,7 @@ def test_build_quarterly_growth_metrics_returns_na_when_previous_missing() -> No
         sales=1_100,
         ordinary_profit=120,
         operating_profit=25,
+        final_profit=20,
         revised_eps=3.0,
         operating_margin=7.0,
     )
@@ -103,6 +106,7 @@ def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_mi
         sales=1_000,
         ordinary_profit=100,
         operating_profit=100,
+        final_profit=90,
         revised_eps=10.0,
         operating_margin=None,
     )
@@ -114,6 +118,7 @@ def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_mi
         sales=2_000,
         ordinary_profit=140,
         operating_profit=260,
+        final_profit=200,
         revised_eps=14.0,
         operating_margin=None,
     )
@@ -145,6 +150,7 @@ def test_assign_quarter_uses_fiscal_end_month() -> None:
         sales=100,
         ordinary_profit=10,
         operating_profit=9,
+        final_profit=8,
         revised_eps=1.1,
         operating_margin=9.0,
     )
@@ -161,6 +167,7 @@ def test_find_prior_same_quarter_returns_none_when_current_quarter_unknown() -> 
         sales=200,
         ordinary_profit=20,
         operating_profit=18,
+        final_profit=16,
         revised_eps=2.2,
         operating_margin=9.0,
     )
@@ -169,10 +176,10 @@ def test_find_prior_same_quarter_returns_none_when_current_quarter_unknown() -> 
 
 def test_find_prior_same_quarter_matches_previous_year_and_same_quarter() -> None:
     rows = [
-        QuarterlyActual("1111", 2023, Quarter.Q4, 3, 100, 10, 9, 1.0, 9.0),
-        QuarterlyActual("1111", 2024, Quarter.Q1, 6, 120, 12, 11, 1.2, 9.2),
+        QuarterlyActual("1111", 2023, Quarter.Q4, 3, 100, 10, 9, 8, 1.0, 9.0),
+        QuarterlyActual("1111", 2024, Quarter.Q1, 6, 120, 12, 11, 10, 1.2, 9.2),
     ]
-    current = QuarterlyActual("1111", 2025, Quarter.Q1, 6, 150, 15, 14, 1.4, 9.3)
+    current = QuarterlyActual("1111", 2025, Quarter.Q1, 6, 150, 15, 14, 13, 1.4, 9.3)
     prior = find_prior_same_quarter(rows=rows, current=current)
     assert prior is not None
     assert prior.fiscal_year == 2024

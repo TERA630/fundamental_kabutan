@@ -27,6 +27,7 @@ def assign_quarter(*, row: QuarterlyActual, fiscal_end_month: int | None) -> Qua
         sales=row.sales,
         ordinary_profit=row.ordinary_profit,
         operating_profit=row.operating_profit,
+        final_profit=row.final_profit,
         revised_eps=row.revised_eps,
         operating_margin=row.operating_margin,
     )

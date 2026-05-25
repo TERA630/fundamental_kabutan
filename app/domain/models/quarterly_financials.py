@@ -34,6 +34,7 @@ class QuarterlyActual:
     sales: int | None
     ordinary_profit: int | None
     operating_profit: int | None
+    final_profit: int | None
     revised_eps: float | None
     operating_margin: float | None
 

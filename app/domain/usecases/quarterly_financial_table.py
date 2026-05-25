@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models.quarterly_financials import Quarter, QuarterlyActual, QuarterlyMetricRow
+from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMetricRow
 from app.domain.models.quarterly_financials import GrowthMetricKind
 from app.domain.policies.quarterly_growth_metrics import assign_quarter, calc_yoy_change, resolve_operating_margin
 
@@ -20,7 +20,7 @@ class BuildQuarterlyFinancialTableUseCase:
 
         resolved = [self._resolve_quarter_row(row) for row in rows]
         actual_only = [row for row in resolved if row.quarter is not None]
-        actual_only.sort(key=lambda r: (r.fiscal_year, _quarter_order(r.quarter)))
+        actual_only.sort(key=lambda r: (r.fiscal_year, _month_order(r.quarter_end_month)))
 
         latest = actual_only[-self.max_quarters :]
         prior_lookup = {(row.fiscal_year, row.quarter): row for row in actual_only}
@@ -51,7 +51,7 @@ class BuildQuarterlyFinancialTableUseCase:
                     sales=row.sales,
                     operating_profit=row.operating_profit,
                     ordinary_profit=row.ordinary_profit,
-                    final_profit=None,
+                    final_profit=row.final_profit,
                     revised_eps=row.revised_eps,
                     operating_profit_yoy_pct=operating_yoy.value_pct,
                     revised_eps_yoy_pct=eps_yoy.value_pct,
@@ -66,8 +66,10 @@ class BuildQuarterlyFinancialTableUseCase:
         return assign_quarter(row=row, fiscal_end_month=self.fiscal_end_month)
 
 
-def _quarter_order(quarter: Quarter) -> int:
-    return {Quarter.Q1: 1, Quarter.Q2: 2, Quarter.Q3: 3, Quarter.Q4: 4}[quarter]
+def _month_order(month: int | None) -> int:
+    if month is None:
+        return 99
+    return month
 
 
 __all__ = ["BuildQuarterlyFinancialTableUseCase"]
