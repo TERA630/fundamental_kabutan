@@ -11,6 +11,8 @@ from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
+from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMetricRow
+from app.domain.usecases.quarterly_financial_table import BuildQuarterlyFinancialTableUseCase
 from app.domain.policies.financial_rows import FinancialRowCandidate, select_common_financial_rows
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 
@@ -58,6 +60,8 @@ class KabutanForecastRepositoryPort(Protocol):
 
     def fetch_kabutan_balance_sheet_rows_from_file(self, html_path: str | Path) -> tuple[KabutanBalanceSheetRow, ...]: ...
 
+    def fetch_kabutan_quarterly_actual_rows_from_file(self, html_path: str | Path, *, ticker: str) -> tuple[QuarterlyActual, ...]: ...
+
 
 @dataclass(frozen=True)
 class KabutanFetchResult:
@@ -66,6 +70,7 @@ class KabutanFetchResult:
     cashflow_rows: tuple[KabutanCashflowRow, ...] = ()
     message: str | None = None
     balance_sheet_rows: tuple[KabutanBalanceSheetRow, ...] = ()
+    quarterly_actual_rows: tuple[QuarterlyActual, ...] = ()
 
 
 class FundamentalAnalysisService:
@@ -125,9 +130,21 @@ class FundamentalAnalysisService:
                 forecast_pair=kabutan_fetch_result.pair,
                 balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
             ),
+            "quarterly_metric_rows": self.build_quarterly_metric_rows(
+                code4=code4,
+                rows=kabutan_fetch_result.quarterly_actual_rows,
+            ),
         }
         return build_output_fn(**output_context)
 
+
+    @staticmethod
+    def build_quarterly_metric_rows(*, code4: str, rows: tuple[QuarterlyActual, ...]) -> tuple[QuarterlyMetricRow, ...]:
+        if not rows:
+            return ()
+        fiscal_end_month = max((row.quarter_end_month for row in rows if row.quarter_end_month is not None), default=None)
+        usecase = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=fiscal_end_month, max_quarters=5)
+        return usecase.execute(rows)
 
     @staticmethod
     def build_financial_metric_rows(
@@ -213,7 +230,11 @@ class FundamentalAnalysisService:
                         balance_sheet_rows = repository.fetch_kabutan_balance_sheet_rows_from_file(html_path)
                     except Exception:
                         balance_sheet_rows = ()
-                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, balance_sheet_rows=balance_sheet_rows, source="html")
+                    try:
+                        quarterly_actual_rows = repository.fetch_kabutan_quarterly_actual_rows_from_file(html_path, ticker=code4)
+                    except Exception:
+                        quarterly_actual_rows = ()
+                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, balance_sheet_rows=balance_sheet_rows, quarterly_actual_rows=quarterly_actual_rows, source="html")
                 except Exception:
                     continue
 

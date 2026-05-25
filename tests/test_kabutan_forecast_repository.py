@@ -171,6 +171,7 @@ def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_bloc
     assert rows[0].sales == 1000
     assert rows[0].operating_profit == 100
     assert rows[0].ordinary_profit == 90
+    assert rows[0].final_profit == 80
     assert rows[0].revised_eps == 10.1
     assert rows[0].operating_margin == 10.0
     assert rows[0].quarter is None
