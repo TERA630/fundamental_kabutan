@@ -241,3 +241,64 @@ def test_build_kabutan_forecast_output_quarterly_snapshot():
     ]
     for line in expected_lines:
         assert line in text
+
+
+def test_build_kabutan_forecast_output_quarterly_snapshot_all_yoy_blank():
+    text = build_kabutan_forecast_output(
+        "base",
+        None,
+        "none",
+        None,
+        (),
+        None,
+        (),
+        (
+            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),
+            QuarterlyMetricRow(2025, Quarter.Q2, 6, 1100, 120, 95, 82, 11.0, None, None, 10.9),
+        ),
+    )
+    assert "2025.3　10.0億|1.0億()|0.9億|0.8億|10.0円()|10.0%|" in text
+    assert "2025.6　11.0億|1.2億()|0.9億|0.8億|11.0円()|10.9%|" in text
+
+
+def test_build_kabutan_forecast_output_section_order_includes_quarterly_after_annual():
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80),
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110),
+        next_forecast=None,
+    )
+    text = build_kabutan_forecast_output(
+        "base",
+        pair,
+        "html",
+        None,
+        (),
+        None,
+        (),
+        (QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),),
+    )
+    annual_pos = text.find("■株探 通期業績推移")
+    quarterly_pos = text.find("■四半期業績推移")
+    assert annual_pos != -1
+    assert quarterly_pos != -1
+    assert annual_pos < quarterly_pos
+
+
+def test_build_kabutan_forecast_output_quarterly_snapshot_non_standard_month_label():
+    text = build_kabutan_forecast_output(
+        "base",
+        None,
+        "none",
+        None,
+        (),
+        None,
+        (),
+        (
+            QuarterlyMetricRow(2025, Quarter.Q1, 12, 1000, 100, 90, 80, 10.0, 20.0, 15.0, 10.0),
+            QuarterlyMetricRow(2026, Quarter.Q1, 12, 1100, 120, 100, 90, 12.0, None, None, 10.9),
+        ),
+    )
+    assert "2025.12　10.0億|1.0億(+20.0%)|0.9億|0.8億|10.0円(+15.0%)|10.0%|" in text
+    assert "2026.12　11.0億|1.2億()|1.0億|0.9億|12.0円()|10.9%|" in text
