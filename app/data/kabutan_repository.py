@@ -13,6 +13,7 @@ from app.data.file_cache import FileCache
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.models.quarterly_financials import Quarter, QuarterlyActual
 
 
 KABUTAN_HEADER_ALIASES = {
@@ -40,6 +41,16 @@ KABUTAN_BALANCE_SHEET_HEADER_ALIASES = {
     "equity": ("自己資本",),
     "retained_earnings": ("剰余金",),
     "interest_bearing_debt_multiple": ("有利子負債倍率",),
+}
+
+KABUTAN_QUARTERLY_HEADER_ALIASES = {
+    "period": ("決算期",),
+    "sales": ("売上高",),
+    "operating_profit": ("営業益", "営業利益"),
+    "ordinary_profit": ("経常益", "経常利益"),
+    "final_profit": ("最終益", "最終利益"),
+    "revised_eps": ("修正1株益",),
+    "operating_margin": ("売上営業損益率",),
 }
 
 
@@ -74,6 +85,101 @@ def _parse_period(text: str) -> tuple[str, int, int] | None:
 
 def _clean_cell_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalize_quarterly_header(text: str) -> str:
+    cleaned = _clean_cell_text(text)
+    cleaned = cleaned.replace(" ", "").replace("\u3000", "")
+    return cleaned
+
+
+def _resolve_quarter_from_month(month: int) -> Quarter:
+    mapping = {
+        3: Quarter.Q4,
+        6: Quarter.Q1,
+        9: Quarter.Q2,
+        12: Quarter.Q3,
+    }
+    return mapping.get(month, Quarter.Q4)
+
+
+def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | None]:
+    normalized = [_normalize_quarterly_header(x) for x in header_cells]
+
+    def _find_idx(tokens: tuple[str, ...]) -> int | None:
+        return next((idx for idx, col in enumerate(normalized) if any(token in col for token in tokens)), None)
+
+    return {key: _find_idx(tokens) for key, tokens in KABUTAN_QUARTERLY_HEADER_ALIASES.items()}
+
+
+def _is_valid_quarterly_header(indices: dict[str, int | None]) -> bool:
+    required = ("period", "sales", "operating_profit", "ordinary_profit", "final_profit", "revised_eps", "operating_margin")
+    return all(indices.get(k) is not None for k in required)
+
+
+def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int | None], *, ticker: str) -> QuarterlyActual | None:
+    period_idx = indices.get("period")
+    if period_idx is None or len(cells) <= period_idx:
+        return None
+    period_text = cells[period_idx]
+    if "予" in period_text:
+        return None
+    parsed_period = _parse_period(period_text)
+    if parsed_period is None:
+        return None
+    _, year, month = parsed_period
+
+    def _int_val(key: str) -> int | None:
+        idx = indices.get(key)
+        if idx is None or len(cells) <= idx:
+            return None
+        return _to_int(cells[idx])
+
+    def _float_val(key: str) -> float | None:
+        idx = indices.get(key)
+        if idx is None or len(cells) <= idx:
+            return None
+        text = cells[idx].replace("%", "")
+        return _to_float(text)
+
+    return QuarterlyActual(
+        ticker=ticker,
+        fiscal_year=year,
+        quarter=_resolve_quarter_from_month(month),
+        sales=_int_val("sales"),
+        ordinary_profit=_int_val("ordinary_profit"),
+        operating_profit=_int_val("operating_profit"),
+        revised_eps=_float_val("revised_eps"),
+        operating_margin=_float_val("operating_margin"),
+    )
+
+
+def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[QuarterlyActual]:
+    soup = BeautifulSoup(html, "html.parser")
+    block = soup.select_one("div#wrapper_main>div#container>div#main>div#finance_box>div.fin_quarter_result_d")
+    if block is None:
+        return []
+
+    for table in block.find_all("table"):
+        header_indices: dict[str, int | None] | None = None
+        rows: list[QuarterlyActual] = []
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["th", "td"])
+            if not cells:
+                continue
+            cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
+            if header_indices is None:
+                maybe = _build_quarterly_header_indices(cleaned)
+                if _is_valid_quarterly_header(maybe):
+                    header_indices = maybe
+                continue
+
+            row = _build_quarterly_actual_from_cells(cleaned, header_indices, ticker=ticker)
+            if row is not None:
+                rows.append(row)
+        if rows:
+            return rows
+    return []
 
 
 def _find_kabutan_result_blocks(html: str) -> list[BeautifulSoup]:
@@ -524,6 +630,10 @@ class KabutanForecastRepository:
         html = Path(html_path).read_text(encoding="utf-8")
         return tuple(parse_kabutan_balance_sheet_rows(html))
 
+    def fetch_kabutan_quarterly_actual_rows_from_file(self, html_path: str | Path, *, ticker: str) -> tuple[QuarterlyActual, ...]:
+        html = Path(html_path).read_text(encoding="utf-8")
+        return tuple(parse_kabutan_quarterly_actual_rows(html, ticker=ticker))
+
     @staticmethod
     def get_kabutan_cache_payload(pair: KabutanForecastPair) -> dict[str, object]:
         rows = []
@@ -554,4 +664,9 @@ class KabutanForecastRepository:
         raise RuntimeError("Web取得は無効です。HTMLファイル入力を使用してください。")
 
 
-__all__ = ["KabutanForecastRepository", "_parse_kabutan_forecast_rows", "_extract_kabutan_visible_body"]
+__all__ = [
+    "KabutanForecastRepository",
+    "_parse_kabutan_forecast_rows",
+    "_extract_kabutan_visible_body",
+    "parse_kabutan_quarterly_actual_rows",
+]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.domain.models.quarterly_financials import QuarterlyActual
 from app.domain.models.quarterly_financials import GrowthMetricKind, QuarterlyGrowthMetrics, YoYMetric, YoYStatus
 
 
@@ -37,7 +38,30 @@ def resolve_operating_margin(
     return (operating_profit / sales) * 100
 
 
-def build_quarterly_growth_metrics(*, previous, current) -> QuarterlyGrowthMetrics:
+def _build_na_growth_metrics() -> QuarterlyGrowthMetrics:
+    na = YoYMetric(status=YoYStatus.NA, value_pct=None)
+    return QuarterlyGrowthMetrics(
+        operating_profit_yoy=na,
+        operating_margin_yoy=na,
+        revised_eps_yoy=na,
+    )
+
+
+def build_quarterly_growth_metrics(*, previous: QuarterlyActual | None, current: QuarterlyActual) -> QuarterlyGrowthMetrics:
+    if previous is None:
+        return _build_na_growth_metrics()
+
+    previous_margin = resolve_operating_margin(
+        previous.operating_margin,
+        sales=previous.sales,
+        operating_profit=previous.operating_profit,
+    )
+    current_margin = resolve_operating_margin(
+        current.operating_margin,
+        sales=current.sales,
+        operating_profit=current.operating_profit,
+    )
+
     return QuarterlyGrowthMetrics(
         operating_profit_yoy=calc_yoy_change(
             previous_value=previous.operating_profit,
@@ -45,8 +69,8 @@ def build_quarterly_growth_metrics(*, previous, current) -> QuarterlyGrowthMetri
             metric_kind=GrowthMetricKind.OPERATING_PROFIT,
         ),
         operating_margin_yoy=calc_yoy_change(
-            previous_value=previous.operating_margin,
-            current_value=current.operating_margin,
+            previous_value=previous_margin,
+            current_value=current_margin,
             metric_kind=GrowthMetricKind.OPERATING_MARGIN,
         ),
         revised_eps_yoy=calc_yoy_change(

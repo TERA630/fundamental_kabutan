@@ -63,3 +63,50 @@ def test_build_quarterly_growth_metrics() -> None:
     assert metrics.operating_profit_yoy.status == YoYStatus.TURNAROUND_TO_PROFIT
     assert metrics.revised_eps_yoy.status == YoYStatus.TURNAROUND_TO_PROFIT
     assert metrics.operating_margin_yoy.status == YoYStatus.OK
+
+
+def test_build_quarterly_growth_metrics_returns_na_when_previous_missing() -> None:
+    current = QuarterlyActual(
+        ticker="1234",
+        fiscal_year=2026,
+        quarter=Quarter.Q1,
+        sales=1_100,
+        ordinary_profit=120,
+        operating_profit=25,
+        revised_eps=3.0,
+        operating_margin=7.0,
+    )
+
+    metrics = build_quarterly_growth_metrics(previous=None, current=current)
+
+    assert metrics.operating_profit_yoy.status == YoYStatus.NA
+    assert metrics.operating_margin_yoy.status == YoYStatus.NA
+    assert metrics.revised_eps_yoy.status == YoYStatus.NA
+
+
+def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_missing() -> None:
+    previous = QuarterlyActual(
+        ticker="1234",
+        fiscal_year=2025,
+        quarter=Quarter.Q1,
+        sales=1_000,
+        ordinary_profit=100,
+        operating_profit=100,
+        revised_eps=10.0,
+        operating_margin=None,
+    )
+    current = QuarterlyActual(
+        ticker="1234",
+        fiscal_year=2026,
+        quarter=Quarter.Q1,
+        sales=2_000,
+        ordinary_profit=140,
+        operating_profit=260,
+        revised_eps=14.0,
+        operating_margin=None,
+    )
+
+    metrics = build_quarterly_growth_metrics(previous=previous, current=current)
+
+    assert metrics.operating_margin_yoy.status == YoYStatus.OK
+    assert metrics.operating_margin_yoy.value_pct == 30.0
