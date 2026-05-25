@@ -3,6 +3,7 @@ from app.data.kabutan_repository import (
     _get_kabutan_header_index,
     build_kabutan_forecast_snapshot,
     fetch_kabutan_header_indices,
+    parse_kabutan_quarterly_actual_rows,
 )
 
 
@@ -143,3 +144,39 @@ def test_parse_kabutan_forecast_rows_collects_all_rows_from_multiple_fin_year_ta
     """
     rows = _parse_kabutan_forecast_rows(html)
     assert [row.year for row in rows] == [2023, 2024, 2025, 2026, 2027]
+
+
+def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_block():
+    html = """
+    <div id="wrapper_main"><div id="container"><div id="main"><div id="finance_box">
+      <div class="fin_quarter_result_d">
+        <table>
+          <thead><tr>
+            <th>決算期</th><th>売上高</th><th>営業益</th><th>経常益</th><th>最終益</th>
+            <th><span class="help-label">修正<br>1株益<span class="help-icon"></span></span></th>
+            <th><span>売上営業<br>損益率</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><th>2025.06</th><td>1,000</td><td>100</td><td>90</td><td>80</td><td>10.1</td><td>10.0%</td></tr>
+            <tr><th>2026.06予</th><td>1,100</td><td>110</td><td>95</td><td>83</td><td>10.5</td><td>10.1%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div></div></div>
+    """
+    rows = parse_kabutan_quarterly_actual_rows(html, ticker="1234")
+    assert len(rows) == 1
+    assert rows[0].ticker == "1234"
+    assert rows[0].fiscal_year == 2025
+    assert rows[0].sales == 1000
+    assert rows[0].operating_profit == 100
+    assert rows[0].ordinary_profit == 90
+    assert rows[0].revised_eps == 10.1
+    assert rows[0].operating_margin == 10.0
+    assert rows[0].quarter is None
+    assert rows[0].quarter_end_month == 6
+
+
+def test_parse_kabutan_quarterly_actual_rows_returns_empty_when_block_missing():
+    rows = parse_kabutan_quarterly_actual_rows("<html><body><table></table></body></html>", ticker="1234")
+    assert rows == []

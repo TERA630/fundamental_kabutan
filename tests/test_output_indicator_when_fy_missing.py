@@ -18,8 +18,8 @@ def test_build_output_shows_indicator_when_fy_missing():
     assert '■指標' in text
     assert '株価：4,850円 / PBR 3.28 / ROE N/A' in text
     assert '業種：非鉄金属' in text
-    assert 'PER：2025年(実績) 24.2倍／2026年(実績) 22.0倍／2027年(予) 19.4倍' in text
-    assert '配当利回り：2025年(実績) 1.44%／2026年(実績) 1.65%／2027年(予) 1.86%' in text
+    assert 'PER：2025/03(実績) 24.2倍／2026/03(実績) 22.0倍／2027/03(予) 19.4倍' in text
+    assert '配当利回り：2025/03(実績) 1.44%／2026/03(実績) 1.65%／2027/03(予) 1.86%' in text
     assert '通期(FY)データを抽出できませんでした。' not in text
 
 
@@ -35,5 +35,5 @@ def test_build_output_keeps_per_when_dividend_missing():
             next_forecast=None,
         ),
     )
-    assert 'PER：2025年(実績) 10.0倍／2026年(実績) 8.0倍／2027年(予) 5.0倍' in text
+    assert 'PER：2025/03(実績) 10.0倍／2026/03(実績) 8.0倍／2027/03(予) 5.0倍' in text
     assert '配当利回り：N/A' in text

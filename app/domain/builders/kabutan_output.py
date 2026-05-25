@@ -55,7 +55,7 @@ def build_profit_with_margin_text(profit: int | None, margin: float | None) -> s
 
 
 def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
-    year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+    year_label = f"{row.year}/{row.month:02d}(予)" if row.section == "予想" else f"{row.year}/{row.month:02d}"
     operating_margin = calc_operating_margin(row.sales, row.operating_profit)
     ordinary_margin = calc_ordinary_margin(row.sales, row.ordinary_profit)
     return (
@@ -181,7 +181,7 @@ def _build_financial_lines(financial_metric_rows: tuple[FinancialMetricInputRow,
 def _build_growth_metric_line(title: str, growth_rows: list[KabutanForecastRow], values: list[float | None]) -> str:
     parts = [title]
     for row, value in zip(growth_rows, values):
-        year_label = f"{row.year}年(予)" if row.section == "予想" else f"{row.year}年"
+        year_label = f"{row.year}/{row.month:02d}(予)" if row.section == "予想" else f"{row.year}/{row.month:02d}"
         parts.append(f"{year_label} {_fmt_percent(value)}")
     return "　".join(parts)
 
