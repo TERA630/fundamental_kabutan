@@ -150,6 +150,7 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
         sales=_int_val("sales"),
         ordinary_profit=_int_val("ordinary_profit"),
         operating_profit=_int_val("operating_profit"),
+        final_profit=_int_val("final_profit"),
         revised_eps=_float_val("revised_eps"),
         operating_margin=_float_val("operating_margin"),
     )
@@ -157,29 +158,41 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
 
 def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[QuarterlyActual]:
     soup = BeautifulSoup(html, "html.parser")
-    block = soup.select_one("div#wrapper_main>div#container>div#main>div#finance_box>div.fin_quarter_result_d")
-    if block is None:
+    blocks = soup.select("div.fin_quarter_result_d")
+    if not blocks:
+        warnings.warn(
+            "四半期テーブル探索: div.fin_quarter_result_d が見つかりませんでした",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return []
 
-    for table in block.find_all("table"):
-        header_indices: dict[str, int | None] | None = None
-        rows: list[QuarterlyActual] = []
-        for tr in table.find_all("tr"):
-            cells = tr.find_all(["th", "td"])
-            if not cells:
-                continue
-            cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
-            if header_indices is None:
-                maybe = _build_quarterly_header_indices(cleaned)
-                if _is_valid_quarterly_header(maybe):
-                    header_indices = maybe
-                continue
+    for block in blocks:
+        for table in block.find_all("table"):
+            header_indices: dict[str, int | None] | None = None
+            rows: list[QuarterlyActual] = []
+            for tr in table.find_all("tr"):
+                cells = tr.find_all(["th", "td"])
+                if not cells:
+                    continue
+                cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
+                if header_indices is None:
+                    maybe = _build_quarterly_header_indices(cleaned)
+                    if _is_valid_quarterly_header(maybe):
+                        header_indices = maybe
+                    continue
 
-            row = _build_quarterly_actual_from_cells(cleaned, header_indices, ticker=ticker)
-            if row is not None:
-                rows.append(row)
-        if rows:
-            return rows
+                row = _build_quarterly_actual_from_cells(cleaned, header_indices, ticker=ticker)
+                if row is not None:
+                    rows.append(row)
+            if rows:
+                return rows
+
+    warnings.warn(
+        "四半期テーブル探索: ブロックは見つかりましたが、有効な四半期実績行を抽出できませんでした",
+        RuntimeWarning,
+        stacklevel=2,
+    )
     return []
 
 
