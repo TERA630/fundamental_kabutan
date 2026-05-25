@@ -1,5 +1,7 @@
 import unittest
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
+from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.models.quarterly_financials import QuarterlyActual
 
 
 class InMemoryCache:
@@ -89,3 +91,24 @@ class TestFundamentalAnalysisService(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_build_quarterly_metric_rows_prefers_fiscal_end_month_from_forecast_pair():
+    rows = (
+        QuarterlyActual("1234", 2025, None, 12, 100, 10, 10, 8, 1.0, None),
+        QuarterlyActual("1234", 2026, None, 12, 150, 15, 15, 12, 1.5, None),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2025.06", 2025, 6, "実績", 1000, 100, 90, 80),
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2026.06", 2026, 6, "予想", 1200, 120, 100, 90),
+        next_forecast=None,
+        all_rows=(
+            KabutanForecastRow("2025.06", 2025, 6, "実績", 1000, 100, 90, 80),
+            KabutanForecastRow("2026.06", 2026, 6, "予想", 1200, 120, 100, 90),
+        ),
+    )
+    out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=rows, forecast_pair=pair)
+    assert len(out) == 2
+    assert out[0].quarter.value == "Q2"
