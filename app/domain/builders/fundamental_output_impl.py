@@ -84,7 +84,7 @@ def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow], *, metric: 
 
 def build_year_label(row: KabutanForecastRow) -> str:
     suffix = "(予)" if row.section == "予想" else "(実績)"
-    return f"{row.year}年{suffix}"
+    return f"{row.year}/{row.month:02d}{suffix}"
 
 
 
