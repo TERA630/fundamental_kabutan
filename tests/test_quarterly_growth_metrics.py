@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from app.domain.models.quarterly_financials import GrowthMetricKind, Quarter, QuarterlyActual, YoYStatus
 from app.domain.policies.quarterly_growth_metrics import (
+    assign_quarter,
     build_quarterly_growth_metrics,
     calc_yoy_change,
+    find_prior_same_quarter,
     resolve_operating_margin,
     resolve_quarter_from_fiscal_end_month,
 )
@@ -132,3 +134,45 @@ def test_resolve_quarter_from_fiscal_end_month_supports_non_march_cycles() -> No
 def test_resolve_quarter_from_fiscal_end_month_returns_none_when_unresolvable() -> None:
     assert resolve_quarter_from_fiscal_end_month(quarter_end_month=None, fiscal_end_month=3) is None
     assert resolve_quarter_from_fiscal_end_month(quarter_end_month=8, fiscal_end_month=3) is None
+
+
+def test_assign_quarter_uses_fiscal_end_month() -> None:
+    row = QuarterlyActual(
+        ticker="1111",
+        fiscal_year=2024,
+        quarter=None,
+        quarter_end_month=12,
+        sales=100,
+        ordinary_profit=10,
+        operating_profit=9,
+        revised_eps=1.1,
+        operating_margin=9.0,
+    )
+    resolved = assign_quarter(row=row, fiscal_end_month=9)
+    assert resolved.quarter == Quarter.Q1
+
+
+def test_find_prior_same_quarter_returns_none_when_current_quarter_unknown() -> None:
+    current = QuarterlyActual(
+        ticker="1111",
+        fiscal_year=2025,
+        quarter=None,
+        quarter_end_month=3,
+        sales=200,
+        ordinary_profit=20,
+        operating_profit=18,
+        revised_eps=2.2,
+        operating_margin=9.0,
+    )
+    assert find_prior_same_quarter(rows=[], current=current) is None
+
+
+def test_find_prior_same_quarter_matches_previous_year_and_same_quarter() -> None:
+    rows = [
+        QuarterlyActual("1111", 2023, Quarter.Q4, 3, 100, 10, 9, 1.0, 9.0),
+        QuarterlyActual("1111", 2024, Quarter.Q1, 6, 120, 12, 11, 1.2, 9.2),
+    ]
+    current = QuarterlyActual("1111", 2025, Quarter.Q1, 6, 150, 15, 14, 1.4, 9.3)
+    prior = find_prior_same_quarter(rows=rows, current=current)
+    assert prior is not None
+    assert prior.fiscal_year == 2024
