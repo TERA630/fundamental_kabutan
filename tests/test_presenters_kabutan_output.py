@@ -16,9 +16,9 @@ def test_build_kabutan_forecast_output_appends_section():
     text = build_kabutan_forecast_output(base, pair, "html", None)
 
     assert "■株探 通期業績推移" in text
-    assert "2025年" in text
-    assert "2026年(予)" in text
-    assert "2027年(予)" in text
+    assert "2025/03" in text
+    assert "2026/03(予)" in text
+    assert "2027/03(予)" in text
 
 
 def test_build_kabutan_forecast_output_renders_na_rows_when_none():
@@ -26,7 +26,7 @@ def test_build_kabutan_forecast_output_renders_na_rows_when_none():
     assert "■株探 通期業績推移" in text
     assert "株探ソース: 取得不可 (HTML解析に失敗)" in text
     assert "データーが取得できません" in text
-    assert "2025年" not in text
+    assert "2025/03" not in text
     assert "予想チェーン" not in text
     assert "■キャッシュフロー" in text
     assert "N/A" in text
@@ -42,8 +42,8 @@ def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast
         next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1350, 150, 140, 120),
     )
     text = build_kabutan_forecast_output(base, pair, "html", None)
-    assert "2026年(予)" not in text.split("営業利益成長率", 1)[1]
-    assert "2027年(予)" in text
+    assert "2026/03(予)" not in text.split("営業利益成長率", 1)[1]
+    assert "2027/03(予)" in text
 
 
 def test_build_kabutan_forecast_output_uses_all_rows_when_available():
@@ -63,9 +63,9 @@ def test_build_kabutan_forecast_output_uses_all_rows_when_available():
         ),
     )
     text = build_kabutan_forecast_output(base, pair, "html", None)
-    assert "2023年" in text
-    assert "2024年" in text
-    assert "2027年(予)" in text
+    assert "2023/03" in text
+    assert "2024/03" in text
+    assert "2027/03(予)" in text
 
 
 def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_yield():
