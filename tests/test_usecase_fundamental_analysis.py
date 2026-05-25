@@ -122,3 +122,8 @@ def test_build_quarterly_metric_rows_falls_back_to_quarter_rows_when_forecast_pa
     out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=rows, forecast_pair=None)
     assert len(out) == 2
     assert out[0].quarter.value == "Q4"
+
+
+def test_build_quarterly_metric_rows_returns_empty_when_rows_missing():
+    out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=(), forecast_pair=None)
+    assert out == ()
