@@ -173,6 +173,8 @@ def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_bloc
     assert rows[0].ordinary_profit == 90
     assert rows[0].revised_eps == 10.1
     assert rows[0].operating_margin == 10.0
+    assert rows[0].quarter is None
+    assert rows[0].quarter_end_month == 6
 
 
 def test_parse_kabutan_quarterly_actual_rows_returns_empty_when_block_missing():

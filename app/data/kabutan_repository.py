@@ -13,7 +13,7 @@ from app.data.file_cache import FileCache
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
-from app.domain.models.quarterly_financials import Quarter, QuarterlyActual
+from app.domain.models.quarterly_financials import QuarterlyActual
 
 
 KABUTAN_HEADER_ALIASES = {
@@ -93,14 +93,14 @@ def _normalize_quarterly_header(text: str) -> str:
     return cleaned
 
 
-def _resolve_quarter_from_month(month: int) -> Quarter:
-    mapping = {
-        3: Quarter.Q4,
-        6: Quarter.Q1,
-        9: Quarter.Q2,
-        12: Quarter.Q3,
-    }
-    return mapping.get(month, Quarter.Q4)
+def _parse_quarter_period(text: str) -> tuple[int, int] | None:
+    match = re.search(r"(\d{4})\.(\d{2})(?:-(\d{2}))?", text)
+    if not match:
+        return None
+    year = int(match.group(1))
+    start_month = int(match.group(2))
+    end_month = int(match.group(3)) if match.group(3) else start_month
+    return year, end_month
 
 
 def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | None]:
@@ -124,10 +124,10 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
     period_text = cells[period_idx]
     if "予" in period_text:
         return None
-    parsed_period = _parse_period(period_text)
+    parsed_period = _parse_quarter_period(period_text)
     if parsed_period is None:
         return None
-    _, year, month = parsed_period
+    year, end_month = parsed_period
 
     def _int_val(key: str) -> int | None:
         idx = indices.get(key)
@@ -145,7 +145,8 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
     return QuarterlyActual(
         ticker=ticker,
         fiscal_year=year,
-        quarter=_resolve_quarter_from_month(month),
+        quarter=None,
+        quarter_end_month=end_month,
         sales=_int_val("sales"),
         ordinary_profit=_int_val("ordinary_profit"),
         operating_profit=_int_val("operating_profit"),
@@ -592,6 +593,19 @@ def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years:
         next_forecast=next_forecast,
         all_rows=tuple(rows),
     )
+
+
+def infer_fiscal_year_end_month_from_forecast_rows(rows: list[KabutanForecastRow]) -> int | None:
+    if not rows:
+        return None
+    prioritized = [row.month for row in rows if row.section == "実績"]
+    months = prioritized or [row.month for row in rows]
+    if not months:
+        return None
+    counts: dict[int, int] = {}
+    for month in months:
+        counts[month] = counts.get(month, 0) + 1
+    return max(sorted(counts.keys()), key=lambda m: counts[m])
 
 
 class KabutanForecastRepository:

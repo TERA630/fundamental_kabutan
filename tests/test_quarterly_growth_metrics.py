@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from app.domain.models.quarterly_financials import GrowthMetricKind, Quarter, QuarterlyActual, YoYStatus
-from app.domain.policies.quarterly_growth_metrics import build_quarterly_growth_metrics, calc_yoy_change, resolve_operating_margin
+from app.domain.policies.quarterly_growth_metrics import (
+    assign_quarter,
+    build_quarterly_growth_metrics,
+    calc_yoy_change,
+    find_prior_same_quarter,
+    resolve_operating_margin,
+    resolve_quarter_from_fiscal_end_month,
+)
 
 
 def test_calc_yoy_change_returns_na_when_previous_zero() -> None:
@@ -41,6 +48,7 @@ def test_build_quarterly_growth_metrics() -> None:
         ticker="1234",
         fiscal_year=2025,
         quarter=Quarter.Q1,
+        quarter_end_month=6,
         sales=1_000,
         ordinary_profit=100,
         operating_profit=-50,
@@ -51,6 +59,7 @@ def test_build_quarterly_growth_metrics() -> None:
         ticker="1234",
         fiscal_year=2026,
         quarter=Quarter.Q1,
+        quarter_end_month=6,
         sales=1_100,
         ordinary_profit=120,
         operating_profit=25,
@@ -70,6 +79,7 @@ def test_build_quarterly_growth_metrics_returns_na_when_previous_missing() -> No
         ticker="1234",
         fiscal_year=2026,
         quarter=Quarter.Q1,
+        quarter_end_month=6,
         sales=1_100,
         ordinary_profit=120,
         operating_profit=25,
@@ -89,6 +99,7 @@ def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_mi
         ticker="1234",
         fiscal_year=2025,
         quarter=Quarter.Q1,
+        quarter_end_month=6,
         sales=1_000,
         ordinary_profit=100,
         operating_profit=100,
@@ -99,6 +110,7 @@ def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_mi
         ticker="1234",
         fiscal_year=2026,
         quarter=Quarter.Q1,
+        quarter_end_month=6,
         sales=2_000,
         ordinary_profit=140,
         operating_profit=260,
@@ -110,3 +122,57 @@ def test_build_quarterly_growth_metrics_recomputes_margin_when_html_margin_is_mi
 
     assert metrics.operating_margin_yoy.status == YoYStatus.OK
     assert metrics.operating_margin_yoy.value_pct == 30.0
+
+
+def test_resolve_quarter_from_fiscal_end_month_supports_non_march_cycles() -> None:
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=12, fiscal_end_month=9) == Quarter.Q1
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=3, fiscal_end_month=9) == Quarter.Q2
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=6, fiscal_end_month=9) == Quarter.Q3
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=9, fiscal_end_month=9) == Quarter.Q4
+
+
+def test_resolve_quarter_from_fiscal_end_month_returns_none_when_unresolvable() -> None:
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=None, fiscal_end_month=3) is None
+    assert resolve_quarter_from_fiscal_end_month(quarter_end_month=8, fiscal_end_month=3) is None
+
+
+def test_assign_quarter_uses_fiscal_end_month() -> None:
+    row = QuarterlyActual(
+        ticker="1111",
+        fiscal_year=2024,
+        quarter=None,
+        quarter_end_month=12,
+        sales=100,
+        ordinary_profit=10,
+        operating_profit=9,
+        revised_eps=1.1,
+        operating_margin=9.0,
+    )
+    resolved = assign_quarter(row=row, fiscal_end_month=9)
+    assert resolved.quarter == Quarter.Q1
+
+
+def test_find_prior_same_quarter_returns_none_when_current_quarter_unknown() -> None:
+    current = QuarterlyActual(
+        ticker="1111",
+        fiscal_year=2025,
+        quarter=None,
+        quarter_end_month=3,
+        sales=200,
+        ordinary_profit=20,
+        operating_profit=18,
+        revised_eps=2.2,
+        operating_margin=9.0,
+    )
+    assert find_prior_same_quarter(rows=[], current=current) is None
+
+
+def test_find_prior_same_quarter_matches_previous_year_and_same_quarter() -> None:
+    rows = [
+        QuarterlyActual("1111", 2023, Quarter.Q4, 3, 100, 10, 9, 1.0, 9.0),
+        QuarterlyActual("1111", 2024, Quarter.Q1, 6, 120, 12, 11, 1.2, 9.2),
+    ]
+    current = QuarterlyActual("1111", 2025, Quarter.Q1, 6, 150, 15, 14, 1.4, 9.3)
+    prior = find_prior_same_quarter(rows=rows, current=current)
+    assert prior is not None
+    assert prior.fiscal_year == 2024

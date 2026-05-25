@@ -3,7 +3,47 @@
 from __future__ import annotations
 
 from app.domain.models.quarterly_financials import QuarterlyActual
-from app.domain.models.quarterly_financials import GrowthMetricKind, QuarterlyGrowthMetrics, YoYMetric, YoYStatus
+from app.domain.models.quarterly_financials import GrowthMetricKind, Quarter, QuarterlyGrowthMetrics, YoYMetric, YoYStatus
+
+
+def resolve_quarter_from_fiscal_end_month(*, quarter_end_month: int | None, fiscal_end_month: int | None) -> Quarter | None:
+    if quarter_end_month is None or fiscal_end_month is None:
+        return None
+    delta = (quarter_end_month - fiscal_end_month) % 12
+    mapping = {3: Quarter.Q1, 6: Quarter.Q2, 9: Quarter.Q3, 0: Quarter.Q4}
+    return mapping.get(delta)
+
+
+def assign_quarter(*, row: QuarterlyActual, fiscal_end_month: int | None) -> QuarterlyActual:
+    quarter = resolve_quarter_from_fiscal_end_month(
+        quarter_end_month=row.quarter_end_month,
+        fiscal_end_month=fiscal_end_month,
+    )
+    return QuarterlyActual(
+        ticker=row.ticker,
+        fiscal_year=row.fiscal_year,
+        quarter=quarter,
+        quarter_end_month=row.quarter_end_month,
+        sales=row.sales,
+        ordinary_profit=row.ordinary_profit,
+        operating_profit=row.operating_profit,
+        revised_eps=row.revised_eps,
+        operating_margin=row.operating_margin,
+    )
+
+
+def find_prior_same_quarter(*, rows: list[QuarterlyActual], current: QuarterlyActual) -> QuarterlyActual | None:
+    if current.quarter is None:
+        return None
+    for row in rows:
+        if row.ticker != current.ticker:
+            continue
+        if row.fiscal_year != current.fiscal_year - 1:
+            continue
+        if row.quarter != current.quarter:
+            continue
+        return row
+    return None
 
 
 def calc_yoy_change(
@@ -81,4 +121,11 @@ def build_quarterly_growth_metrics(*, previous: QuarterlyActual | None, current:
     )
 
 
-__all__ = ["build_quarterly_growth_metrics", "calc_yoy_change", "resolve_operating_margin"]
+__all__ = [
+    "assign_quarter",
+    "build_quarterly_growth_metrics",
+    "calc_yoy_change",
+    "find_prior_same_quarter",
+    "resolve_operating_margin",
+    "resolve_quarter_from_fiscal_end_month",
+]

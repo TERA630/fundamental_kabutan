@@ -29,7 +29,8 @@ class GrowthMetricKind(str, Enum):
 class QuarterlyActual:
     ticker: str
     fiscal_year: int
-    quarter: Quarter
+    quarter: Quarter | None
+    quarter_end_month: int | None
     sales: int | None
     ordinary_profit: int | None
     operating_profit: int | None
