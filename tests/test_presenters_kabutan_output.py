@@ -217,3 +217,27 @@ def test_build_kabutan_forecast_output_includes_quarterly_block():
     assert "売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|" in text
     assert "2025.3" in text
     assert "2026.3" in text
+
+
+def test_build_kabutan_forecast_output_quarterly_snapshot():
+    text = build_kabutan_forecast_output(
+        "base",
+        None,
+        "none",
+        None,
+        (),
+        None,
+        (),
+        (
+            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),
+            QuarterlyMetricRow(2025, Quarter.Q2, 6, None, None, 95, None, None, 12.3, None, None),
+        ),
+    )
+    expected_lines = [
+        "■四半期業績推移",
+        "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|",
+        "2025.3　10.0億|1.0億()|0.9億|0.8億|10.0円()|10.0%|",
+        "2025.6　N/A|N/A(+12.3%)|0.9億|N/A|N/A()|N/A|",
+    ]
+    for line in expected_lines:
+        assert line in text

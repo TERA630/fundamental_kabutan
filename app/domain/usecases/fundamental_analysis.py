@@ -133,18 +133,46 @@ class FundamentalAnalysisService:
             "quarterly_metric_rows": self.build_quarterly_metric_rows(
                 code4=code4,
                 rows=kabutan_fetch_result.quarterly_actual_rows,
+                forecast_pair=kabutan_fetch_result.pair,
             ),
         }
         return build_output_fn(**output_context)
 
 
     @staticmethod
-    def build_quarterly_metric_rows(*, code4: str, rows: tuple[QuarterlyActual, ...]) -> tuple[QuarterlyMetricRow, ...]:
+    def build_quarterly_metric_rows(
+        *,
+        code4: str,
+        rows: tuple[QuarterlyActual, ...],
+        forecast_pair: KabutanForecastPair | None,
+    ) -> tuple[QuarterlyMetricRow, ...]:
         if not rows:
             return ()
-        fiscal_end_month = max((row.quarter_end_month for row in rows if row.quarter_end_month is not None), default=None)
+        fiscal_end_month = FundamentalAnalysisService.resolve_fiscal_end_month_from_forecast_pair(forecast_pair)
+        if fiscal_end_month is None:
+            fiscal_end_month = max((row.quarter_end_month for row in rows if row.quarter_end_month is not None), default=None)
         usecase = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=fiscal_end_month, max_quarters=5)
         return usecase.execute(rows)
+
+    @staticmethod
+    def resolve_fiscal_end_month_from_forecast_pair(forecast_pair: KabutanForecastPair | None) -> int | None:
+        if forecast_pair is None:
+            return None
+        rows = list(forecast_pair.all_rows) if forecast_pair.all_rows else [
+            row
+            for row in (
+                forecast_pair.previous2_actual,
+                forecast_pair.previous_actual,
+                forecast_pair.current_actual,
+                forecast_pair.current_forecast,
+                forecast_pair.next_forecast,
+            )
+            if row is not None
+        ]
+        if not rows:
+            return None
+        # 通期業績テーブルの決算月（YYYY.MM の MM）を採用
+        return rows[-1].month
 
     @staticmethod
     def build_financial_metric_rows(
