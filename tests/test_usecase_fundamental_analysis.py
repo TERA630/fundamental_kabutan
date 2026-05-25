@@ -112,3 +112,13 @@ def test_build_quarterly_metric_rows_prefers_fiscal_end_month_from_forecast_pair
     out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=rows, forecast_pair=pair)
     assert len(out) == 2
     assert out[0].quarter.value == "Q2"
+
+
+def test_build_quarterly_metric_rows_falls_back_to_quarter_rows_when_forecast_pair_missing():
+    rows = (
+        QuarterlyActual("1234", 2025, None, 12, 100, 10, 10, 8, 1.0, None),
+        QuarterlyActual("1234", 2026, None, 12, 150, 15, 15, 12, 1.5, None),
+    )
+    out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=rows, forecast_pair=None)
+    assert len(out) == 2
+    assert out[0].quarter.value == "Q4"

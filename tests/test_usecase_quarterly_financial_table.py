@@ -91,3 +91,28 @@ def test_execute_preserves_final_profit() -> None:
     )
     out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=3, max_quarters=5).execute(rows)
     assert out[0].final_profit == 77
+
+
+def test_execute_returns_empty_when_rows_empty() -> None:
+    out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=3, max_quarters=5).execute(())
+    assert out == ()
+
+
+def test_execute_drops_rows_when_quarter_cannot_be_resolved() -> None:
+    rows = (
+        QuarterlyActual("1234", 2025, None, None, 100, 10, 9, 8, 1.0, None),
+        QuarterlyActual("1234", 2026, None, None, 120, 12, 11, 10, 1.2, None),
+    )
+    out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=3, max_quarters=5).execute(rows)
+    assert out == ()
+
+
+def test_execute_keeps_all_when_less_than_max_quarters() -> None:
+    rows = (
+        QuarterlyActual("1234", 2025, Quarter.Q1, 3, 100, 10, 9, 8, 1.0, 9.0),
+        QuarterlyActual("1234", 2025, Quarter.Q2, 6, 110, 11, 10, 9, 1.1, 9.1),
+        QuarterlyActual("1234", 2025, Quarter.Q3, 9, 120, 12, 11, 10, 1.2, 9.2),
+    )
+    out = BuildQuarterlyFinancialTableUseCase(fiscal_end_month=3, max_quarters=5).execute(rows)
+    assert len(out) == 3
+    assert [(x.fiscal_year, x.quarter_end_month) for x in out] == [(2025, 3), (2025, 6), (2025, 9)]
