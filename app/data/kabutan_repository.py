@@ -150,6 +150,7 @@ def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int 
         sales=_int_val("sales"),
         ordinary_profit=_int_val("ordinary_profit"),
         operating_profit=_int_val("operating_profit"),
+        final_profit=_int_val("final_profit"),
         revised_eps=_float_val("revised_eps"),
         operating_margin=_float_val("operating_margin"),
     )

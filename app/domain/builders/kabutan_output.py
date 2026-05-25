@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
+from app.domain.models.quarterly_financials import QuarterlyMetricRow
 from app.domain.policies.growth_metrics import (
     calc_eps_growth_rate,
     calc_operating_growth_rate,
@@ -178,6 +179,28 @@ def _build_financial_lines(financial_metric_rows: tuple[FinancialMetricInputRow,
     return lines
 
 
+
+def _fmt_ratio_or_blank(value: float | None) -> str:
+    if value is None:
+        return ""
+    return f"{value:+.1f}%"
+
+
+def _build_quarterly_lines(quarterly_metric_rows: tuple[QuarterlyMetricRow, ...]) -> list[str]:
+    if not quarterly_metric_rows:
+        return ["■四半期業績推移", "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|", "N/A"]
+
+    lines = ["■四半期業績推移", "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|"]
+    for row in quarterly_metric_rows:
+        label = f"{row.fiscal_year}.{row.quarter_end_month}" if row.quarter_end_month is not None else str(row.fiscal_year)
+        op = _fmt_oku(row.operating_profit)
+        op_yoy = _fmt_ratio_or_blank(row.operating_profit_yoy_pct)
+        eps = _fmt_yen(row.revised_eps)
+        eps_yoy = _fmt_ratio_or_blank(row.revised_eps_yoy_pct)
+        margin = _fmt_percent(row.operating_margin_pct) if row.operating_margin_pct is not None else "N/A"
+        lines.append(f"{label}　{_fmt_oku(row.sales)}|{op}({op_yoy})|{_fmt_oku(row.ordinary_profit)}|{_fmt_oku(row.final_profit)}|{eps}({eps_yoy})|{margin}|")
+    return lines
+
 def _build_growth_metric_line(title: str, growth_rows: list[KabutanForecastRow], values: list[float | None]) -> str:
     parts = [title]
     for row, value in zip(growth_rows, values):
@@ -214,6 +237,7 @@ def build_kabutan_forecast_output(
     kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
     market_cap: float | None = None,
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
+    quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
 ) -> str:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
@@ -268,7 +292,7 @@ def build_kabutan_forecast_output(
         )
 
     section = "\n".join(
-        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap), *_build_financial_lines(financial_metric_rows)]
+        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap), *_build_financial_lines(financial_metric_rows), *_build_quarterly_lines(quarterly_metric_rows)]
     )
     return f"{base_output}\n{section}"
 
