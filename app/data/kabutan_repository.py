@@ -49,7 +49,7 @@ KABUTAN_QUARTERLY_HEADER_ALIASES = {
     "operating_profit": ("営業益", "営業利益"),
     "ordinary_profit": ("経常益", "経常利益"),
     "final_profit": ("最終益", "最終利益"),
-    "revised_eps": ("修正1株益",),
+    "revised_eps": ("修正1株益", "1株益", "１株益"),
     "operating_margin": ("売上営業損益率",),
 }
 
@@ -94,10 +94,17 @@ def _normalize_quarterly_header(text: str) -> str:
 
 
 def _parse_quarter_period(text: str) -> tuple[int, int] | None:
-    match = re.search(r"(\d{4})\.(\d{2})(?:-(\d{2}))?", text)
+    normalized = _clean_cell_text(text)
+    normalized = (
+        normalized.replace("－", "-")
+        .replace("ー", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+    match = re.search(r"(\d{2})\.(\d{2})(?:-(\d{2}))?", normalized)
     if not match:
         return None
-    year = int(match.group(1))
+    year = 2000 + int(match.group(1))
     start_month = int(match.group(2))
     end_month = int(match.group(3)) if match.group(3) else start_month
     return year, end_month
@@ -114,7 +121,7 @@ def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | 
 
 def _is_valid_quarterly_header(indices: dict[str, int | None]) -> bool:
     # Proposal A: core columns are required; some columns are optional and can be N/A in display.
-    required_core = ("period", "sales", "operating_profit", "ordinary_profit", "revised_eps")
+    required_core = ("period", "sales", "operating_profit", "ordinary_profit")
     return all(indices.get(k) is not None for k in required_core)
 
 
@@ -168,6 +175,10 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
         )
         return []
 
+    first_header_candidate: list[str] | None = None
+    first_header_indices: dict[str, int | None] | None = None
+    first_data_row_candidate: list[str] | None = None
+
     for block in blocks:
         for table in block.find_all("table"):
             header_indices: dict[str, int | None] | None = None
@@ -179,10 +190,15 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
                 cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
                 if header_indices is None:
                     maybe = _build_quarterly_header_indices(cleaned)
+                    if first_header_candidate is None:
+                        first_header_candidate = cleaned
+                        first_header_indices = maybe
                     if _is_valid_quarterly_header(maybe):
                         header_indices = maybe
                     continue
 
+                if first_data_row_candidate is None:
+                    first_data_row_candidate = cleaned
                 row = _build_quarterly_actual_from_cells(cleaned, header_indices, ticker=ticker)
                 if row is not None:
                     rows.append(row)
@@ -190,7 +206,12 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
                 return rows
 
     warnings.warn(
-        "四半期テーブル探索: ブロックは見つかりましたが、有効な四半期実績行を抽出できませんでした",
+        (
+            "四半期テーブル探索: ブロックは見つかりましたが、有効な四半期実績行を抽出できませんでした"
+            f" / 先頭ヘッダ={first_header_candidate!r}"
+            f" / ヘッダ推定index={first_header_indices!r}"
+            f" / 先頭データ行候補={first_data_row_candidate!r}"
+        ),
         RuntimeWarning,
         stacklevel=2,
     )
