@@ -139,7 +139,15 @@ class FundamentalAnalysisService:
             ),
             "quarterly_message": kabutan_fetch_result.quarterly_message,
         }
-        accepted_params = inspect.signature(build_output_fn).parameters
+        signature = inspect.signature(build_output_fn)
+        accepts_var_keyword = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in signature.parameters.values()
+        )
+        if accepts_var_keyword:
+            return build_output_fn(**output_context)
+
+        accepted_params = signature.parameters
         safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
         return build_output_fn(**safe_context)
 

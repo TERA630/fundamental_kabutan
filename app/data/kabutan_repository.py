@@ -49,7 +49,7 @@ KABUTAN_QUARTERLY_HEADER_ALIASES = {
     "operating_profit": ("営業益", "営業利益"),
     "ordinary_profit": ("経常益", "経常利益"),
     "final_profit": ("最終益", "最終利益"),
-    "revised_eps": ("修正1株益",),
+    "revised_eps": ("修正1株益", "1株益", "１株益"),
     "operating_margin": ("売上営業損益率",),
 }
 
@@ -114,7 +114,7 @@ def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | 
 
 def _is_valid_quarterly_header(indices: dict[str, int | None]) -> bool:
     # Proposal A: core columns are required; some columns are optional and can be N/A in display.
-    required_core = ("period", "sales", "operating_profit", "ordinary_profit", "revised_eps")
+    required_core = ("period", "sales", "operating_profit", "ordinary_profit")
     return all(indices.get(k) is not None for k in required_core)
 
 
