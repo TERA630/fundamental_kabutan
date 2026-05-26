@@ -112,3 +112,54 @@ def test_total_judgement_boundaries():
     result = calculate_cf_score(data)
     assert result.total.total_points == 0
     assert result.total.judgement.startswith("✕")
+
+
+def test_score_per_negative_or_zero_is_not_scored_as_s():
+    neg = score_per(-12.0, 30.0)
+    zero = score_per(0.0, 30.0)
+    assert neg.rank == "D"
+    assert neg.points == 0
+    assert zero.rank == "D"
+    assert zero.points == 0
+
+
+def test_cash_conversion_negative_signs_do_not_get_high_scores():
+    both_negative = CfScoringInput(
+        code4="9999",
+        as_of=None,
+        roic=10.0,
+        ocf=-100.0,
+        net_income=-50.0,
+        operating_income=80.0,
+        revenue=1000.0,
+        fcf=10.0,
+        eps_cagr_3y=5.0,
+        sales_cagr_3y=5.0,
+        fcf_yield=2.0,
+        per=20.0,
+    )
+    result = calculate_cf_score(both_negative)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "cash_conversion_np")
+    assert metric.rank == "E"
+    assert metric.points == 0
+
+
+def test_cash_conversion_non_positive_ocf_is_e0_even_with_positive_income():
+    data = CfScoringInput(
+        code4="9999",
+        as_of=None,
+        roic=10.0,
+        ocf=0.0,
+        net_income=100.0,
+        operating_income=80.0,
+        revenue=1000.0,
+        fcf=10.0,
+        eps_cagr_3y=5.0,
+        sales_cagr_3y=5.0,
+        fcf_yield=2.0,
+        per=20.0,
+    )
+    result = calculate_cf_score(data)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "cash_conversion_np")
+    assert metric.rank == "E"
+    assert metric.points == 0

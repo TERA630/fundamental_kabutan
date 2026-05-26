@@ -39,6 +39,10 @@ def score_roic(roic: float | None) -> MetricScore:
 def score_cash_conversion_np(ocf: float | None, net_income: float | None) -> MetricScore:
     if ocf is None or net_income in (None, 0):
         return _metric("cash_conversion_np", "quality", None, "N/A", 0, 15)
+    if net_income <= 0:
+        return _metric("cash_conversion_np", "quality", ocf / net_income, "E", 0, 15, "invalid_sign: net_income <= 0")
+    if ocf <= 0:
+        return _metric("cash_conversion_np", "quality", ocf / net_income, "E", 0, 15, "invalid_sign: ocf <= 0")
     ratio = ocf / net_income
     if ratio < 0.3:
         return _metric("cash_conversion_np", "quality", ratio, "E", 0, 15)
@@ -186,6 +190,8 @@ def score_fcf_yield(fcf_yield: float | None, sales_cagr_3y: float | None) -> Met
 def score_per(per: float | None, eps_cagr_3y: float | None) -> MetricScore:
     if per is None:
         return _metric("per", "valuation", None, "N/A", 0, 5)
+    if per <= 0:
+        return _metric("per", "valuation", per, "D", 0, 5, "invalid_per: per <= 0")
     high_growth = eps_cagr_3y is not None and eps_cagr_3y > 20
     if per < 15:
         return _metric("per", "valuation", per, "S", 5, 5)
