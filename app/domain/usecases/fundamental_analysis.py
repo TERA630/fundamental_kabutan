@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
+import inspect
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
@@ -138,7 +139,9 @@ class FundamentalAnalysisService:
             ),
             "quarterly_message": kabutan_fetch_result.quarterly_message,
         }
-        return build_output_fn(**output_context)
+        accepted_params = inspect.signature(build_output_fn).parameters
+        safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
+        return build_output_fn(**safe_context)
 
 
     @staticmethod
