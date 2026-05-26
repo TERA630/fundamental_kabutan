@@ -175,6 +175,10 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
         )
         return []
 
+    first_header_candidate: list[str] | None = None
+    first_header_indices: dict[str, int | None] | None = None
+    first_data_row_candidate: list[str] | None = None
+
     for block in blocks:
         for table in block.find_all("table"):
             header_indices: dict[str, int | None] | None = None
@@ -186,10 +190,15 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
                 cleaned = [_clean_cell_text(c.get_text(" ", strip=True)) for c in cells]
                 if header_indices is None:
                     maybe = _build_quarterly_header_indices(cleaned)
+                    if first_header_candidate is None:
+                        first_header_candidate = cleaned
+                        first_header_indices = maybe
                     if _is_valid_quarterly_header(maybe):
                         header_indices = maybe
                     continue
 
+                if first_data_row_candidate is None:
+                    first_data_row_candidate = cleaned
                 row = _build_quarterly_actual_from_cells(cleaned, header_indices, ticker=ticker)
                 if row is not None:
                     rows.append(row)
@@ -197,7 +206,12 @@ def parse_kabutan_quarterly_actual_rows(html: str, *, ticker: str) -> list[Quart
                 return rows
 
     warnings.warn(
-        "四半期テーブル探索: ブロックは見つかりましたが、有効な四半期実績行を抽出できませんでした",
+        (
+            "四半期テーブル探索: ブロックは見つかりましたが、有効な四半期実績行を抽出できませんでした"
+            f" / 先頭ヘッダ={first_header_candidate!r}"
+            f" / ヘッダ推定index={first_header_indices!r}"
+            f" / 先頭データ行候補={first_data_row_candidate!r}"
+        ),
         RuntimeWarning,
         stacklevel=2,
     )
