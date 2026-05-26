@@ -8,7 +8,15 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 
 from app.gui_controller import FundamentalGuiController
-from app.gui_state import GuiState, build_default_output_filename, build_output_cache_key, build_stock_choices, get_selected_stock
+from app.gui_state import (
+    GuiState,
+    build_default_output_filename,
+    build_output_cache_key,
+    build_stock_choices,
+    current_date_iso,
+    get_selected_stock,
+    should_rotate_output_cache,
+)
 from app.gui_view import FundamentalView
 from app.gui_view_model import GuiViewModel
 
@@ -46,6 +54,7 @@ class FundamentalApp:
             on_open_kabutan_dir=self.open_kabutan_html_dir,
         )
         self.state.output_cache = self.controller.fetch_output_cache_for_today()
+        self.state.output_cache_date = current_date_iso()
         self._restore_watchlist()
         self._restore_kabutan_html_dir()
 
@@ -70,6 +79,7 @@ class FundamentalApp:
         self.controller.save_watchlist_path_cache(self.state.watchlist_path)
         self.state.watchlist = watchlist
         self.state.output_cache.clear()
+        self.state.output_cache_date = current_date_iso()
         self.controller.save_output_cache_for_today(self.state.output_cache)
         self.path_var.set(str(self.state.watchlist_path))
         self._populate_stock_choices()
@@ -95,6 +105,7 @@ class FundamentalApp:
         self.state.kabutan_html_dir = Path(path)
         self.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
         self.state.output_cache.clear()
+        self.state.output_cache_date = current_date_iso()
         self.controller.save_output_cache_for_today(self.state.output_cache)
         self.kabutan_dir_var.set(str(self.state.kabutan_html_dir))
         self.status_var.set(self.view_model.build_kabutan_dir_selected_status())
@@ -169,6 +180,13 @@ class FundamentalApp:
         self._render_output(cached_output, self.view_model.build_cached_status(name, code4))
         return True
 
+    def _rotate_output_cache_if_needed(self) -> None:
+        if not should_rotate_output_cache(self.state.output_cache_date):
+            return
+        self.state.output_cache.clear()
+        self.state.output_cache_date = current_date_iso()
+        self.controller.save_output_cache_for_today(self.state.output_cache)
+
     def _start_fetch_thread(self, name: str, code4: str, cache_key: str) -> None:
         self.set_busy(True, self.view_model.build_fetching_status(name, code4))
         thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
@@ -177,6 +195,8 @@ class FundamentalApp:
     def generate_text(self):
         if self.state.is_fetching:
             return
+
+        self._rotate_output_cache_if_needed()
 
         selected = self._require_selected_stock()
         if selected is None:
