@@ -94,10 +94,17 @@ def _normalize_quarterly_header(text: str) -> str:
 
 
 def _parse_quarter_period(text: str) -> tuple[int, int] | None:
-    match = re.search(r"(\d{4})\.(\d{2})(?:-(\d{2}))?", text)
+    normalized = _clean_cell_text(text)
+    normalized = (
+        normalized.replace("－", "-")
+        .replace("ー", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+    match = re.search(r"(\d{2})\.(\d{2})(?:-(\d{2}))?", normalized)
     if not match:
         return None
-    year = int(match.group(1))
+    year = 2000 + int(match.group(1))
     start_month = int(match.group(2))
     end_month = int(match.group(3)) if match.group(3) else start_month
     return year, end_month
