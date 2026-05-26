@@ -95,6 +95,7 @@ class FundamentalApp:
         self.state.kabutan_html_dir = Path(path)
         self.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
         self.state.output_cache.clear()
+        self.controller.save_output_cache_for_today(self.state.output_cache)
         self.kabutan_dir_var.set(str(self.state.kabutan_html_dir))
         self.status_var.set(self.view_model.build_kabutan_dir_selected_status())
 
