@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 
@@ -15,7 +16,18 @@ class GuiState:
     watchlist: list[tuple[str, str]] = field(default_factory=list)
     display_to_code: dict[str, tuple[str, str]] = field(default_factory=dict)
     output_cache: dict[str, str] = field(default_factory=dict)
+    output_cache_date: str | None = None
     is_fetching: bool = False
+
+
+def current_date_iso(*, today: date | None = None) -> str:
+    return (today or date.today()).isoformat()
+
+
+def should_rotate_output_cache(cache_date: str | None, *, today: date | None = None) -> bool:
+    if cache_date is None:
+        return False
+    return cache_date != current_date_iso(today=today)
 
 
 def build_stock_choices(watchlist: list[tuple[str, str]]) -> tuple[list[str], dict[str, tuple[str, str]]]:
@@ -49,6 +61,8 @@ def build_output_cache_key(code4: str, kabutan_html_dir: Path | None) -> str:
 
 __all__ = [
     "GuiState",
+    "current_date_iso",
+    "should_rotate_output_cache",
     "build_stock_choices",
     "get_selected_stock",
     "build_default_output_filename",
