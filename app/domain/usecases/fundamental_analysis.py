@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
+import inspect
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
@@ -71,6 +72,7 @@ class KabutanFetchResult:
     message: str | None = None
     balance_sheet_rows: tuple[KabutanBalanceSheetRow, ...] = ()
     quarterly_actual_rows: tuple[QuarterlyActual, ...] = ()
+    quarterly_message: str | None = None
 
 
 class FundamentalAnalysisService:
@@ -135,8 +137,11 @@ class FundamentalAnalysisService:
                 rows=kabutan_fetch_result.quarterly_actual_rows,
                 forecast_pair=kabutan_fetch_result.pair,
             ),
+            "quarterly_message": kabutan_fetch_result.quarterly_message,
         }
-        return build_output_fn(**output_context)
+        accepted_params = inspect.signature(build_output_fn).parameters
+        safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
+        return build_output_fn(**safe_context)
 
 
     @staticmethod
@@ -260,9 +265,18 @@ class FundamentalAnalysisService:
                         balance_sheet_rows = ()
                     try:
                         quarterly_actual_rows = repository.fetch_kabutan_quarterly_actual_rows_from_file(html_path, ticker=code4)
-                    except Exception:
+                        quarterly_message: str | None = None
+                    except Exception as exc:
                         quarterly_actual_rows = ()
-                    return KabutanFetchResult(pair=pair, cashflow_rows=cashflow_rows, balance_sheet_rows=balance_sheet_rows, quarterly_actual_rows=quarterly_actual_rows, source="html")
+                        quarterly_message = f"四半期業績推移の解析失敗: {exc}"
+                    return KabutanFetchResult(
+                        pair=pair,
+                        cashflow_rows=cashflow_rows,
+                        balance_sheet_rows=balance_sheet_rows,
+                        quarterly_actual_rows=quarterly_actual_rows,
+                        quarterly_message=quarterly_message,
+                        source="html",
+                    )
                 except Exception:
                     continue
 
