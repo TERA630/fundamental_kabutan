@@ -171,6 +171,7 @@ def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_bloc
     assert rows[0].sales == 1000
     assert rows[0].operating_profit == 100
     assert rows[0].ordinary_profit == 90
+    assert rows[0].final_profit == 80
     assert rows[0].revised_eps == 10.1
     assert rows[0].operating_margin == 10.0
     assert rows[0].quarter is None
@@ -180,3 +181,48 @@ def test_parse_kabutan_quarterly_actual_rows_parses_actual_only_from_target_bloc
 def test_parse_kabutan_quarterly_actual_rows_returns_empty_when_block_missing():
     rows = parse_kabutan_quarterly_actual_rows("<html><body><table></table></body></html>", ticker="1234")
     assert rows == []
+
+
+def test_parse_kabutan_quarterly_actual_rows_parses_when_final_profit_header_missing():
+    html = """
+    <div id="wrapper_main"><div id="container"><div id="main"><div id="finance_box">
+      <div class="fin_quarter_result_d">
+        <table>
+          <thead><tr>
+            <th>決算期</th><th>売上高</th><th>営業益</th><th>経常益</th>
+            <th><span class="help-label">修正<br>1株益</span></th>
+            <th><span>売上営業<br>損益率</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><th>2025.06</th><td>1,000</td><td>100</td><td>90</td><td>10.1</td><td>10.0%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div></div></div>
+    """
+    rows = parse_kabutan_quarterly_actual_rows(html, ticker="1234")
+    assert len(rows) == 1
+    assert rows[0].final_profit is None
+    assert rows[0].operating_margin == 10.0
+
+
+def test_parse_kabutan_quarterly_actual_rows_parses_when_operating_margin_header_missing():
+    html = """
+    <div id="wrapper_main"><div id="container"><div id="main"><div id="finance_box">
+      <div class="fin_quarter_result_d">
+        <table>
+          <thead><tr>
+            <th>決算期</th><th>売上高</th><th>営業益</th><th>経常益</th><th>最終益</th>
+            <th><span class="help-label">修正<br>1株益</span></th>
+          </tr></thead>
+          <tbody>
+            <tr><th>2025.06</th><td>1,000</td><td>100</td><td>90</td><td>80</td><td>10.1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div></div></div>
+    """
+    rows = parse_kabutan_quarterly_actual_rows(html, ticker="1234")
+    assert len(rows) == 1
+    assert rows[0].final_profit == 80
+    assert rows[0].operating_margin is None
