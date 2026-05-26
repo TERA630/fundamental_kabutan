@@ -10,6 +10,7 @@ from app.data.kabutan_repository import KabutanForecastRepository
 from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.data.watchlist_repository import fetch_watchlist_entries
 from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
+from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.presenters import build_fundamental_output
@@ -36,6 +37,7 @@ class FundamentalGuiController:
     ):
         self.file_cache = file_cache or FileCache()
         self.resolve_kabutan_html_dir_usecase = ResolveKabutanHtmlDirUseCase()
+        self.resolve_watchlist_path_usecase = ResolveWatchlistPathUseCase()
         self.build_fundamental_service = build_fundamental_service or build_default_fundamental_service
 
     def fetch_resolved_kabutan_html_dir(self) -> ResolvedKabutanHtmlDir:
@@ -44,6 +46,19 @@ class FundamentalGuiController:
 
     def save_kabutan_html_dir_cache(self, path: Path) -> None:
         self.file_cache.save_kabutan_html_dir_cache(path)
+
+    def fetch_resolved_watchlist_path(self) -> ResolvedWatchlistPath:
+        cached_path = self.file_cache.fetch_watchlist_path_cache()
+        return self.resolve_watchlist_path_usecase.fetch_resolved_watchlist_path(cached_path)
+
+    def save_watchlist_path_cache(self, path: Path) -> None:
+        self.file_cache.save_watchlist_path_cache(path)
+
+    def fetch_output_cache_for_today(self) -> dict[str, str]:
+        return self.file_cache.fetch_output_cache_for_today()
+
+    def save_output_cache_for_today(self, output_cache: dict[str, str]) -> None:
+        self.file_cache.save_output_cache_for_today(output_cache)
 
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
         return fetch_watchlist_entries(path)

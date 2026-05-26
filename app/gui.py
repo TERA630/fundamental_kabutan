@@ -45,6 +45,8 @@ class FundamentalApp:
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
         )
+        self.state.output_cache = self.controller.fetch_output_cache_for_today()
+        self._restore_watchlist()
         self._restore_kabutan_html_dir()
 
     def set_busy(self, busy: bool, status: str | None = None):
@@ -65,10 +67,26 @@ class FundamentalApp:
             return
 
         self.state.watchlist_path = Path(path)
+        self.controller.save_watchlist_path_cache(self.state.watchlist_path)
         self.state.watchlist = watchlist
         self.state.output_cache.clear()
+        self.controller.save_output_cache_for_today(self.state.output_cache)
         self.path_var.set(str(self.state.watchlist_path))
         self._populate_stock_choices()
+
+    def _restore_watchlist(self) -> None:
+        resolved = self.controller.fetch_resolved_watchlist_path()
+        if resolved.status != "ok" or resolved.file_path is None:
+            return
+        try:
+            watchlist = self.controller.fetch_watchlist_entries(resolved.file_path)
+        except Exception:
+            return
+        self.state.watchlist_path = resolved.file_path
+        self.state.watchlist = watchlist
+        self.path_var.set(str(resolved.file_path))
+        self._populate_stock_choices()
+        self.status_var.set(self.view_model.build_watchlist_restored_status(len(watchlist)))
 
     def open_kabutan_html_dir(self):
         path = filedialog.askdirectory(title="株探HTML保存フォルダを選択")
@@ -130,6 +148,7 @@ class FundamentalApp:
                 output_cache_key=cache_key,
                 kabutan_html_dir=self.state.kabutan_html_dir,
             )
+            self.controller.save_output_cache_for_today(self.state.output_cache)
             self.master.after(0, lambda: self._render_output(output, self.view_model.build_generated_status(name, code4)))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
