@@ -51,3 +51,15 @@ def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
 
     assert resolved.status == "ok"
     assert resolved.dir_path == target.resolve()
+
+
+def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
+    controller = FundamentalGuiController()
+    target = tmp_path / "watchlist.md"
+    target.write_text("トヨタ (7203)\n", encoding="utf-8")
+
+    controller.save_watchlist_path_cache(target)
+    resolved = controller.fetch_resolved_watchlist_path()
+
+    assert resolved.status == "ok"
+    assert resolved.file_path == target.resolve()

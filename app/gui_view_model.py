@@ -11,6 +11,10 @@ class GuiViewModel:
         return f"{count}件の監視銘柄を読み込みました。"
 
     @staticmethod
+    def build_watchlist_restored_status(count: int) -> str:
+        return f"前回の監視銘柄ファイルを復元しました（{count}件）。"
+
+    @staticmethod
     def build_selected_status() -> str:
         return "銘柄を選択しました。取得ボタンを押してください。"
 
