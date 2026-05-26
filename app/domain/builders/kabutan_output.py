@@ -186,9 +186,10 @@ def _fmt_ratio_or_blank(value: float | None) -> str:
     return f"{value:+.1f}%"
 
 
-def _build_quarterly_lines(quarterly_metric_rows: tuple[QuarterlyMetricRow, ...]) -> list[str]:
+def _build_quarterly_lines(quarterly_metric_rows: tuple[QuarterlyMetricRow, ...], message: str | None = None) -> list[str]:
     if not quarterly_metric_rows:
-        return ["■四半期業績推移", "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|", "N/A"]
+        detail = f"N/A ({message})" if message else "N/A"
+        return ["■四半期業績推移", "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|", detail]
 
     lines = ["■四半期業績推移", "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|"]
     for row in quarterly_metric_rows:
@@ -238,6 +239,7 @@ def build_kabutan_forecast_output(
     market_cap: float | None = None,
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
     quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
+    quarterly_message: str | None = None,
 ) -> str:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
@@ -292,7 +294,17 @@ def build_kabutan_forecast_output(
         )
 
     section = "\n".join(
-        ["", "■株探 通期業績推移", _build_kabutan_source_label(kabutan_source, kabutan_source_message), header, *row_lines, *growth_lines, *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap), *_build_financial_lines(financial_metric_rows), *_build_quarterly_lines(quarterly_metric_rows)]
+        [
+            "",
+            "■株探 通期業績推移",
+            _build_kabutan_source_label(kabutan_source, kabutan_source_message),
+            header,
+            *row_lines,
+            *growth_lines,
+            *_build_cashflow_lines(rows, kabutan_cashflow_rows, market_cap),
+            *_build_financial_lines(financial_metric_rows),
+            *_build_quarterly_lines(quarterly_metric_rows, quarterly_message),
+        ]
     )
     return f"{base_output}\n{section}"
 
