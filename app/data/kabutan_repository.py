@@ -113,8 +113,9 @@ def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | 
 
 
 def _is_valid_quarterly_header(indices: dict[str, int | None]) -> bool:
-    required = ("period", "sales", "operating_profit", "ordinary_profit", "final_profit", "revised_eps", "operating_margin")
-    return all(indices.get(k) is not None for k in required)
+    # Proposal A: core columns are required; some columns are optional and can be N/A in display.
+    required_core = ("period", "sales", "operating_profit", "ordinary_profit", "revised_eps")
+    return all(indices.get(k) is not None for k in required_core)
 
 
 def _build_quarterly_actual_from_cells(cells: list[str], indices: dict[str, int | None], *, ticker: str) -> QuarterlyActual | None:
