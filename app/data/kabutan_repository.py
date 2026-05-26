@@ -49,7 +49,7 @@ KABUTAN_QUARTERLY_HEADER_ALIASES = {
     "operating_profit": ("営業益", "営業利益"),
     "ordinary_profit": ("経常益", "経常利益"),
     "final_profit": ("最終益", "最終利益"),
-    "revised_eps": ("修正1株益",),
+    "revised_eps": ("修正1株益", "1株益", "１株益"),
     "operating_margin": ("売上営業損益率",),
 }
 
@@ -94,10 +94,17 @@ def _normalize_quarterly_header(text: str) -> str:
 
 
 def _parse_quarter_period(text: str) -> tuple[int, int] | None:
-    match = re.search(r"(\d{4})\.(\d{2})(?:-(\d{2}))?", text)
+    normalized = _clean_cell_text(text)
+    normalized = (
+        normalized.replace("－", "-")
+        .replace("ー", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+    match = re.search(r"(\d{2})\.(\d{2})(?:-(\d{2}))?", normalized)
     if not match:
         return None
-    year = int(match.group(1))
+    year = 2000 + int(match.group(1))
     start_month = int(match.group(2))
     end_month = int(match.group(3)) if match.group(3) else start_month
     return year, end_month
@@ -114,7 +121,7 @@ def _build_quarterly_header_indices(header_cells: list[str]) -> dict[str, int | 
 
 def _is_valid_quarterly_header(indices: dict[str, int | None]) -> bool:
     # Proposal A: core columns are required; some columns are optional and can be N/A in display.
-    required_core = ("period", "sales", "operating_profit", "ordinary_profit", "revised_eps")
+    required_core = ("period", "sales", "operating_profit", "ordinary_profit")
     return all(indices.get(k) is not None for k in required_core)
 
 
