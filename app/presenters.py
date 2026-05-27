@@ -68,8 +68,8 @@ def _format_metric_score(metric: MetricScore) -> str | None:
         )
         return None
 
-    raw = "N/A" if metric.raw_value is None else f"{metric.raw_value:.2f}"
-    if metric.metric_id == "fcf_yield" and metric.raw_value is not None:
+    raw = f"{metric.raw_value:.2f}"
+    if metric.metric_id == "fcf_yield":
         raw = f"{metric.raw_value:.2f}%"
     return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
 
@@ -78,10 +78,12 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
     lines: list[str] = [
         "",
         "■rankCF スコア",
-        f"バージョン: {scoring.version}",
         f"算出日: {scoring.as_of or 'N/A'}",
+        f"総合評価: {scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
+        f"投資分類: {scoring.total.investment_category}",
+        f"投資戦略: {scoring.total.investment_strategy}",
+        "",
         f"合計: {scoring.total.total_points}/{scoring.total.max_points}",
-        f"判定: {scoring.total.judgement}",
         f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
     ]
     for metric in scoring.quality.metrics:

@@ -44,6 +44,9 @@ def _sample_scoring() -> CfScoringResult:
 def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     text = build_cf_scoring_summary_text(_sample_scoring())
     assert "■rankCF スコア" in text
+    assert "総合評価: A (73/100点) バージョン: rankcf-v1" in text
+    assert "投資分類: 標準的な強銘柄" in text
+    assert "投資戦略: トレンド・地合い次第で順張り。" in text
     assert "合計: 73/100" in text
     assert "Quality: 45/60" in text
     assert "Growth: 20/25" in text
@@ -117,6 +120,8 @@ def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
     assert "Quality: 0/60" in text
     assert "Growth: 0/25" in text
     assert "Valuation: 0/15" in text
+    assert "投資分類: 対象外" in text
+    assert "投資戦略: 基本ノータッチ" in text
     assert "ROIC:" not in text
     assert "FCF Ratio" not in text
     assert "取得不可: ROIC (値欠損)" in caplog.text
