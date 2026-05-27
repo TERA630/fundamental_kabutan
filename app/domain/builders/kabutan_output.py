@@ -153,7 +153,7 @@ def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[K
         fcf_yield_pct = _calc_fcf_yield_pct(resolved_fcf, market_cap)
         investment_aggressiveness_pct = None
         if cf_row.operating_cf not in (None, 0) and cf_row.investing_cf is not None:
-            investment_aggressiveness_pct = abs(cf_row.investing_cf) / abs(cf_row.operating_cf) * 100
+            investment_aggressiveness_pct = abs(cf_row.investing_cf) / cf_row.operating_cf * 100
 
         lines.append(
             f"{cf_row.year} | {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)} | {_fmt_percent(fcf_yield_pct)} | {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} | {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)} | {_fmt_percent(investment_aggressiveness_pct)}"

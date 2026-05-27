@@ -127,6 +127,30 @@ def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_c
     assert "2024 | 300.0% | 0.8% | 8.0% | 15.0% | 46.7%" in text
 
 
+def test_build_kabutan_forecast_output_keeps_negative_operating_cf_sign_for_investment_aggressiveness():
+    base = "base output"
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2024.03", 2024, 3, "螳溽ｸｾ", 1000, 110, 100, 50),
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2024.03", 2024, 3, "莠域Φ", 1010, 112, 101, 51),
+        next_forecast=None,
+    )
+
+    from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+
+    text = build_kabutan_forecast_output(
+        base,
+        pair,
+        "html",
+        None,
+        (KabutanCashflowRow("2024.03", 2024, 3, -150, -100, -50, 30, 350),),
+        10_000_000_000.0,
+    )
+
+    assert "2024 | -200.0% | -1.5% | -15.0% | -10.0% | -50.0%" in text
+
+
 def test_build_kabutan_forecast_output_appends_financial_block_with_formats():
     base = "base output"
     text = build_kabutan_forecast_output(
