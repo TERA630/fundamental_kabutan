@@ -1,6 +1,7 @@
 """Presentation helpers: bridge GUI use-cases and domain/output builders."""
 
 from __future__ import annotations
+import logging
 from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text
@@ -24,9 +25,25 @@ METRIC_LABELS = {
     "per": "PER",
 }
 
+logger = logging.getLogger(__name__)
 
-def _format_metric_score(metric: MetricScore) -> str:
+
+def _format_metric_score(metric: MetricScore) -> str | None:
     label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
+    if metric.raw_value is None:
+        reason = "値欠損"
+        logger.info("取得不可: %s (%s)", label, reason)
+        logger.debug(
+            "N/A項目を表示省略: metric_id=%s rank=%s points=%s/%s rule_notes=%s reason=%s",
+            metric.metric_id,
+            metric.rank,
+            metric.points,
+            metric.max_points,
+            metric.rule_notes,
+            reason,
+        )
+        return None
+
     raw = "N/A" if metric.raw_value is None else f"{metric.raw_value:.2f}"
     if metric.metric_id == "fcf_yield" and metric.raw_value is not None:
         raw = f"{metric.raw_value:.2f}%"
@@ -43,11 +60,20 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
         f"判定: {scoring.total.judgement}",
         f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
     ]
-    lines.extend(_format_metric_score(metric) for metric in scoring.quality.metrics)
+    for metric in scoring.quality.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
     lines.append(f"Growth: {scoring.growth.subtotal}/{scoring.growth.max_points}")
-    lines.extend(_format_metric_score(metric) for metric in scoring.growth.metrics)
+    for metric in scoring.growth.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
     lines.append(f"Valuation: {scoring.valuation.subtotal}/{scoring.valuation.max_points}")
-    lines.extend(_format_metric_score(metric) for metric in scoring.valuation.metrics)
+    for metric in scoring.valuation.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
 
     notes = [note for category in (scoring.quality, scoring.growth, scoring.valuation) for metric in category.metrics for note in metric.rule_notes]
     lines.append("ルール注記:")
