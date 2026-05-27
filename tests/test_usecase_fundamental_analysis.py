@@ -127,3 +127,32 @@ def test_build_quarterly_metric_rows_falls_back_to_quarter_rows_when_forecast_pa
 def test_build_quarterly_metric_rows_returns_empty_when_rows_missing():
     out = FundamentalAnalysisService.build_quarterly_metric_rows(code4="1234", rows=(), forecast_pair=None)
     assert out == ()
+
+
+
+def test_build_cf_scoring_input_prefers_next_forecast_eps_for_per():
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2024.03", 2024, 3, "実績", 1000, 100, 90, 80, 100.0, None),
+        current_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1200, 120, 100, 90, 110.0, None),
+        current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1300, 130, 110, 95, 130.0, None),
+        next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1400, 150, 120, 100, 200.0, None),
+        all_rows=(
+            KabutanForecastRow("2024.03", 2024, 3, "実績", 1000, 100, 90, 80, 100.0, None),
+            KabutanForecastRow("2025.03", 2025, 3, "実績", 1200, 120, 100, 90, 110.0, None),
+        ),
+    )
+    from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+    from app.domain.models.financial_snapshot import FinancialMetricInputRow
+
+    scoring_input = FundamentalAnalysisService.build_cf_scoring_input(
+        code4="1234",
+        as_of=None,
+        price=2000.0,
+        market_per=99.0,
+        forecast_pair=pair,
+        cashflow_rows=(KabutanCashflowRow("2025.03", 2025, 3, 50, 100, -50, 0, 0),),
+        financial_metric_rows=(FinancialMetricInputRow(2025, 90, 600, 120, 100, 1000.0, 2000.0),),
+    )
+    assert scoring_input is not None
+    assert scoring_input.per == 10.0

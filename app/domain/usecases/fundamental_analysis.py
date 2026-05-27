@@ -15,12 +15,14 @@ from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.cf_scoring_input import CfScoringInput
 from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMetricRow
-from app.domain.policies.cf_scoring import calculate_cf_score
-from app.domain.policies.growth_metrics import calc_cagr
-from app.domain.policies.financial_metrics import calc_roic_approx
+from app.domain.models.cf_scoring_input import CfScoringInput
+from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.usecases.quarterly_financial_table import BuildQuarterlyFinancialTableUseCase
 from app.domain.policies.financial_rows import FinancialRowCandidate, select_common_financial_rows
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
+from app.domain.policies.cf_scoring import calculate_cf_score
+from app.domain.policies.financial_metrics import calc_roic_approx
+from app.domain.policies.growth_metrics import calc_cagr
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
 MARKET_SNAPSHOT_KEYS = (
@@ -121,6 +123,22 @@ class FundamentalAnalysisService:
             code4,
             html_dir=kabutan_html_dir,
         )
+        financial_metric_rows = self.build_financial_metric_rows(
+            price=price_snapshot.get("price"),
+            forecast_pair=kabutan_fetch_result.pair,
+            balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
+        )
+        cf_scoring_input = self.build_cf_scoring_input(
+            code4=code4,
+            as_of=None,
+            price=price_snapshot.get("price"),
+            market_per=price_snapshot.get("per"),
+            forecast_pair=kabutan_fetch_result.pair,
+            cashflow_rows=kabutan_fetch_result.cashflow_rows,
+            financial_metric_rows=financial_metric_rows,
+        )
+        cf_scoring_result = calculate_cf_score(cf_scoring_input) if cf_scoring_input is not None else None
+
         output_context = {
             "name": name,
             "code4": code4,
@@ -132,28 +150,14 @@ class FundamentalAnalysisService:
             "kabutan_cashflow_rows": kabutan_fetch_result.cashflow_rows,
             "kabutan_source": kabutan_fetch_result.source,
             "kabutan_source_message": kabutan_fetch_result.message,
-            "financial_metric_rows": self.build_financial_metric_rows(
-                price=price_snapshot.get("price"),
-                forecast_pair=kabutan_fetch_result.pair,
-                balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
-            ),
+            "financial_metric_rows": financial_metric_rows,
             "quarterly_metric_rows": self.build_quarterly_metric_rows(
                 code4=code4,
                 rows=kabutan_fetch_result.quarterly_actual_rows,
                 forecast_pair=kabutan_fetch_result.pair,
             ),
             "quarterly_message": kabutan_fetch_result.quarterly_message,
-            "cf_scoring_result": self._build_cf_scoring_result(
-                code4=code4,
-                market_snapshot=price_snapshot,
-                forecast_pair=kabutan_fetch_result.pair,
-                cashflow_rows=kabutan_fetch_result.cashflow_rows,
-                financial_metric_rows=self.build_financial_metric_rows(
-                    price=price_snapshot.get("price"),
-                    forecast_pair=kabutan_fetch_result.pair,
-                    balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
-                ),
-            ),
+            "cf_scoring_result": cf_scoring_result,
         }
         signature = inspect.signature(build_output_fn)
         accepts_var_keyword = any(
@@ -347,6 +351,83 @@ class FundamentalAnalysisService:
                 )
             )
         return tuple(out)
+
+
+    @staticmethod
+    def build_cf_scoring_input(
+        *,
+        code4: str,
+        as_of: str | None,
+        price: float | None,
+        market_per: float | str | None,
+        forecast_pair: KabutanForecastPair | None,
+        cashflow_rows: tuple[KabutanCashflowRow, ...],
+        financial_metric_rows: tuple[FinancialMetricInputRow, ...],
+    ) -> CfScoringInput | None:
+        if forecast_pair is None:
+            return None
+
+        roic: float | None = None
+        if financial_metric_rows:
+            latest_fin = max(financial_metric_rows, key=lambda row: row.year)
+            roic = calc_roic_approx(latest_fin.operating_profit, latest_fin.equity, latest_fin.interest_bearing_debt)
+
+        actual_rows = [row for row in forecast_pair.all_rows if row.section == "実績"] if forecast_pair.all_rows else []
+        latest_actual = max(actual_rows, key=lambda row: (row.year, row.month)) if actual_rows else None
+
+        latest_cf = max(cashflow_rows, key=lambda row: (row.year, row.month)) if cashflow_rows else None
+        ocf = latest_cf.operating_cf if latest_cf is not None else None
+        fcf = None
+        if latest_cf is not None:
+            if latest_cf.free_cf is not None:
+                fcf = float(latest_cf.free_cf)
+            elif latest_cf.operating_cf is not None and latest_cf.investing_cf is not None:
+                fcf = float(latest_cf.operating_cf + latest_cf.investing_cf)
+
+        eps_candidates = [
+            (forecast_pair.next_forecast.revised_eps if forecast_pair.next_forecast is not None else None),
+            forecast_pair.current_forecast.revised_eps,
+        ]
+        forecast_eps = next((eps for eps in eps_candidates if eps is not None and eps > 0), None)
+        per_from_forecast = (float(price) / float(forecast_eps)) if (price is not None and forecast_eps is not None) else None
+
+        per: float | None = per_from_forecast
+        if per is None and isinstance(market_per, (int, float)):
+            per = float(market_per)
+
+        eps_start = latest_actual.revised_eps if latest_actual is not None else None
+        eps_end = forecast_eps
+        eps_years = 1
+        if latest_actual is not None:
+            target_year = forecast_pair.next_forecast.year if forecast_pair.next_forecast is not None else forecast_pair.current_forecast.year
+            eps_years = max(1, target_year - latest_actual.year)
+        eps_cagr_3y = calc_cagr(eps_start, eps_end, eps_years)
+
+        sales_start = latest_actual.sales if latest_actual is not None else None
+        sales_end_row = forecast_pair.next_forecast if forecast_pair.next_forecast is not None else forecast_pair.current_forecast
+        sales_end = sales_end_row.sales
+        sales_years = max(1, sales_end_row.year - latest_actual.year) if latest_actual is not None else 1
+        sales_cagr_3y = calc_cagr(sales_start, sales_end, sales_years)
+
+        fcf_yield = None
+        if price is not None and latest_actual is not None and latest_actual.final_profit not in (None, 0) and fcf is not None:
+            # Proxy: FCF margin against price-based scale is unavailable without shares/market cap in this scope.
+            fcf_yield = None
+
+        return CfScoringInput(
+            code4=code4,
+            as_of=as_of,
+            roic=roic,
+            ocf=float(ocf) if ocf is not None else None,
+            net_income=float(latest_actual.final_profit) if (latest_actual is not None and latest_actual.final_profit is not None) else None,
+            operating_income=float(latest_actual.operating_profit) if (latest_actual is not None and latest_actual.operating_profit is not None) else None,
+            revenue=float(latest_actual.sales) if (latest_actual is not None and latest_actual.sales is not None) else None,
+            fcf=fcf,
+            eps_cagr_3y=eps_cagr_3y,
+            sales_cagr_3y=sales_cagr_3y,
+            fcf_yield=fcf_yield,
+            per=per,
+        )
 
     def fetch_kabutan_forecast_pair(
         self,
