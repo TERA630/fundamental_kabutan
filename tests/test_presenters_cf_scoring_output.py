@@ -30,7 +30,14 @@ def _sample_scoring() -> CfScoringResult:
                 MetricScore("per", "valuation", 40.0, "C", 2, 5, ("high_growth_bonus: +1 point",)),
             ),
         ),
-        total=TotalScore(total_points=73, max_points=100, judgement="○ 標準的な強銘柄", priority_hint=None),
+        total=TotalScore(
+            total_points=73,
+            max_points=100,
+            judgement="A",
+            investment_category="標準的な強銘柄",
+            investment_strategy="トレンド・地合い次第で順張り。",
+            priority_hint=None,
+        ),
     )
 
 
