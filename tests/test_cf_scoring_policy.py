@@ -19,7 +19,9 @@ def test_calculate_cf_score_high_case_reaches_100_and_top_judgement():
     )
     result = calculate_cf_score(data)
     assert result.total.total_points == 98
-    assert result.total.judgement.startswith("◎")
+    assert result.total.judgement == "S"
+    assert result.total.investment_category == "機関主導グロース候補"
+    assert result.total.investment_strategy == "押し目で積極監視"
 
 
 def test_quality_filter_caps_cash_conversion_to_c_when_ocf_op_is_low():
@@ -111,7 +113,21 @@ def test_total_judgement_boundaries():
     )
     result = calculate_cf_score(data)
     assert result.total.total_points == 0
-    assert result.total.judgement.startswith("✕")
+    assert result.total.judgement == "C"
+    assert result.total.investment_category == "対象外"
+    assert result.total.investment_strategy == "基本ノータッチ"
+
+
+def test_total_judgement_grade_boundaries_are_s_a_b_c():
+    s_case = CfScoringInput("1111", None, 30.0, 200.0, 100.0, 120.0, 800.0, 150.0, 30.0, 25.0, 8.0, 14.0)
+    a_case = CfScoringInput("1111", None, 20.0, 120.0, 100.0, 100.0, 1000.0, 60.0, 15.0, 12.0, 2.0, 20.0)
+    b_case = CfScoringInput("1111", None, 10.0, 100.0, 100.0, 80.0, 1000.0, 10.0, 5.0, 5.0, 2.0, 30.0)
+    c_case = CfScoringInput("1111", None, None, None, None, None, None, None, None, None, None, None)
+
+    assert calculate_cf_score(s_case).total.judgement == "S"
+    assert calculate_cf_score(a_case).total.judgement == "A"
+    assert calculate_cf_score(b_case).total.judgement == "B"
+    assert calculate_cf_score(c_case).total.judgement == "C"
 
 
 def test_score_per_negative_or_zero_is_not_scored_as_s():
