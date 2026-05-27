@@ -144,7 +144,7 @@
 1. `株価：xxxx円 `
 2. `時価総額：xx,xxxx.x億円(xx型)`
 3. （空行）
-4. `総合評価：　{S/A/B/C/D} ({xx}/100点) ` 
+4. `総合評価：　{S/A/B/C/D} ({xx}/100点) バージョン: rankcf-v1` 
 5. `投資分類： {機関主導グロース候補/標準的強銘柄/バリュー・シクリカル/対象外}`
 6. `投資戦略：　{押し目で積極監視/トレンド・地合い次第で順張り/順張り対象外。逆張り限定/基本ノータッチ}`
 
@@ -169,16 +169,24 @@
 
 ### 5.6 　Quality スコアブロック 
 **表示順**
-　-　`Quality　{S/A/B/C/D}　xx/60点`
-　-　`Cach conversion　{S/A/B/C/D}　xx/15点`
-　-　`ROIC　{S/A/B/C/D}　xx/15点`
-　-　`営業CFマージン　{S/A/B/C/D}　xx/10点`
-　-　`営業利益率　{S/A/B/C/D}　xx/10点`
-　-　`FCF Ratio　{S/A/B/C/D}　xx/10点`
+　-　`Quality　xx/60`
+　-　`ROIC:　xx.xx -> {S/A/B/C/D}　(xx/15)`
+　-　`Cach conversion:　x.xx -> {S/A/B/C/D}　(xx/15)`
+　-　`営業CFマージン:　xx.xx -> {S/A/B/C/D}　(xx/10)`
+　-　`営業利益率:　xx.xx% -> {S/A/B/C/D}　(xx/10)`
+　-　`FCF Ratio(FCF/OCF):　xx.xx -> {S/A/B/C/D}　xx/10点`
+### 5.7 Growth スコアブロック
+ -  `Growth: {xx}/25`
+ -  `EPS CAGR(3y): -x.xx -> {S/A/B/C/D} ({xx}/15)`
+ - `売上CAGR(3y): x.xx -> {S/A/B/C/D}({xx}/10)`
+### 5.8 Valuation スコアブロック
+ - `Valuation: {xx}/15`
+ - `FCF Yield: x.xx% -> {S/A/B/C/D}({x}/10)`
+ -  `PER: xx.xx倍 -> {S/A/B/C/D}({x}/5)`
+ - `ルール注記: {なし/...}`
 
-
+### 5.9 CF 経時ブロック
 **算出定義**
-
 | 指標 | 計算式 |
 |------|-------|
 | FCF | 営業CF ＋ 投資CF |
@@ -195,14 +203,8 @@
 3. FCF Yield
 4. FCFマージン ／ 営業CFマージン
 5. 投資積極性
-### 5.7  成長性スコアブロック
 
-**表示順**
-
-
-
-
-### 5.7  成長性
+### 5.10  成長性経時ブロック
 
 1.　`EPS成長率　202x年　+xx.x%　202x年　-xx.x%　202x年　-xx.x%`
 2. `営業利益成長率　202x年　+xx.x%　202x年　-xx.x%　202x年　-xx.x%`
