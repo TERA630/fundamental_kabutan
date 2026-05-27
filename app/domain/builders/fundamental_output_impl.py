@@ -96,16 +96,31 @@ def build_indicator_lines(
     industry: str,
     pbr: float | None,
     roe: float | None,
-    per_lines: list[str],
-    dividend_lines: list[str],
 ) -> list[str]:
     return [
         "■指標",
         f"株価：{_fmt_num(price,0)}円 / PBR {_fmt_num(pbr)} / ROE {_fmt_plain_pct(roe)}",
         f"業種：{industry}　時価総額：{_fmt_money(market_cap)}({_build_market_cap_rank(market_cap)})",
+    ]
+
+
+def _build_valuation_lines(per_lines: list[str], dividend_lines: list[str]) -> list[str]:
+    year_labels: list[str] = []
+    if per_lines:
+        year_labels = [part.split(" ", 1)[0] for part in per_lines]
+    elif dividend_lines:
+        year_labels = [part.split(" ", 1)[0] for part in dividend_lines]
+
+    header = "年度|" + "|".join(year_labels) if year_labels else "年度|N/A"
+    per_values = [part.split(" ", 1)[1] for part in per_lines] if per_lines else ["N/A"]
+    dividend_values = [part.split(" ", 1)[1] for part in dividend_lines] if dividend_lines else ["N/A"]
+
+    return [
         "",
-        f"PER：{'／'.join(per_lines) if per_lines else 'N/A'}",
-        f"配当利回り：{'／'.join(dividend_lines) if dividend_lines else 'N/A'}",
+        "■バリュエーション",
+        header,
+        f"PER|{'|'.join(per_values)}",
+        f"配当利回り|{'|'.join(dividend_values)}",
     ]
 
 
@@ -125,7 +140,6 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         industry=industry_name,
         pbr=(market_snapshot or {}).get("pbr"),
         roe=(market_snapshot or {}).get("roe"),
-        per_lines=per_lines,
-        dividend_lines=dividend_lines,
     )
-    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines])
+    valuation_lines = _build_valuation_lines(per_lines, dividend_lines)
+    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines, *valuation_lines])

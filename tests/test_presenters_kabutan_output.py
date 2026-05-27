@@ -96,11 +96,11 @@ def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_y
     assert "[A] CF実績（百万円）" in text
     assert "年度 | フリーCF | 営業CF | 投資CF | 財務CF | 現金等残高" in text
     assert "[B] 指標（%）" in text
-    assert "年度 | 営業CFマージン | Cash conversion | FCFマージン | FCF Yield" in text
+    assert "年度 | Cash conversion | FCF Yield | FCFマージン | 営業CFマージン | 投資積極性" in text
     assert "2022 | 100 | 140 | -40 | 10 | 300" in text
     assert "2023 | -50 | 120 | -170 | 20 | 280" in text
     assert "2024 | 80 | 150 | -70 | 30 | 350" in text
-    assert "2023 | 13.3% | 300.0% | -5.6% | -0.5%" in text
+    assert "2023 | 300.0% | -0.5% | -5.6% | 13.3% | 141.7%" in text
 
 
 def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_cf_missing():
@@ -124,7 +124,7 @@ def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_c
         10_000_000_000.0,
     )
 
-    assert "2024 | 15.0% | 300.0% | 8.0% | 0.8%" in text
+    assert "2024 | 300.0% | 0.8% | 8.0% | 15.0% | 46.7%" in text
 
 
 def test_build_kabutan_forecast_output_appends_financial_block_with_formats():

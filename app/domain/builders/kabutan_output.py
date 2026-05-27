@@ -139,7 +139,7 @@ def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[K
     lines.extend([
         "",
         "[B] 指標（%）",
-        "年度 | 営業CFマージン | Cash conversion | FCFマージン | FCF Yield",
+        "年度 | Cash conversion | FCF Yield | FCFマージン | 営業CFマージン | 投資積極性",
     ])
 
     for cf_row in selected_cashflow_rows:
@@ -151,9 +151,12 @@ def _build_cashflow_lines(rows: list[KabutanForecastRow], cashflow_rows: tuple[K
         resolved_fcf = _resolve_fcf_million_yen(cf_row)
         fcf_margin = _safe_div(resolved_fcf, sales)
         fcf_yield_pct = _calc_fcf_yield_pct(resolved_fcf, market_cap)
+        investment_aggressiveness_pct = None
+        if cf_row.operating_cf not in (None, 0) and cf_row.investing_cf is not None:
+            investment_aggressiveness_pct = abs(cf_row.investing_cf) / abs(cf_row.operating_cf) * 100
 
         lines.append(
-            f"{cf_row.year} | {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)} | {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)} | {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} | {_fmt_percent(fcf_yield_pct)}"
+            f"{cf_row.year} | {_fmt_percent(cash_conversion * 100 if cash_conversion is not None else None)} | {_fmt_percent(fcf_yield_pct)} | {_fmt_percent(fcf_margin * 100 if fcf_margin is not None else None)} | {_fmt_percent(operating_cf_margin * 100 if operating_cf_margin is not None else None)} | {_fmt_percent(investment_aggressiveness_pct)}"
         )
 
     return lines
@@ -288,8 +291,8 @@ def build_kabutan_forecast_output(
         growth_lines.extend(
             [
                 "■成長性",
-                _build_growth_metric_line("営業利益成長率", growth_rows, operating_growth_rates),
                 _build_growth_metric_line("EPS成長率", growth_rows, eps_growth_rates),
+                _build_growth_metric_line("営業利益成長率", growth_rows, operating_growth_rates),
                 _build_cagr_line("3年営業利益CAGR", growth_rows, lambda row: row.operating_profit if row else None),
                 _build_cagr_line("3年EPS CAGR", growth_rows, lambda row: row.revised_eps if row else None),
             ]
