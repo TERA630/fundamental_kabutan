@@ -30,7 +30,14 @@ def _sample_scoring() -> CfScoringResult:
                 MetricScore("per", "valuation", 40.0, "C", 2, 5, ("high_growth_bonus: +1 point",)),
             ),
         ),
-        total=TotalScore(total_points=73, max_points=100, judgement="○ 標準的な強銘柄", priority_hint=None),
+        total=TotalScore(
+            total_points=73,
+            max_points=100,
+            judgement="A",
+            investment_category="標準的な強銘柄",
+            investment_strategy="トレンド・地合い次第で順張り。",
+            priority_hint=None,
+        ),
     )
 
 
@@ -69,3 +76,48 @@ def test_build_fundamental_output_without_scoring_keeps_previous_behavior():
         market_cap=1_000_000_000.0,
     )
     assert "■rankCF スコア" not in out
+
+
+def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
+    scoring = CfScoringResult(
+        version="rankcf-v1",
+        as_of="2026-05-27",
+        quality=CategoryScore(
+            category="quality",
+            subtotal=0,
+            max_points=60,
+            metrics=(
+                MetricScore("roic", "quality", None, "N/A", 0, 15),
+                MetricScore("fcf_ratio", "quality", None, "N/A", 0, 10),
+            ),
+        ),
+        growth=CategoryScore(
+            category="growth",
+            subtotal=0,
+            max_points=25,
+            metrics=(MetricScore("sales_cagr_3y", "growth", None, "N/A", 0, 10),),
+        ),
+        valuation=CategoryScore(
+            category="valuation",
+            subtotal=0,
+            max_points=15,
+            metrics=(MetricScore("fcf_yield", "valuation", None, "N/A", 0, 10),),
+        ),
+        total=TotalScore(
+            total_points=0,
+            max_points=100,
+            judgement="C",
+            investment_category="対象外",
+            investment_strategy="基本ノータッチ",
+            priority_hint=None,
+        ),
+    )
+    caplog.set_level("DEBUG")
+    text = build_cf_scoring_summary_text(scoring)
+    assert "Quality: 0/60" in text
+    assert "Growth: 0/25" in text
+    assert "Valuation: 0/15" in text
+    assert "ROIC:" not in text
+    assert "FCF Ratio" not in text
+    assert "取得不可: ROIC (値欠損)" in caplog.text
+    assert "取得不可: FCF Yield (値欠損)" in caplog.text
