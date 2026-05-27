@@ -186,7 +186,7 @@ def test_fcf_ratio_non_positive_ocf_is_not_scored_as_s():
     assert metric.points == 0
 
 
-def test_fcf_ratio_negative_fcf_is_c0_even_if_ocf_positive():
+def test_fcf_ratio_negative_fcf_still_gets_growth_exemption_when_conditions_match():
     data = CfScoringInput(
         code4="7777",
         as_of=None,
@@ -197,11 +197,12 @@ def test_fcf_ratio_negative_fcf_is_c0_even_if_ocf_positive():
         revenue=1000.0,
         fcf=-10.0,
         eps_cagr_3y=12.0,
-        sales_cagr_3y=12.0,
+        sales_cagr_3y=16.0,
         fcf_yield=3.0,
         per=25.0,
     )
     result = calculate_cf_score(data)
     metric = next(m for m in result.quality.metrics if m.metric_id == "fcf_ratio")
-    assert metric.rank == "C"
-    assert metric.points == 0
+    assert metric.rank == "A"
+    assert metric.points == 7
+    assert any("growth_exemption" in note for note in metric.rule_notes)

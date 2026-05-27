@@ -111,8 +111,6 @@ def score_fcf_ratio(fcf: float | None, ocf: float | None, sales_cagr_3y: float |
         return _metric("fcf_ratio", "quality", None, "N/A", 0, 10)
     if ocf <= 0:
         return _metric("fcf_ratio", "quality", (fcf / ocf) * 100, "C", 0, 10, "invalid_sign: ocf <= 0")
-    if fcf < 0:
-        return _metric("fcf_ratio", "quality", (fcf / ocf) * 100, "C", 0, 10, "invalid_sign: fcf < 0")
     ratio = (fcf / ocf) * 100
     if ratio >= 60:
         metric = _metric("fcf_ratio", "quality", ratio, "S", 10, 10)
