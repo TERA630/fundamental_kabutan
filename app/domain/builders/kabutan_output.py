@@ -6,6 +6,7 @@ from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
+from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.policies.growth_metrics import (
     calc_eps_growth_rate,
     calc_operating_growth_rate,
@@ -240,6 +241,7 @@ def build_kabutan_forecast_output(
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
     quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
     quarterly_message: str | None = None,
+    cf_scoring_result: CfScoringResult | None = None,
 ) -> str:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
