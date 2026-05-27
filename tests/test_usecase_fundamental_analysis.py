@@ -150,9 +150,11 @@ def test_build_cf_scoring_input_prefers_next_forecast_eps_for_per():
         as_of=None,
         price=2000.0,
         market_per=99.0,
+        market_cap=2_000_000_000.0,
         forecast_pair=pair,
         cashflow_rows=(KabutanCashflowRow("2025.03", 2025, 3, 50, 100, -50, 0, 0),),
         financial_metric_rows=(FinancialMetricInputRow(2025, 90, 600, 120, 100, 1000.0, 2000.0),),
     )
     assert scoring_input is not None
     assert scoring_input.per == 10.0
+    assert scoring_input.fcf_yield == 2.5
