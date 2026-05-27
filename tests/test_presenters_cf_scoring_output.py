@@ -45,11 +45,11 @@ def _sample_scoring() -> CfScoringResult:
 
 def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     text = build_cf_scoring_summary_text(_sample_scoring())
-    assert "■rankCF スコア" in text
-    assert "総合評価: A (73/100点) バージョン: rankcf-v1" in text
-    assert "投資分類: 標準的な強銘柄" in text
-    assert "投資戦略: トレンド・地合い次第で順張り。" in text
-    assert "合計: 73/100" in text
+    assert "■rankCF スコア" not in text
+    assert "総合評価" not in text
+    assert "投資分類" not in text
+    assert "投資戦略" not in text
+    assert "合計: 73/100" not in text
     assert "Quality: 45/60" in text
     assert "Growth: 20/25" in text
     assert "Valuation: 8/15" in text
@@ -68,8 +68,14 @@ def test_build_fundamental_output_appends_scoring_when_present():
         market_cap=1_000_000_000.0,
         cf_scoring_result=_sample_scoring(),
     )
-    assert "■rankCF スコア" in out
-    assert "合計: 73/100" in out
+    assert "■rankCF スコア" not in out
+    assert "総合評価：　A (73/100点) バージョン: rankcf-v1" in out
+    assert "投資分類： 標準的な強銘柄" in out
+    assert "投資戦略：　トレンド・地合い次第で順張り。" in out
+    assert "算出基準： 2026-05-27" in out
+    assert "Quality: 45/60" in out
+    assert out.find("業種：") < out.find("総合評価：") < out.find("■バリュエーション")
+    assert out.find("■バリュエーション") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
 
 
 def test_build_fundamental_output_without_scoring_keeps_previous_behavior():
@@ -122,8 +128,8 @@ def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
     assert "Quality: 0/60" in text
     assert "Growth: 0/25" in text
     assert "Valuation: 0/15" in text
-    assert "投資分類: 対象外" in text
-    assert "投資戦略: 基本ノータッチ" in text
+    assert "投資分類" not in text
+    assert "投資戦略" not in text
     assert "ROIC:" not in text
     assert "FCF Ratio" not in text
     assert "取得不可: ROIC (値欠損)" in caplog.text

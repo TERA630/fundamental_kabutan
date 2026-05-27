@@ -77,13 +77,6 @@ def _format_metric_score(metric: MetricScore) -> str | None:
 def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
     lines: list[str] = [
         "",
-        "■rankCF スコア",
-        f"算出日: {scoring.as_of or 'N/A'}",
-        f"総合評価: {scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
-        f"投資分類: {scoring.total.investment_category}",
-        f"投資戦略: {scoring.total.investment_strategy}",
-        "",
-        f"合計: {scoring.total.total_points}/{scoring.total.max_points}",
         f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
     ]
     for metric in scoring.quality.metrics:
@@ -108,6 +101,23 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
     else:
         lines.append("- なし")
     return "\n".join(lines)
+
+
+def build_cf_scoring_summary_lines(scoring: CfScoringResult) -> list[str]:
+    return [
+        f"総合評価：　{scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
+        f"投資分類： {scoring.total.investment_category}",
+        f"投資戦略：　{scoring.total.investment_strategy}",
+        f"算出基準： {scoring.as_of or 'N/A'}",
+    ]
+
+
+def _insert_summary_after_indicator(base_output: str, scoring: CfScoringResult) -> str:
+    lines = base_output.splitlines()
+    insert_at = next((index + 1 for index, line in enumerate(lines) if line.startswith("業種：")), None)
+    if insert_at is None:
+        insert_at = 1 if lines else 0
+    return "\n".join([*lines[:insert_at], *build_cf_scoring_summary_lines(scoring), *lines[insert_at:]])
 
 
 def build_fundamental_output(
@@ -137,6 +147,9 @@ def build_fundamental_output(
         market_snapshot=market_snapshot,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
+    if cf_scoring_result is not None:
+        base_output = _insert_summary_after_indicator(base_output, cf_scoring_result)
+        base_output = f"{base_output}\n{build_cf_scoring_summary_text(cf_scoring_result)}"
     output = build_kabutan_forecast_output(
         base_output,
         kabutan_forecast_pair,
@@ -149,6 +162,4 @@ def build_fundamental_output(
         quarterly_message,
         cf_scoring_result,
     )
-    if cf_scoring_result is None:
-        return output
-    return f"{output}\n{build_cf_scoring_summary_text(cf_scoring_result)}"
+    return output
