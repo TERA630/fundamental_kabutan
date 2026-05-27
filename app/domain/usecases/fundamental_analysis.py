@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
@@ -15,8 +16,6 @@ from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.cf_scoring_input import CfScoringInput
 from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMetricRow
-from app.domain.models.cf_scoring_input import CfScoringInput
-from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.usecases.quarterly_financial_table import BuildQuarterlyFinancialTableUseCase
 from app.domain.policies.financial_rows import FinancialRowCandidate, select_common_financial_rows
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
@@ -33,6 +32,7 @@ MARKET_SNAPSHOT_KEYS = (
     "industry",
     "div_yield",
     "payout_ratio",
+    "as_of",
 )
 
 
@@ -130,9 +130,13 @@ class FundamentalAnalysisService:
         )
         cf_scoring_input = self.build_cf_scoring_input(
             code4=code4,
-            as_of=None,
+            as_of=self.resolve_cf_scoring_as_of(
+                price_snapshot=price_snapshot,
+                forecast_pair=kabutan_fetch_result.pair,
+            ),
             price=price_snapshot.get("price"),
             market_per=price_snapshot.get("per"),
+            market_cap=price_snapshot.get("market_cap"),
             forecast_pair=kabutan_fetch_result.pair,
             cashflow_rows=kabutan_fetch_result.cashflow_rows,
             financial_metric_rows=financial_metric_rows,
@@ -171,93 +175,26 @@ class FundamentalAnalysisService:
         safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
         return build_output_fn(**safe_context)
 
-    def _build_cf_scoring_result(
-        self,
-        *,
-        code4: str,
-        market_snapshot: dict[str, float | str | None],
-        forecast_pair: KabutanForecastPair | None,
-        cashflow_rows: tuple[KabutanCashflowRow, ...],
-        financial_metric_rows: tuple[FinancialMetricInputRow, ...],
-    ) -> CfScoringResult | None:
-        cf_input = self._build_cf_scoring_input(
-            code4=code4,
-            market_snapshot=market_snapshot,
-            forecast_pair=forecast_pair,
-            cashflow_rows=cashflow_rows,
-            financial_metric_rows=financial_metric_rows,
-        )
-        if cf_input is None:
-            return None
-        return calculate_cf_score(cf_input)
 
     @staticmethod
-    def _build_cf_scoring_input(
+    def resolve_cf_scoring_as_of(
         *,
-        code4: str,
-        market_snapshot: dict[str, float | str | None],
+        price_snapshot: dict[str, float | str | None],
         forecast_pair: KabutanForecastPair | None,
-        cashflow_rows: tuple[KabutanCashflowRow, ...],
-        financial_metric_rows: tuple[FinancialMetricInputRow, ...],
-    ) -> CfScoringInput | None:
-        if forecast_pair is None:
+    ) -> str | None:
+        if price_snapshot.get("price") is not None:
+            snapshot_as_of = price_snapshot.get("as_of")
+            if isinstance(snapshot_as_of, str) and snapshot_as_of:
+                return snapshot_as_of
+            return date.today().isoformat()
+
+        if forecast_pair is None or not forecast_pair.all_rows:
             return None
-
-        rows = list(forecast_pair.all_rows) if forecast_pair.all_rows else []
-        actual_rows = [row for row in rows if row.section == "実績"]
-        actual_rows.sort(key=lambda row: (row.year, row.month))
-        latest_actual = actual_rows[-1] if actual_rows else None
-
-        cf_rows = sorted(cashflow_rows, key=lambda row: (row.year, row.month))
-        latest_cf = cf_rows[-1] if cf_rows else None
-        fcf = latest_cf.free_cf if latest_cf is not None else None
-        ocf = latest_cf.operating_cf if latest_cf is not None else None
-        if fcf is None and latest_cf is not None and latest_cf.investing_cf is not None and latest_cf.operating_cf is not None:
-            fcf = latest_cf.operating_cf + latest_cf.investing_cf
-
-        financial_rows = sorted(financial_metric_rows, key=lambda row: row.year)
-        latest_financial = financial_rows[-1] if financial_rows else None
-
-        roic = None
-        if latest_financial is not None:
-            roic = calc_roic_approx(
-                latest_financial.operating_profit,
-                latest_financial.equity,
-                latest_financial.interest_bearing_debt,
-            )
-
-        sales_by_year: dict[int, int | None] = {row.year: row.sales for row in actual_rows}
-        years = sorted(sales_by_year.keys())
-        end_year = years[-1] if years else None
-        start_year = end_year - 3 if end_year is not None else None
-        sales_cagr_3y = calc_cagr(sales_by_year.get(start_year), sales_by_year.get(end_year), years=3) if end_year is not None else None
-
-        eps_by_year: dict[int, float | None] = {row.year: row.revised_eps for row in actual_rows}
-        eps_cagr_3y = calc_cagr(eps_by_year.get(start_year), eps_by_year.get(end_year), years=3) if end_year is not None else None
-
-        market_cap = market_snapshot.get("market_cap")
-        market_cap_float = float(market_cap) if isinstance(market_cap, (int, float)) else None
-        fcf_yield = ((fcf * 1_000_000) / market_cap_float) * 100 if fcf is not None and market_cap_float not in (None, 0.0) else None
-
-        per = market_snapshot.get("per")
-        per_float = float(per) if isinstance(per, (int, float)) else None
-
-        as_of = f"{latest_actual.year}-{latest_actual.month:02d}" if latest_actual is not None else None
-        return CfScoringInput(
-            code4=code4,
-            as_of=as_of,
-            roic=roic,
-            ocf=ocf,
-            net_income=latest_actual.final_profit if latest_actual is not None else None,
-            operating_income=latest_actual.operating_profit if latest_actual is not None else None,
-            revenue=latest_actual.sales if latest_actual is not None else None,
-            fcf=fcf,
-            eps_cagr_3y=eps_cagr_3y,
-            sales_cagr_3y=sales_cagr_3y,
-            fcf_yield=fcf_yield,
-            per=per_float,
-        )
-
+        actual_rows = [row for row in forecast_pair.all_rows if row.section == "実績"]
+        if not actual_rows:
+            return None
+        latest_actual = max(actual_rows, key=lambda row: (row.year, row.month))
+        return f"{latest_actual.year}-{latest_actual.month:02d}"
 
     @staticmethod
     def build_quarterly_metric_rows(
@@ -360,6 +297,7 @@ class FundamentalAnalysisService:
         as_of: str | None,
         price: float | None,
         market_per: float | str | None,
+        market_cap: float | str | None,
         forecast_pair: KabutanForecastPair | None,
         cashflow_rows: tuple[KabutanCashflowRow, ...],
         financial_metric_rows: tuple[FinancialMetricInputRow, ...],
@@ -409,10 +347,8 @@ class FundamentalAnalysisService:
         sales_years = max(1, sales_end_row.year - latest_actual.year) if latest_actual is not None else 1
         sales_cagr_3y = calc_cagr(sales_start, sales_end, sales_years)
 
-        fcf_yield = None
-        if price is not None and latest_actual is not None and latest_actual.final_profit not in (None, 0) and fcf is not None:
-            # Proxy: FCF margin against price-based scale is unavailable without shares/market cap in this scope.
-            fcf_yield = None
+        market_cap_float = float(market_cap) if isinstance(market_cap, (int, float)) else None
+        fcf_yield = ((fcf * 1_000_000) / market_cap_float) * 100 if fcf is not None and market_cap_float not in (None, 0.0) else None
 
         return CfScoringInput(
             code4=code4,

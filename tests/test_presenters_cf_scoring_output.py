@@ -25,7 +25,10 @@ def _sample_scoring() -> CfScoringResult:
             category="valuation",
             subtotal=8,
             max_points=15,
-            metrics=(MetricScore("per", "valuation", 40.0, "C", 2, 5, ("high_growth_bonus: +1 point",)),),
+            metrics=(
+                MetricScore("fcf_yield", "valuation", 2.5, "B", 4, 10),
+                MetricScore("per", "valuation", 40.0, "C", 2, 5, ("high_growth_bonus: +1 point",)),
+            ),
         ),
         total=TotalScore(total_points=73, max_points=100, judgement="○ 標準的な強銘柄", priority_hint=None),
     )
@@ -38,6 +41,7 @@ def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     assert "Quality: 45/60" in text
     assert "Growth: 20/25" in text
     assert "Valuation: 8/15" in text
+    assert "FCF Yield: 2.50% -> B(4/10)" in text
     assert "ROIC: 18.20 -> B(9/15)" in text
     assert "ルール注記:" in text
     assert "growth_exemption: fcf_ratio promoted to A(7)" in text
