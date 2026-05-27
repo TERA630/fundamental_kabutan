@@ -1,4 +1,3 @@
-from datetime import date
 from pathlib import Path
 
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
@@ -67,7 +66,7 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert "cf_scoring_result" in captured
     assert captured["cf_scoring_result"] is not None
     assert captured["cf_scoring_result"].total.max_points == 100
-    assert captured["cf_scoring_result"].as_of == date.today().isoformat()
+    assert captured["cf_scoring_result"].as_of == "2025-03"
 
 
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():
@@ -85,3 +84,23 @@ def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missin
     assert out == "ok"
     assert "cf_scoring_result" in captured
     assert captured["cf_scoring_result"] is None
+
+
+def test_resolve_cf_scoring_as_of_falls_back_to_latest_observed_minus_one_when_actual_missing():
+    rows = (
+        KabutanForecastRow("2026.03", 2026, 3, "予想", 10000, 1200, 1100, 800, 120.0, 16.0),
+        KabutanForecastRow("2027.03", 2027, 3, "予想", 12000, 1500, 1300, 900, 130.0, 18.0),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=None,
+        current_actual=None,
+        current_forecast=rows[0],
+        next_forecast=rows[1],
+        all_rows=rows,
+    )
+    as_of = FundamentalAnalysisService.resolve_cf_scoring_as_of(
+        price_snapshot={"price": 1000.0, "as_of": "2026-05-27"},
+        forecast_pair=pair,
+    )
+    assert as_of == "2026-03"

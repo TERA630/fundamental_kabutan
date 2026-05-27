@@ -214,12 +214,32 @@ def score_per(per: float | None, eps_cagr_3y: float | None) -> MetricScore:
 
 def build_total_judgement(total_points: int) -> str:
     if total_points >= 80:
-        return "◎ 機関主導グロース候補"
+        return "S"
     if total_points >= 60:
-        return "○ 標準的な強銘柄"
+        return "A"
     if total_points >= 40:
-        return "△ バリュー・シクリカル"
-    return "✕ 対象外"
+        return "B"
+    return "C"
+
+
+def build_investment_category(total_points: int) -> str:
+    if total_points >= 80:
+        return "機関主導グロース候補"
+    if total_points >= 60:
+        return "標準的な強銘柄"
+    if total_points >= 40:
+        return "バリュー・シクリカル"
+    return "対象外"
+
+
+def build_investment_strategy(total_points: int) -> str:
+    if total_points >= 80:
+        return "押し目で積極監視"
+    if total_points >= 60:
+        return "トレンド・地合い次第で順張り。"
+    if total_points >= 40:
+        return "順張り対象外。逆張り限定"
+    return "基本ノータッチ"
 
 
 def calculate_cf_score(input_data: CfScoringInput) -> CfScoringResult:
@@ -246,7 +266,14 @@ def calculate_cf_score(input_data: CfScoringInput) -> CfScoringResult:
     growth = CategoryScore("growth", sum(x.points for x in growth_metrics), 25, growth_metrics)
     valuation = CategoryScore("valuation", sum(x.points for x in valuation_metrics), 15, valuation_metrics)
     total_points = quality.subtotal + growth.subtotal + valuation.subtotal
-    total = TotalScore(total_points, 100, build_total_judgement(total_points), None)
+    total = TotalScore(
+        total_points,
+        100,
+        build_total_judgement(total_points),
+        build_investment_category(total_points),
+        build_investment_strategy(total_points),
+        None,
+    )
     return CfScoringResult(SCORING_VERSION, input_data.as_of, quality, growth, valuation, total)
 
 
@@ -254,6 +281,8 @@ __all__ = [
     "SCORING_VERSION",
     "apply_quality_filter_ocf_op",
     "build_total_judgement",
+    "build_investment_category",
+    "build_investment_strategy",
     "calculate_cf_score",
     "score_cash_conversion_np",
     "score_eps_cagr_3y",
