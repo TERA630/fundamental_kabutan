@@ -107,10 +107,12 @@ def score_op_margin(operating_income: float | None, revenue: float | None) -> Me
 
 
 def score_fcf_ratio(fcf: float | None, ocf: float | None, sales_cagr_3y: float | None, roic: float | None) -> MetricScore:
-    if fcf is None or ocf in (None, 0):
+    if fcf is None or ocf is None:
         return _metric("fcf_ratio", "quality", None, "N/A", 0, 10)
-    if ocf <= 0:
-        return _metric("fcf_ratio", "quality", (fcf / ocf) * 100, "C", 0, 10, "invalid_sign: ocf <= 0")
+    if ocf == 0:
+        return _metric("fcf_ratio", "quality", None, "C", 0, 10, "invalid_sign: ocf == 0")
+    if ocf < 0:
+        return _metric("fcf_ratio", "quality", (fcf / ocf) * 100, "C", 0, 10, "invalid_sign: ocf < 0")
     ratio = (fcf / ocf) * 100
     if ratio >= 60:
         metric = _metric("fcf_ratio", "quality", ratio, "S", 10, 10)

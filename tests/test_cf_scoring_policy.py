@@ -206,3 +206,46 @@ def test_fcf_ratio_negative_fcf_still_gets_growth_exemption_when_conditions_matc
     assert metric.rank == "A"
     assert metric.points == 7
     assert any("growth_exemption" in note for note in metric.rule_notes)
+
+
+def test_fcf_ratio_zero_ocf_is_explicit_invalid_c0_not_na():
+    data = CfScoringInput(
+        code4="7777",
+        as_of=None,
+        roic=18.0,
+        ocf=0.0,
+        net_income=100.0,
+        operating_income=90.0,
+        revenue=1000.0,
+        fcf=20.0,
+        eps_cagr_3y=12.0,
+        sales_cagr_3y=12.0,
+        fcf_yield=3.0,
+        per=25.0,
+    )
+    result = calculate_cf_score(data)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "fcf_ratio")
+    assert metric.rank == "C"
+    assert metric.points == 0
+    assert any("ocf == 0" in note for note in metric.rule_notes)
+
+
+def test_fcf_ratio_none_ocf_is_na():
+    data = CfScoringInput(
+        code4="7777",
+        as_of=None,
+        roic=18.0,
+        ocf=None,
+        net_income=100.0,
+        operating_income=90.0,
+        revenue=1000.0,
+        fcf=20.0,
+        eps_cagr_3y=12.0,
+        sales_cagr_3y=12.0,
+        fcf_yield=3.0,
+        per=25.0,
+    )
+    result = calculate_cf_score(data)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "fcf_ratio")
+    assert metric.rank == "N/A"
+    assert metric.points == 0
