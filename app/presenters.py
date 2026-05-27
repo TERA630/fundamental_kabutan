@@ -1,6 +1,7 @@
 """Presentation helpers: bridge GUI use-cases and domain/output builders."""
 
 from __future__ import annotations
+import logging
 from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text
@@ -24,11 +25,51 @@ METRIC_LABELS = {
     "per": "PER",
 }
 
+logger = logging.getLogger(__name__)
 
-def _format_metric_score(metric: MetricScore) -> str:
+RULE_NOTE_JA_MAP = {
+    "high_growth_bonus": "高グロース株加点",
+    "growth_floor": "高成長考慮による下限補正",
+    "growth_exemption": "成長投資免責によるランク引き上げ",
+    "quality_filter": "品質フィルター適用（OCF/営業利益）",
+    "invalid_per": "PER算出値不正",
+}
+
+RULE_NOTE_EXACT_MAP = {
+    "invalid_sign: net_income <= 0": "純利益符号不正",
+    "invalid_sign: ocf <= 0": "営業CF符号不正",
+    "invalid_sign: ocf == 0": "営業CFゼロ",
+    "invalid_sign: ocf < 0": "営業CFマイナス",
+}
+
+
+def _format_rule_note(note: str) -> str:
+    if note in RULE_NOTE_EXACT_MAP:
+        return RULE_NOTE_EXACT_MAP[note]
+    key = note.split(":", 1)[0].strip()
+    if key in RULE_NOTE_JA_MAP:
+        return RULE_NOTE_JA_MAP[key]
+    return f"未定義ルール: {note}"
+
+
+def _format_metric_score(metric: MetricScore) -> str | None:
     label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
-    raw = "N/A" if metric.raw_value is None else f"{metric.raw_value:.2f}"
-    if metric.metric_id == "fcf_yield" and metric.raw_value is not None:
+    if metric.raw_value is None:
+        reason = "値欠損"
+        logger.info("取得不可: %s (%s)", label, reason)
+        logger.debug(
+            "N/A項目を表示省略: metric_id=%s rank=%s points=%s/%s rule_notes=%s reason=%s",
+            metric.metric_id,
+            metric.rank,
+            metric.points,
+            metric.max_points,
+            metric.rule_notes,
+            reason,
+        )
+        return None
+
+    raw = f"{metric.raw_value:.2f}"
+    if metric.metric_id == "fcf_yield":
         raw = f"{metric.raw_value:.2f}%"
     return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
 
@@ -37,22 +78,33 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
     lines: list[str] = [
         "",
         "■rankCF スコア",
-        f"バージョン: {scoring.version}",
         f"算出日: {scoring.as_of or 'N/A'}",
+        f"総合評価: {scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
+        f"投資分類: {scoring.total.investment_category}",
+        f"投資戦略: {scoring.total.investment_strategy}",
+        "",
         f"合計: {scoring.total.total_points}/{scoring.total.max_points}",
-        f"判定: {scoring.total.judgement}",
         f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
     ]
-    lines.extend(_format_metric_score(metric) for metric in scoring.quality.metrics)
+    for metric in scoring.quality.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
     lines.append(f"Growth: {scoring.growth.subtotal}/{scoring.growth.max_points}")
-    lines.extend(_format_metric_score(metric) for metric in scoring.growth.metrics)
+    for metric in scoring.growth.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
     lines.append(f"Valuation: {scoring.valuation.subtotal}/{scoring.valuation.max_points}")
-    lines.extend(_format_metric_score(metric) for metric in scoring.valuation.metrics)
+    for metric in scoring.valuation.metrics:
+        formatted = _format_metric_score(metric)
+        if formatted is not None:
+            lines.append(formatted)
 
     notes = [note for category in (scoring.quality, scoring.growth, scoring.valuation) for metric in category.metrics for note in metric.rule_notes]
     lines.append("ルール注記:")
     if notes:
-        lines.extend(f"- {note}" for note in notes)
+        lines.extend(f"- {_format_rule_note(note)}" for note in notes)
     else:
         lines.append("- なし")
     return "\n".join(lines)

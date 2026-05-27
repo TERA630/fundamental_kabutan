@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
@@ -182,19 +181,16 @@ class FundamentalAnalysisService:
         price_snapshot: dict[str, float | str | None],
         forecast_pair: KabutanForecastPair | None,
     ) -> str | None:
-        if price_snapshot.get("price") is not None:
-            snapshot_as_of = price_snapshot.get("as_of")
-            if isinstance(snapshot_as_of, str) and snapshot_as_of:
-                return snapshot_as_of
-            return date.today().isoformat()
-
         if forecast_pair is None or not forecast_pair.all_rows:
             return None
         actual_rows = [row for row in forecast_pair.all_rows if row.section == "実績"]
-        if not actual_rows:
-            return None
-        latest_actual = max(actual_rows, key=lambda row: (row.year, row.month))
-        return f"{latest_actual.year}-{latest_actual.month:02d}"
+        if actual_rows:
+            latest_actual = max(actual_rows, key=lambda row: (row.year, row.month))
+            return f"{latest_actual.year}-{latest_actual.month:02d}"
+
+        latest_observed = max(forecast_pair.all_rows, key=lambda row: (row.year, row.month))
+        fallback_year = latest_observed.year - 1
+        return f"{fallback_year}-{latest_observed.month:02d}"
 
     @staticmethod
     def build_quarterly_metric_rows(
