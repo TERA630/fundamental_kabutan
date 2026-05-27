@@ -1,81 +1,134 @@
-# 表示仕様ギャップ分析（2026-05-27）
+# 表示順序ギャップ分析と修正設計案（2026-05-27）
 
 対象:
 - 仕様: `docs/display_spec.md`
-- 実装: `app/presenters.py`, `app/domain/usecases/fundamental_analysis.py`, `app/domain/policies/cf_scoring.py`
+- 実装: `app/domain/builders/fundamental_output_impl.py`, `app/domain/builders/kabutan_output.py`, `app/presenters.py`
 
-## 1. 差異サマリ（高優先度）
+## 1. 結論（表示順序の差分）
 
-1. rankCFブロックの見出し・文言差異
-- 仕様は「総合評価」「投資分類」「投資戦略」をサマリブロックで上位表示。
-- 実装は `■rankCF スコア` / `合計` / `判定` を末尾に追記し、投資戦略文言は未表示。
+表示順序は `docs/display_spec.md` と一致していません。差分は以下です。
 
-2. メトリクス表示フォーマット差異
-- 仕様は metricごとの単位（%/倍/点）と全角空白・日本語ラベルを規定。
-- 実装は `- {label}: {raw} -> {rank}({points}/{max})` の共通書式で、PERの「倍」やOCFマージンの「%」が一部未付与。
+1. **サマリブロック位置差異**
+   - 仕様: 株価・時価総額の直後に「総合評価 → 投資分類 → 投資戦略 → 算出基準」。
+   - 実装: 総合評価等は末尾 `■rankCF スコア` で表示。
 
-3. `as_of` の定義が仕様未確定項目のまま実装先行
-- 実装は「株価スナップショット日優先、なければ当日、さらに無ければ最新実績年-月」。
-- 仕様側の定義（実績基準/取得日基準）が未確定。
+2. **成長性ブロック順差異**
+   - 仕様: `EPS成長率` → `営業利益成長率`。
+   - 実装: `営業利益成長率` → `EPS成長率`。
 
-4. FCF Yield のデータ欠損耐性
-- 仕様では Valuation ブロックを前提。
-- 実装は `market_cap` 非取得時に `fcf_yield=None` となり N/A化（意図通りだが表示許容ルールの明文化不足）。
+3. **CF経時ブロック順差異**
+   - 仕様: 「CF実績 → Cash Conversion → FCF Yield → FCFマージン/営業CFマージン → 投資積極性」。
+   - 実装: `[A] CF実績` の後、`営業CFマージン → Cash conversion → FCFマージン → FCF Yield` の順で同一表表示。投資積極性は未表示。
 
-## 2. 仕様に対する実装詳細（主要ポイント）
+4. **Valuation表示形式差異**
+   - 仕様: 年ヘッダ + `PER` 行 + `配当利回り` 行の縦並び表。
+   - 実装: `■指標` 内で `PER: ...` / `配当利回り: ...` のテキスト行。
 
-### 2.1 rankCF 出力構造
-- 実装は presenter で rankCF文字列を最後尾に連結。
-- 出力順は `バージョン`→`算出日`→`合計`→`判定`→`カテゴリ内訳`→`ルール注記`。
+## 2. 現行実装の表示順（As-Is）
 
-### 2.2 スコア閾値
-- Quality/Growth/Valuation の閾値と配点は、`docs/rankCF_spec.md` の定義と概ね一致。
-- `cash_conversion` の品質フィルター、`fcf_ratio` のグロース免責、`fcf_yield` の底上げ、`PER` 高成長加点は実装済み。
+1. `【銘柄】...`
+2. `■指標`（株価/PBR/ROE、業種/時価総額、PER、配当利回り）
+3. `■株探 通期業績推移`（ソース、通期テーブル）
+4. `■成長性`（営業利益成長率、EPS成長率、3年営業利益CAGR、3年EPS CAGR）
+5. `■キャッシュフロー`（[A] CF実績、[B] 指標）
+6. `■財務ブロック`
+7. `■四半期業績推移`
+8. `■rankCF スコア`（算出日、総合評価、投資分類、投資戦略、合計、Quality/Growth/Valuation、ルール注記）
 
-### 2.3 PER 算出優先
-- 実装は forecast EPS からの PER を優先し、取得不可時のみ market PER にフォールバック。
+## 3. 目標表示順（To-Be）
 
-## 3. 修正提案
+`docs/display_spec.md` に合わせ、以下を目標順とする。
 
-## 提案A（表示仕様の統一）
-- `build_cf_scoring_summary_text()` の表示テンプレートを `docs/display_spec.md` 5.6〜5.8 の文言・順序に合わせる。
-- 単位ルールを metric単位で明示実装（PER=倍、margin系=%、ratio系=無次元）。
+1. `【銘柄】...`
+2. サマリブロック
+   - 株価
+   - 時価総額
+   - 総合評価
+   - 投資分類
+   - 投資戦略
+   - 算出基準
+3. Valuationブロック（年ヘッダ + PER行 + 配当利回り行）
+4. Qualityスコアブロック
+5. Growthスコアブロック
+6. Valuationスコアブロック
+7. `■株探 通期業績推移`
+8. CF経時ブロック（仕様順）
+9. 成長性経時ブロック（EPS成長率 → 営業利益成長率）
+10. 既存の財務/四半期補助ブロック（仕様追記が必要なため暫定で末尾配置）
 
-## 提案B（as_of仕様の確定）
-- 以下のどちらかに固定し、仕様書とコードを一致させる。
-  - B1: 「取得日基準」: market snapshot as_of、無ければ実行日。
-  - B2: 「実績基準」: 最新実績決算年月。
-- 画面表示ラベルも `算出日` か `基準日` に統一。
+## 4. 修正設計案（レイヤー分離準拠）
 
-## 提案C（N/A許容ルールの明文化）
-- FCF Yield/PER/ROIC 等で欠損時に
-  - 点数0で継続
-  - ブロック自体は表示
-  - ルール注記に欠損理由を載せる
-  を仕様に追記。
+### 4.1 方針
 
-## 提案D（プレゼン層の整形責務を分離）
-- `presenters.py` の rankCF整形を専用 formatter モジュールへ分離し、UI文言差し替え容易性を上げる。
+- **Presenterは表示順制御のみ**を担当し、計算ロジックはドメイン側で完結させる。
+- 既存の `build_fundamental_output_text_impl()` / `build_kabutan_forecast_output()` の「文字列直結」を縮小し、
+  **ドメインDTO（表示モデル）→ Presenter整形**へ段階移行する。
+- UI依存コードは追加せず、ドメインは純粋Pythonのまま維持する。
 
-## 4. ユーザー確認が必要なポイント
+### 4.2 追加/変更コンポーネント
 
-1. 総合評価の表示位置
-- 価格・時価総額の直下（仕様）に置くか、末尾ブロック（現行）を維持するか。
+1. **ドメイン表示モデル（新規）**
+   - 追加候補: `app/domain/models/display_sections.py`
+   - 役割:
+     - `SummarySection`
+     - `ValuationTableSection`
+     - `ScoreSection`（quality/growth/valuation）
+     - `ForecastTableSection`
+     - `CashflowTimelineSection`
+     - `GrowthTimelineSection`
 
-2. 判定と投資戦略の関係
-- `判定` だけ表示で良いか、仕様どおり `投資分類` と `投資戦略` を常時表示するか。
+2. **ドメイン組み立て器（新規）**
+   - 追加候補: `app/domain/builders/display_section_builder.py`
+   - 役割:
+     - 既存入力（price, market_cap, forecast, cf_scoring_result等）から上記セクションDTOを構築。
+     - 表示順はここで固定せず、セクション内容のみ返す。
 
-3. `as_of` の意味
-- 「株価取得日時」か「業績基準年月」か。
+3. **Presenterフォーマッタ（新規）**
+   - 追加候補: `app/presentation/display_formatter.py`（または `app/presenters.py` 内分離）
+   - 役割:
+     - 仕様どおりの順序でセクションDTOを文字列化。
+     - ラベル差異（例: 算出日/算出基準）を統一。
 
-4. 指標の単位表示
-- Cash Conversion / FCF Ratio を「倍率（x.xx）」で統一するか、「%」換算で統一するか。
+4. **既存ビルダーの縮退**
+   - `fundamental_output_impl.py`:
+     - `■指標` に混在する PER/配当利回りを Valuation表へ移管。
+   - `kabutan_output.py`:
+     - 成長性行順を仕様順へ修正。
+     - CF経時ブロックを仕様順へ再構成。
+   - `presenters.py`:
+     - `build_cf_scoring_summary_text()` を「末尾追記」用途から、サマリ/各スコアブロック生成に再編。
 
-5. 欠損時の見せ方
-- N/A時に注記必須か、省略可か。
+### 4.3 実装ステップ（段階導入）
 
-6. PER の優先ソース
-- 現行（forecast EPS優先）を採用確定するか、market PER優先に戻すか。
+- **Step 1（低リスク・順序修正）**
+  - 成長性経時ブロック順を入れ替え（EPS先行）。
+  - CF経時ブロック内の行順を仕様順へ変更。
+- **Step 2（Valuation表化）**
+  - 年ヘッダ + PER行 + 配当利回り行を専用関数で生成。
+  - `■指標` から旧PER/配当利回り行を削除。
+- **Step 3（サマリ統合）**
+  - 総合評価/投資分類/投資戦略/算出基準をサマリ位置へ移設。
+  - `■rankCF スコア` は廃止またはデバッグ専用化。
+- **Step 4（DTO分離）**
+  - 文字列連結ロジックを表示モデル+フォーマッタに分割。
+  - テストを順次DTO基準へ移行。
 
-7. ルール注記の粒度
-- 内部向け識別子（`growth_floor` など）をそのまま表示するか、日本語文へ変換するか。
+### 4.4 影響範囲
+
+- 主変更: `app/domain/builders/fundamental_output_impl.py`, `app/domain/builders/kabutan_output.py`, `app/presenters.py`
+- 追加想定: 表示モデル/フォーマッタモジュール、対応テスト
+- 非影響: GUIフレームワーク層（`tkinter`側イベント/Widget実装）
+
+## 5. 受け入れ条件（Definition of Done）
+
+1. 生成テキストのブロック順が `docs/display_spec.md` 5.4〜5.10 と一致する。
+2. 成長性経時ブロックが `EPS成長率` → `営業利益成長率` になる。
+3. Valuationが「年ヘッダ + PER行 + 配当利回り行」の3行表で出力される。
+4. CF経時ブロックに「投資積極性」が表示される。
+5. 欠損値（N/A）時の省略/注記挙動が仕様に沿ってテストで検証される。
+
+## 6. 未確定事項（実装前に確定が必要）
+
+1. 「算出基準」の表示値を `as_of`（取得日）とするか、最新実績年月とするか。
+2. 既存 `■財務ブロック` / `■四半期業績推移` の仕様上の正式位置。
+3. `■rankCF スコア` 見出しを完全廃止するか、互換モードとして残すか。
