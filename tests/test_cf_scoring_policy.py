@@ -118,6 +118,18 @@ def test_total_judgement_boundaries():
     assert result.total.investment_strategy == "基本ノータッチ"
 
 
+def test_total_judgement_grade_boundaries_are_s_a_b_c():
+    s_case = CfScoringInput("1111", None, 30.0, 200.0, 100.0, 120.0, 800.0, 150.0, 30.0, 25.0, 8.0, 14.0)
+    a_case = CfScoringInput("1111", None, 20.0, 120.0, 100.0, 100.0, 1000.0, 60.0, 15.0, 12.0, 2.0, 20.0)
+    b_case = CfScoringInput("1111", None, 10.0, 100.0, 100.0, 80.0, 1000.0, 10.0, 5.0, 5.0, 2.0, 30.0)
+    c_case = CfScoringInput("1111", None, None, None, None, None, None, None, None, None, None, None)
+
+    assert calculate_cf_score(s_case).total.judgement == "S"
+    assert calculate_cf_score(a_case).total.judgement == "A"
+    assert calculate_cf_score(b_case).total.judgement == "B"
+    assert calculate_cf_score(c_case).total.judgement == "C"
+
+
 def test_score_per_negative_or_zero_is_not_scored_as_s():
     neg = score_per(-12.0, 30.0)
     zero = score_per(0.0, 30.0)

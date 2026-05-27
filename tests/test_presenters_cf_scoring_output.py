@@ -1,3 +1,5 @@
+import pytest
+
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
 from app.presenters import build_cf_scoring_summary_text, build_fundamental_output
 
@@ -151,3 +153,35 @@ def test_build_cf_scoring_summary_text_rule_note_fallback_for_unknown_key():
     )
     text = build_cf_scoring_summary_text(scoring)
     assert "未定義ルール: unknown_rule: detail" in text
+
+
+@pytest.mark.parametrize(
+    ("raw_note", "expected"),
+    [
+        ("high_growth_bonus: +1 point", "高グロース株加点"),
+        ("growth_floor: fcf_yield raised to C(2)", "高成長考慮による下限補正"),
+        ("growth_exemption: fcf_ratio promoted to A(7)", "成長投資免責によるランク引き上げ"),
+        ("quality_filter: ocf/op < 0.7 capped to C(5)", "品質フィルター適用（OCF/営業利益）"),
+        ("invalid_per: per <= 0", "PER算出値不正"),
+        ("invalid_sign: net_income <= 0", "純利益符号不正"),
+        ("invalid_sign: ocf <= 0", "営業CF符号不正"),
+        ("invalid_sign: ocf == 0", "営業CFゼロ"),
+        ("invalid_sign: ocf < 0", "営業CFマイナス"),
+    ],
+)
+def test_build_cf_scoring_summary_text_localizes_rule_notes(raw_note, expected):
+    scoring = CfScoringResult(
+        version="rankcf-v1",
+        as_of="2026-05-27",
+        quality=CategoryScore(
+            category="quality",
+            subtotal=10,
+            max_points=60,
+            metrics=(MetricScore("roic", "quality", 10.0, "C", 6, 15, (raw_note,)),),
+        ),
+        growth=CategoryScore(category="growth", subtotal=0, max_points=25, metrics=()),
+        valuation=CategoryScore(category="valuation", subtotal=0, max_points=15, metrics=()),
+        total=TotalScore(10, 100, "C", "対象外", "基本ノータッチ", None),
+    )
+    text = build_cf_scoring_summary_text(scoring)
+    assert expected in text

@@ -104,3 +104,24 @@ def test_resolve_cf_scoring_as_of_falls_back_to_latest_observed_minus_one_when_a
         forecast_pair=pair,
     )
     assert as_of == "2026-03"
+
+
+def test_resolve_cf_scoring_as_of_prefers_latest_actual_over_snapshot_as_of():
+    rows = (
+        KabutanForecastRow("2024.03", 2024, 3, "実績", 8000, 900, 800, 700, 90.0, 14.0),
+        KabutanForecastRow("2025.03", 2025, 3, "実績", 10000, 1200, 1100, 800, 120.0, 16.0),
+        KabutanForecastRow("2026.03", 2026, 3, "予想", 12000, 1500, 1300, 900, 130.0, 18.0),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=rows[0],
+        previous_actual=rows[1],
+        current_actual=rows[1],
+        current_forecast=rows[2],
+        next_forecast=None,
+        all_rows=rows,
+    )
+    as_of = FundamentalAnalysisService.resolve_cf_scoring_as_of(
+        price_snapshot={"price": 1000.0, "as_of": "2026-12-31"},
+        forecast_pair=pair,
+    )
+    assert as_of == "2025-03"
