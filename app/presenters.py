@@ -27,6 +27,30 @@ METRIC_LABELS = {
 
 logger = logging.getLogger(__name__)
 
+RULE_NOTE_JA_MAP = {
+    "high_growth_bonus": "高グロース株加点",
+    "growth_floor": "高成長考慮による下限補正",
+    "growth_exemption": "成長投資免責によるランク引き上げ",
+    "quality_filter": "品質フィルター適用（OCF/営業利益）",
+    "invalid_per": "PER算出値不正",
+}
+
+RULE_NOTE_EXACT_MAP = {
+    "invalid_sign: net_income <= 0": "純利益符号不正",
+    "invalid_sign: ocf <= 0": "営業CF符号不正",
+    "invalid_sign: ocf == 0": "営業CFゼロ",
+    "invalid_sign: ocf < 0": "営業CFマイナス",
+}
+
+
+def _format_rule_note(note: str) -> str:
+    if note in RULE_NOTE_EXACT_MAP:
+        return RULE_NOTE_EXACT_MAP[note]
+    key = note.split(":", 1)[0].strip()
+    if key in RULE_NOTE_JA_MAP:
+        return RULE_NOTE_JA_MAP[key]
+    return f"未定義ルール: {note}"
+
 
 def _format_metric_score(metric: MetricScore) -> str | None:
     label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
@@ -78,7 +102,7 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
     notes = [note for category in (scoring.quality, scoring.growth, scoring.valuation) for metric in category.metrics for note in metric.rule_notes]
     lines.append("ルール注記:")
     if notes:
-        lines.extend(f"- {note}" for note in notes)
+        lines.extend(f"- {_format_rule_note(note)}" for note in notes)
     else:
         lines.append("- なし")
     return "\n".join(lines)
