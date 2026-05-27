@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Callable, Protocol
 from pathlib import Path
 import re
@@ -31,6 +32,7 @@ MARKET_SNAPSHOT_KEYS = (
     "industry",
     "div_yield",
     "payout_ratio",
+    "as_of",
 )
 
 
@@ -128,7 +130,10 @@ class FundamentalAnalysisService:
         )
         cf_scoring_input = self.build_cf_scoring_input(
             code4=code4,
-            as_of=None,
+            as_of=self.resolve_cf_scoring_as_of(
+                price_snapshot=price_snapshot,
+                forecast_pair=kabutan_fetch_result.pair,
+            ),
             price=price_snapshot.get("price"),
             market_per=price_snapshot.get("per"),
             market_cap=price_snapshot.get("market_cap"),
@@ -169,6 +174,27 @@ class FundamentalAnalysisService:
         accepted_params = signature.parameters
         safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
         return build_output_fn(**safe_context)
+
+
+    @staticmethod
+    def resolve_cf_scoring_as_of(
+        *,
+        price_snapshot: dict[str, float | str | None],
+        forecast_pair: KabutanForecastPair | None,
+    ) -> str | None:
+        if price_snapshot.get("price") is not None:
+            snapshot_as_of = price_snapshot.get("as_of")
+            if isinstance(snapshot_as_of, str) and snapshot_as_of:
+                return snapshot_as_of
+            return date.today().isoformat()
+
+        if forecast_pair is None or not forecast_pair.all_rows:
+            return None
+        actual_rows = [row for row in forecast_pair.all_rows if row.section == "実績"]
+        if not actual_rows:
+            return None
+        latest_actual = max(actual_rows, key=lambda row: (row.year, row.month))
+        return f"{latest_actual.year}-{latest_actual.month:02d}"
 
     @staticmethod
     def build_quarterly_metric_rows(

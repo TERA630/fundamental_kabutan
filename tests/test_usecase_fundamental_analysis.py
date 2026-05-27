@@ -66,7 +66,7 @@ class TestFundamentalAnalysisService(unittest.TestCase):
         snap1 = service.fetch_price_snapshot("5803")
         snap2 = service.fetch_price_snapshot("5803")
 
-        expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
+        expected = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None, "as_of": None}
         self.assertEqual(snap1, expected)
         self.assertEqual(snap2, expected)
         self.assertEqual(market.calls, 2)

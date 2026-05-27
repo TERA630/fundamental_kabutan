@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
@@ -66,6 +67,7 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert "cf_scoring_result" in captured
     assert captured["cf_scoring_result"] is not None
     assert captured["cf_scoring_result"].total.max_points == 100
+    assert captured["cf_scoring_result"].as_of == date.today().isoformat()
 
 
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():

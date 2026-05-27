@@ -10,7 +10,6 @@ from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
-from app.domain.models.cf_scoring_result import CfScoringResult
 
 
 METRIC_LABELS = {
@@ -29,6 +28,8 @@ METRIC_LABELS = {
 def _format_metric_score(metric: MetricScore) -> str:
     label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
     raw = "N/A" if metric.raw_value is None else f"{metric.raw_value:.2f}"
+    if metric.metric_id == "fcf_yield" and metric.raw_value is not None:
+        raw = f"{metric.raw_value:.2f}%"
     return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
 
 
