@@ -10,6 +10,7 @@ from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
+from app.domain.models.cf_scoring_result import CfScoringResult
 
 
 METRIC_LABELS = {
@@ -93,6 +94,7 @@ def build_fundamental_output(
         financial_metric_rows,
         quarterly_metric_rows,
         quarterly_message,
+        cf_scoring_result,
     )
     if cf_scoring_result is None:
         return output

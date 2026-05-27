@@ -1,0 +1,7 @@
+{
+  "name": "Python Environment",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "containerEnv": {
+    "PYTHONPATH": "${containerWorkspaceFolder}"
+  }
+}
