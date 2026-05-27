@@ -163,3 +163,45 @@ def test_cash_conversion_non_positive_ocf_is_e0_even_with_positive_income():
     metric = next(m for m in result.quality.metrics if m.metric_id == "cash_conversion_np")
     assert metric.rank == "E"
     assert metric.points == 0
+
+
+def test_fcf_ratio_non_positive_ocf_is_not_scored_as_s():
+    data = CfScoringInput(
+        code4="7777",
+        as_of=None,
+        roic=18.0,
+        ocf=-100.0,
+        net_income=100.0,
+        operating_income=90.0,
+        revenue=1000.0,
+        fcf=-80.0,
+        eps_cagr_3y=12.0,
+        sales_cagr_3y=12.0,
+        fcf_yield=3.0,
+        per=25.0,
+    )
+    result = calculate_cf_score(data)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "fcf_ratio")
+    assert metric.rank == "C"
+    assert metric.points == 0
+
+
+def test_fcf_ratio_negative_fcf_is_c0_even_if_ocf_positive():
+    data = CfScoringInput(
+        code4="7777",
+        as_of=None,
+        roic=18.0,
+        ocf=100.0,
+        net_income=100.0,
+        operating_income=90.0,
+        revenue=1000.0,
+        fcf=-10.0,
+        eps_cagr_3y=12.0,
+        sales_cagr_3y=12.0,
+        fcf_yield=3.0,
+        per=25.0,
+    )
+    result = calculate_cf_score(data)
+    metric = next(m for m in result.quality.metrics if m.metric_id == "fcf_ratio")
+    assert metric.rank == "C"
+    assert metric.points == 0
