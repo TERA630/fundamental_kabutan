@@ -5,10 +5,55 @@ from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+from app.domain.models.cf_scoring_result import CfScoringResult, MetricScore
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
+
+
+METRIC_LABELS = {
+    "roic": "ROIC",
+    "cash_conversion_np": "Cash Conversion(OCF/純利益)",
+    "ocf_margin": "営業CFマージン",
+    "op_margin": "営業利益率",
+    "fcf_ratio": "FCF Ratio(FCF/OCF)",
+    "eps_cagr_3y": "EPS CAGR(3y)",
+    "sales_cagr_3y": "売上CAGR(3y)",
+    "fcf_yield": "FCF Yield",
+    "per": "PER",
+}
+
+
+def _format_metric_score(metric: MetricScore) -> str:
+    label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
+    raw = "N/A" if metric.raw_value is None else f"{metric.raw_value:.2f}"
+    return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
+
+
+def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
+    lines: list[str] = [
+        "",
+        "■rankCF スコア",
+        f"バージョン: {scoring.version}",
+        f"算出日: {scoring.as_of or 'N/A'}",
+        f"合計: {scoring.total.total_points}/{scoring.total.max_points}",
+        f"判定: {scoring.total.judgement}",
+        f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
+    ]
+    lines.extend(_format_metric_score(metric) for metric in scoring.quality.metrics)
+    lines.append(f"Growth: {scoring.growth.subtotal}/{scoring.growth.max_points}")
+    lines.extend(_format_metric_score(metric) for metric in scoring.growth.metrics)
+    lines.append(f"Valuation: {scoring.valuation.subtotal}/{scoring.valuation.max_points}")
+    lines.extend(_format_metric_score(metric) for metric in scoring.valuation.metrics)
+
+    notes = [note for category in (scoring.quality, scoring.growth, scoring.valuation) for metric in category.metrics for note in metric.rule_notes]
+    lines.append("ルール注記:")
+    if notes:
+        lines.extend(f"- {note}" for note in notes)
+    else:
+        lines.append("- なし")
+    return "\n".join(lines)
 
 
 def build_fundamental_output(
@@ -26,6 +71,7 @@ def build_fundamental_output(
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
     quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
     quarterly_message: str | None = None,
+    cf_scoring_result: CfScoringResult | None = None,
 ) -> str:
     """ドメイン層の出力生成ビルダーを呼び出す。"""
     base_output = build_fundamental_output_text(
@@ -37,7 +83,7 @@ def build_fundamental_output(
         market_snapshot=market_snapshot,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
-    return build_kabutan_forecast_output(
+    output = build_kabutan_forecast_output(
         base_output,
         kabutan_forecast_pair,
         kabutan_source,
@@ -48,3 +94,6 @@ def build_fundamental_output(
         quarterly_metric_rows,
         quarterly_message,
     )
+    if cf_scoring_result is None:
+        return output
+    return f"{output}\n{build_cf_scoring_summary_text(cf_scoring_result)}"
