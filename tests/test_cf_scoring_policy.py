@@ -19,7 +19,9 @@ def test_calculate_cf_score_high_case_reaches_100_and_top_judgement():
     )
     result = calculate_cf_score(data)
     assert result.total.total_points == 98
-    assert result.total.judgement.startswith("◎")
+    assert result.total.judgement == "S"
+    assert result.total.investment_category == "機関主導グロース候補"
+    assert result.total.investment_strategy == "押し目で積極監視"
 
 
 def test_quality_filter_caps_cash_conversion_to_c_when_ocf_op_is_low():
@@ -111,7 +113,9 @@ def test_total_judgement_boundaries():
     )
     result = calculate_cf_score(data)
     assert result.total.total_points == 0
-    assert result.total.judgement.startswith("✕")
+    assert result.total.judgement == "C"
+    assert result.total.investment_category == "対象外"
+    assert result.total.investment_strategy == "基本ノータッチ"
 
 
 def test_score_per_negative_or_zero_is_not_scored_as_s():
