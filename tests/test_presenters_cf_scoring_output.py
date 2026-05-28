@@ -1,6 +1,9 @@
 import pytest
 
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
+from app.domain.builders.fundamental_output import build_fundamental_output_sections
+from app.domain.models.display_sections import SummarySection, ValuationTableSection
+from app.presentation.display_formatter import format_sections
 from app.presenters import build_cf_scoring_summary_text, build_fundamental_output
 
 
@@ -87,6 +90,30 @@ def test_build_fundamental_output_without_scoring_keeps_previous_behavior():
         market_cap=1_000_000_000.0,
     )
     assert "■rankCF スコア" not in out
+
+
+def test_build_fundamental_output_sections_and_formatter_produces_valuation_table():
+    sections = build_fundamental_output_sections(
+        name="Test",
+        code4="1234",
+        master=None,
+        price=1000.0,
+        market_cap=1_000_000_000.0,
+    )
+
+    assert len(sections.sections) == 2
+    assert isinstance(sections.sections[0], SummarySection)
+    assert isinstance(sections.sections[1], ValuationTableSection)
+    assert sections.sections[0].company_name == "Test"
+    assert sections.sections[1].year_labels == []
+    assert sections.sections[1].per_values == ["N/A"]
+    assert sections.sections[1].dividend_values == ["N/A"]
+
+    formatted = format_sections(sections)
+    assert "■バリュエーション" in formatted
+    assert "年度|N/A" in formatted
+    assert "PER|N/A" in formatted
+    assert "配当利回り|N/A" in formatted
 
 
 def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):

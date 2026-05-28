@@ -14,7 +14,8 @@ def format_summary(section: SummarySection) -> List[str]:
     pbr = "N/A" if section.pbr is None else f"{section.pbr:.2f}"
     roe = "N/A" if section.roe is None else f"{section.roe:.2f}%"
     lines.append(f"株価：{price}円 / PBR {pbr} / ROE {roe}")
-    lines.append(f"業種：{section.industry}　時価総額：{('N/A' if section.market_cap is None else f'{section.market_cap/100_000_000:,.1f}億円')})")
+    cap_text = "N/A" if section.market_cap is None else f"{section.market_cap/100_000_000:,.1f}億円"
+    lines.append(f"業種：{section.industry}　時価総額：{cap_text}")
     return lines
 
 
