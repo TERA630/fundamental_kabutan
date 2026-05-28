@@ -8,7 +8,7 @@ import re
 import time
 from datetime import date
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 CACHE_DIR_NAME = ".fundamental_cache"
 
@@ -43,14 +43,6 @@ class FileCache:
         payload = {"saved_at": time.time(), "data": data}
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, path)
-
-    def get_or_fetch(self, key: str, ttl_sec: int | float, fetcher: Callable[[], Any]) -> Any:
-        cached = self.get(key, ttl_sec)
-        if cached is not None:
-            return cached
-        data = fetcher()
-        self.set(key, data)
-        return data
 
     def fetch_kabutan_html_dir_cache(self) -> Path | None:
         cached = self.get("kabutan_last_html_dir", ttl_sec=10**9)

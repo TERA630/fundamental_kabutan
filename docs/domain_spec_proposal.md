@@ -1,34 +1,65 @@
-# ドメイン層仕様提案（現行方針）
+# ドメイン層仕様
 
-## 1. 目的
-表示フォーマット（銘柄ヘッダ / 株価・指標 / 株探の通期業績推移）を、
-**J-Quants 由来の財務データ構造に依存せず**、現行の取得元に合わせてドメイン層で一貫生成できる状態にする。
+最終更新: 2026-05-28
+
+本書は、データ取得後のモデル、UseCase、ドメイン計算、出力Builderの責務を定義する。
+表示順・文言・数値表現は `docs/display_spec.md`、rankCF 採点仕様は `docs/rankCF_spec.md` を正とする。
 
 ---
 
-## 2. 現行データソース
+## 1. 責務境界
+
+依存方向:
+
+- GUI / Presentation → UseCase → Domain
+- Data / Infrastructure は UseCase に注入される Port 実装として接続する。
+
+各層の責務:
+
+| 層 | 主な責務 | 主なファイル |
+|----|---------|-------------|
+| Data | 監視銘柄読み込み、yFinance取得、株探HTML解析、キャッシュ | `app/data/*.py` |
+| Domain Model | 株探・CF・財務・四半期・スコアの入力/結果モデル | `app/domain/models/*.py` |
+| Domain Policy | 成長率、CF、財務指標、rankCF などの純計算 | `app/domain/policies/*.py` |
+| UseCase | Data Port を呼び出し、分析に必要な入力を組み立てる | `app/domain/usecases/*.py` |
+| Builder / Presenter | Domain結果を表示DTOまたは出力テキストへ変換する | `app/domain/builders/*.py`, `app/presenters.py` |
+| GUI | 画面部品、イベント、状態、ステータスメッセージ表示 | `app/gui*.py` |
+
+禁止事項:
+
+- Domain / UseCase は `tkinter` などの UI ライブラリを import しない。
+- Data層は表示文言を組み立てない。
+- 表示仕様上の `N/A` や本文行省略は Presentation / Builder 側で扱い、Domain Policy は `None` などの計算結果で返す。
+
+---
+
+## 2. データソース
 
 ### 2.1 yFinance
+
 - 株価
 - 時価総額
+- PER
 - PBR
 - ROE
 - 業種
 
 ### 2.2 株探HTML
-- 通期の売上高
-- 営業益
-- 経常益
-- 最終益
-- 修正1株益
-- 1株配当
+
+- 通期業績
+- CF実績
+- 財務指標
+- 四半期業績
 - 実績/予想区分
+
+既定ではローカルHTML優先・Webフォールバックなしとする。
 
 ---
 
-## 3. 現行ドメインモデル
+## 3. 主要ドメインモデル
 
 ### 3.1 `KabutanForecastRow`
+
 株探HTMLから取得した通期業績の1行を表す。
 
 - `period_label: str`
@@ -43,6 +74,7 @@
 - `dividend: float | None`
 
 ### 3.2 `KabutanForecastPair`
+
 表示・指標計算に使う複数年分の株探行をまとめる。
 
 - `previous2_actual: KabutanForecastRow | None`
@@ -52,126 +84,40 @@
 - `next_forecast: KabutanForecastRow | None`
 - `all_rows: tuple[KabutanForecastRow, ...]`
 
+### 3.3 表示セクションDTO
+
+`app/domain/models/display_sections.py` は、出力テキストの各ブロックを表すDTOを保持する。
+DTOは表示に必要な値を運ぶだけで、データ取得やHTML解析を行わない。
+
 ---
 
-## 4. ユースケース方針
+## 4. UseCase
 
 ### 4.1 `FundamentalAnalysisService`
-責務：yFinanceスナップショットと株探HTML行を取得し、Presenterへ渡す。
 
-- yFinance値は `fetch_yfinance_snapshot` から取得する。
-- 株探業績は `FetchKabutanForecastUseCase` / `KabutanForecastRepository` から取得する。
-- J-Quants の `summary_rows`、FY/四半期データ、J-Quants形式の財務指標計算には依存しない。
+- yFinanceスナップショットと株探HTML行を取得する。
+- CF / 成長性 / 財務 / 四半期 / rankCF に必要な入力を構築する。
+- `calculate_cf_score()` を呼び、`CfScoringResult` を出力Builderへ渡す。
+- J-Quants 由来の `summary_rows` や旧FY/四半期補完モデルには依存しない。
 
 ### 4.2 `FetchKabutanForecastUseCase`
-責務：株探の通期業績行取得をリポジトリへ委譲する。
 
+- 株探の通期業績行取得をリポジトリへ委譲する。
 - HTMLフォルダ指定時はローカルHTMLを優先する。
-- 既定ではWebフォールバックを行わない。
 
 ---
 
-## 5. 出力生成方針
+## 5. ドメイン計算ルール
 
-### 5.1 基本出力
-`build_fundamental_output_text` は、銘柄名・株価・時価総額・PBR・ROE・業種と、株探行から算出したPER/配当利回りを生成する。
+### 5.1 成長率
 
-### 5.2 株探セクション
-`build_kabutan_forecast_output` は、株探の通期業績推移セクションを生成する。
+- 比較系列は年次昇順で構築する。
+- 同一年に実績行と予想行が存在する場合、成長率計算では同年予想を除外する。
+- 営業利益成長率は `((current - previous) / abs(previous)) * 100`。
+- EPS成長率は表示仕様で定めた式に従う。
+- 比較元なし、欠損、0除算相当は `None` を返す。
 
-- BuilderはI/O（HTTP、ファイル読込）を行わない。
-- 表示整形はBuilderに閉じ込める。
-- 欠損値は表示時に `N/A` または仕様上の欠損メッセージへ変換する。
-
----
-
-## 6. 廃止済み方針
-- J-Quants由来の財務指標計算モデルは使用しない。
-- `summary_rows` は使用しない。
-- FY/四半期データを前提にした表示補完は行わない。
-- `FundamentalDisplaySnapshot` / `PeriodFundamentalRow` へ寄せる段階移管案は廃止する。
-
----
-
-## 7. 追加提案：成長性ブロック（5.3 / 5.6）をドメイン層で実装する設計
-
-結論：**実装可能**。ただし、表示仕様を安定して満たすために「比較対象行の選定ルール」をValue Objectとして分離する。
-
-### 7.1 追加するドメインルール
-
-1. **成長率計算対象行の前処理（比較系列の確定）**
-   - 入力：株探行 `all_rows`（年・実績/予想・EPS・営業利益を含む）
-   - ルール：
-     - 年次昇順で走査する。
-     - 同一年に `実績` と `予想` が共存する場合、**成長率計算の系列には同年予想を含めない**。
-     - それ以外の年は、当該年の代表行（通常は実績、実績が無ければ予想）を採用する。
-   - 出力：比較系列 `growth_rows`。
-
-2. **営業利益成長率(%)**
-   - `op_growth[i] = ((op[i] - op[i-1]) / abs(op[i-1])) * 100`
-   - `i=0` は比較元が無いため `N/A`。
-   - 前年値欠損・0のときは `N/A`。
-
-3. **EPS成長率(%)（新仕様）**
-   - 仕様文をそのまま採用：
-     - `eps_growth[i] = (1 - (eps[i] - eps[i-1])) * 100`
-   - `i=0` は `N/A`。
-   - 前年EPS欠損時は `N/A`。
-
-4. **成長性ブロック表示順（5.6）**
-   1. 営業利益成長率
-   2. EPS成長率
-
-### 7.2 ドメイン層の責務分割（クリーンアーキテクチャ準拠）
-
-- `app/domain/policies/growth_rows.py`（新規）
-  - 比較系列 `growth_rows` の構築責務のみ。
-  - UI/Repository非依存。
-
-- `app/domain/policies/growth_metrics.py`（新規）
-  - 営業利益成長率、EPS成長率の純計算。
-  - 欠損時 `None` を返す。
-
-- `app/domain/builders/fundamental_output_impl.py`（既存拡張）
-  - 上記policyを呼び、表示文字列（`N/A`/`+xx.x%`）へ整形。
-
-### 7.3 追加するValue Object案
-
-- `GrowthPoint`
-  - `year: int`
-  - `operating_growth_pct: float | None`
-  - `eps_growth_pct: float | None`
-
-- `GrowthBlock`
-  - `points: tuple[GrowthPoint, ...]`
-  - Builderは `GrowthBlock` を受けて表示行を作るだけにする。
-
-### 7.4 実装時の注意点
-
-- **同年 実績→予想の比較禁止**は、計算関数内部ではなく、必ず比較系列の前処理で保証する。
-- 5.3のEPS式は一般的な前年比式と異なるため、domain_specに「仕様固定式」であることを明記する。
-- `%`付き表示はBuilder責務、計算値はdomain policyで数値として保持する。
-
-### 7.5 テスト観点（ドメイン中心）
-
-1. 同年に実績/予想があるケースで、同年予想が比較系列から除外されること。
-2. 先頭行が常に `N/A` になること。
-3. 欠損・0除算相当で `N/A` になること。
-4. 成長性ブロックの表示順が仕様通りであること。
-
-### 7.6 段階導入案
-
-- Phase 1: policy関数 + 単体テスト追加（表示は未接続でも可）
-- Phase 2: builderへ接続し、成長性ブロック出力を有効化
-- Phase 3: スナップショット差分テストで表示フォーマット固定
-
----
-
-## 8. CF経時ブロックの算出定義（表示仕様書から移管）
-
-本章は `docs/display_spec.md` の「5.9 CF 経時ブロック」で参照される、ドメイン計算ルールの正本定義とする。
-
-### 8.1 指標定義
+### 5.2 CF経時ブロック
 
 | 指標 | 計算式 |
 |------|-------|
@@ -180,11 +126,35 @@
 | 営業CFマージン | 営業CF ÷ 売上高 |
 | Cash Conversion | 営業CF ÷ 純利益 |
 | FCF Yield | FCF ÷ 時価総額 |
-| 投資積極性 | \|投資CF\| ÷ 営業CF |
+| 投資積極性 | `abs(投資CF) ÷ 営業CF` |
 
-### 8.2 欠損値・算出不可の扱い
+分母が `0` または `None`、または必要な入力値が欠損している場合は `None` とする。
 
-- 分母が `0` または `None` の場合は算出不可（`None`）とする。
-- 分子または分母に必要な入力値が欠損している場合は算出不可（`None`）とする。
-- 表示上の `N/A` 変換や本文行の省略可否は、表示仕様書（`docs/display_spec.md`）の欠損値ルールに従う。
-- 省略時の内部ログ出力（「取得不可（指標名・理由）」）は表示仕様書で規定された要件に従う。
+### 5.3 PER / 配当利回り
+
+- PERは forecast EPS 由来を優先する。
+- forecast EPS が取得不可の場合のみ market PER を使う。
+- 配当利回りは株探行の修正1株配当と株価から算出する。
+
+---
+
+## 6. Builder / Presenter
+
+- Builder / Presenter はI/Oを行わない。
+- Domain結果を表示DTOまたは出力テキストへ変換する。
+- 表示順、見出し、ラベル、`N/A`、本文行省略、内部ログ文言は `docs/display_spec.md` に従う。
+
+---
+
+## 7. 廃止済み方針
+
+- J-Quants由来の財務指標計算モデルは使用しない。
+- `summary_rows` は使用しない。
+- FY/四半期データを前提にした表示補完は行わない。
+- `FundamentalDisplaySnapshot` / `PeriodFundamentalRow` へ寄せる段階移管案は廃止する。
+
+---
+
+## 8. 未完了タスク
+
+なし。

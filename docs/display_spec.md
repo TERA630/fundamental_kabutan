@@ -4,7 +4,7 @@
 ## 1. 目的
 
 本仕様書は、GUIおよび分析出力テキストの表示仕様を整理する正本である。
-実装との差分や未完了タスクは `docs/display_spec_gap_analysis_20260527.md` に集約する。
+完了済みの差分分析や移行タスクは本書へ反映済みとし、未完了タスクは保持しない。
 
 ---
 
@@ -16,36 +16,14 @@
 
 ---
 
-## 3. 責務分離
+## 3. 責務境界
 
-### 3.1 データ層
+本書は表示仕様のみを定義する。
 
-| 責務 | ファイル |
-|------|---------|
-| 監視銘柄読み込み | `app/data/watchlist_repository.py` |
-| yFinance 株価取得 | `app/data/market_data_provider.py` |
-| 株探データ取得（HTML解析・Web取得） | `app/data/kabutan_repository.py` |
-| キャッシュ | `app/data/file_cache.py` |
-
-### 3.2 ドメイン層
-
-| 責務 | ファイル |
-|------|---------|
-| モデル | `app/domain/models/kabutan_forecast.py` |
-| 分析オーケストレーション | `app/domain/usecases/fundamental_analysis.py` |
-| 株探予想取得 | `app/domain/usecases/kabutan_forecast.py` |
-| 基本出力生成 | `app/domain/builders/fundamental_output.py` |
-| 株探セクション追記 | `app/domain/builders/kabutan_output.py` |
-
-### 3.3 GUI層
-
-| 責務 | ファイル |
-|------|---------|
-| 画面部品描画 | `app/gui_view.py` |
-| 表示文言生成 | `app/gui_view_model.py` |
-| 画面状態 | `app/gui_state.py` |
-| イベント仲介 | `app/gui_controller.py` |
-| 画面イベント処理 | `app/gui.py` |
+- GUI上の固定ラベル、ステータスメッセージ、出力テキストの順序・文言・数値表現を定義する。
+- データ取得、HTML解析、キャッシュ、ドメインモデル、指標計算の責務分離は `docs/domain_spec_proposal.md` を正とする。
+- rankCF の採点ルールは `docs/rankCF_spec.md`、実装設計は `docs/cf_scoring_design.md` を正とする。
+- 表示に必要な計算値は UseCase / Domain / Presenter から受け取り、本書では表示時の扱いだけを規定する。
 
 ---
 
@@ -296,6 +274,7 @@
 - 本書を表示仕様の単一ソースとする。
 
 
-## 9. 未完了タスク
+## 9. 検証状況
 
-未完了タスクは `docs/display_spec_gap_analysis_20260527.md` に集約する。
+- 直近確認: `python -m pytest`
+- 結果: `148 passed, 1 warning`

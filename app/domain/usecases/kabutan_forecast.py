@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastSnapshot
+from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.policies.kabutan_forecast_snapshot import build_kabutan_forecast_snapshot
 
 
@@ -29,14 +29,6 @@ class FetchKabutanForecastUseCase:
         target_years: tuple[int, int] | None = None,
     ) -> KabutanForecastPair:
         return self.repository.fetch_kabutan_forecast_pair(code=code, target_years=target_years)
-
-    def get_kabutan_forecast_snapshot_from_rows(
-        self,
-        rows: list,
-        base_year: int,
-    ) -> KabutanForecastSnapshot:
-        return build_kabutan_forecast_snapshot(rows, base_year=base_year)
-
 
 __all__ = [
     "KabutanForecastRepositoryPort",

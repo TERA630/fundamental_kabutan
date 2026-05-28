@@ -631,19 +631,6 @@ def _build_forecast_pair_from_rows(rows: list[KabutanForecastRow], target_years:
     )
 
 
-def infer_fiscal_year_end_month_from_forecast_rows(rows: list[KabutanForecastRow]) -> int | None:
-    if not rows:
-        return None
-    prioritized = [row.month for row in rows if row.section == "実績"]
-    months = prioritized or [row.month for row in rows]
-    if not months:
-        return None
-    counts: dict[int, int] = {}
-    for month in months:
-        counts[month] = counts.get(month, 0) + 1
-    return max(sorted(counts.keys()), key=lambda m: counts[m])
-
-
 class KabutanForecastRepository:
     def __init__(self, timeout_sec: int = 10, file_cache: FileCache | None = None):
         self.timeout_sec = timeout_sec
