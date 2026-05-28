@@ -2,7 +2,15 @@ import pytest
 
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
 from app.domain.builders.fundamental_output import build_fundamental_output_sections
-from app.domain.models.display_sections import RuleNotesSection, ScoreCategorySection, ScoreSummarySection, SummarySection, ValuationTableSection
+from app.domain.models.display_sections import (
+    DisplaySections,
+    OpeningSummarySection,
+    RuleNotesSection,
+    ScoreCategorySection,
+    ScoreSummarySection,
+    SummarySection,
+    ValuationTableSection,
+)
 from app.presentation.display_formatter import format_sections
 from app.presenters import build_cf_scoring_sections, build_cf_scoring_summary_text, build_fundamental_output
 
@@ -73,6 +81,64 @@ def test_build_cf_scoring_sections_builds_score_display_dtos():
     assert sections[1].title == "Quality"
     assert sections[2].title == "Growth"
     assert sections[3].title == "Valuation"
+
+
+def test_format_opening_summary_section():
+    formatted = format_sections(
+        DisplaySections(
+            sections=[
+                OpeningSummarySection(
+                    company_name="ハーモニック・ドライブ・システム",
+                    code4="6324",
+                    price=7690.0,
+                    market_cap=727_900_000_000.0,
+                    judgement="B",
+                    total_points=49,
+                    max_points=100,
+                    growth_phase="利益改善型",
+                    per_level="超高PER",
+                    roic_level="低ROIC",
+                    investment_strategy="順張り対象外・逆張り限定",
+                )
+            ]
+        )
+    )
+
+    assert formatted.splitlines() == [
+        "【ハーモニック・ドライブ・システム (6324)】",
+        "株価 7,690円　時価総額 7,279億円（中型主役）",
+        "",
+        "総合評価 B（49/100）",
+        "利益改善型 / 超高PER / 低ROIC",
+        "順張り対象外・逆張り限定",
+    ]
+
+
+def test_format_opening_summary_section_fallbacks():
+    formatted = format_sections(
+        DisplaySections(
+            sections=[
+                OpeningSummarySection(
+                    company_name="Test",
+                    code4="1234",
+                    price=None,
+                    market_cap=None,
+                    judgement=None,
+                    total_points=None,
+                    max_points=None,
+                    growth_phase=None,
+                    per_level=None,
+                    roic_level=None,
+                    investment_strategy=None,
+                )
+            ]
+        )
+    )
+
+    assert "株価 N/A　時価総額 N/A" in formatted
+    assert "総合評価 N/A" in formatted
+    assert "N/A / N/A / N/A" in formatted
+    assert "投資戦略 N/A" in formatted
 
 
 def test_build_fundamental_output_appends_scoring_when_present():

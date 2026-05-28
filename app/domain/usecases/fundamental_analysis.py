@@ -22,6 +22,7 @@ from app.domain.policies.cf_scoring import calculate_cf_score
 from app.domain.policies.financial_metrics import calc_roic_approx
 from app.domain.policies.growth_metrics import calc_cagr
 from app.domain.policies.growth_phase import GrowthPhase, classify_growth_phase_from_rows
+from app.domain.policies.valuation_levels import PerLevel, RoicLevel, classify_per_level, classify_roic_level
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
 MARKET_SNAPSHOT_KEYS = (
@@ -163,6 +164,11 @@ class FundamentalAnalysisService:
             "quarterly_message": kabutan_fetch_result.quarterly_message,
             "cf_scoring_result": cf_scoring_result,
             "growth_phase": self.build_growth_phase(kabutan_fetch_result.pair),
+            "per_level": self.build_per_level(
+                cf_scoring_input=cf_scoring_input,
+                industry=price_snapshot.get("industry"),
+            ),
+            "roic_level": self.build_roic_level(cf_scoring_input),
         }
         signature = inspect.signature(build_output_fn)
         accepts_var_keyword = any(
@@ -305,6 +311,17 @@ class FundamentalAnalysisService:
         if not rows:
             return None
         return classify_growth_phase_from_rows(rows)
+
+    @staticmethod
+    def build_per_level(*, cf_scoring_input: CfScoringInput | None, industry: float | str | None) -> PerLevel | None:
+        industry_text = industry if isinstance(industry, str) else None
+        per = cf_scoring_input.per if cf_scoring_input is not None else None
+        return classify_per_level(per, industry_text)
+
+    @staticmethod
+    def build_roic_level(cf_scoring_input: CfScoringInput | None) -> RoicLevel | None:
+        roic = cf_scoring_input.roic if cf_scoring_input is not None else None
+        return classify_roic_level(roic)
 
     @staticmethod
     def build_cf_scoring_input(

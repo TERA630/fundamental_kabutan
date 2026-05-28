@@ -193,6 +193,7 @@
 
 - `割安PER`
 - `適正PER`
+- `高PER`
 - `超高PER`
 
 **ROIC水準分類 `{roic_level}`**
@@ -352,8 +353,31 @@
 - 将来のWeb優先モードや複数ソース統合表示は対象外。
 - 本書を表示仕様の単一ソースとする。
 
+---
 
-## 9. 検証状況
+## 9. GUI層実装工程
+
+### 9.1 Phase 1: 冒頭サマリーDTO / Formatter追加
+
+- `OpeningSummarySection` を追加し、冒頭サマリーブロックの表示に必要な値を保持する。
+- `format_opening_summary()` を追加し、5.4 の表示形式に従ってテキスト化する。
+- 既存の `SummarySection` / `ScoreSummarySection` の出力はこの段階では変更しない。
+- Formatter単体テストで、通常表示と欠損時フォールバックを確認する。
+
+### 9.2 Phase 2: Presenter結合
+
+- `build_fundamental_output()` が `growth_phase` / `per_level` / `roic_level` を受け取る。
+- `SummarySection` と `ScoreSummarySection` を冒頭で統合し、`OpeningSummarySection` に変換する。
+- 旧表示の `投資分類` / `算出基準` は冒頭サマリーからは出さない。
+- `Quality` / `Growth` / `Valuation` の詳細スコア、ルール注記、バリュエーション表以降の表示順は維持する。
+
+### 9.3 Phase 3: 統合テスト更新
+
+- `build_fundamental_output()` の期待出力を新冒頭サマリーへ更新する。
+- `FundamentalAnalysisService.build_analysis_output()` から渡される `growth_phase` / `per_level` / `roic_level` が表示へ反映されることを確認する。
+- 全体テスト `python -m pytest` を通す。
+
+## 10. 検証状況
 
 - 直近確認: `python -m pytest`
-- 結果: `148 passed, 1 warning`
+- 結果: `188 passed, 1 warning`

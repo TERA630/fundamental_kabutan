@@ -21,6 +21,21 @@ class SummarySection:
 
 
 @dataclass
+class OpeningSummarySection:
+    company_name: str
+    code4: str
+    price: float | None
+    market_cap: float | None
+    judgement: str | None
+    total_points: int | None
+    max_points: int | None
+    growth_phase: str | None
+    per_level: str | None
+    roic_level: str | None
+    investment_strategy: str | None
+
+
+@dataclass
 class ValuationTableSection:
     year_labels: List[str]
     per_values: List[str]
@@ -106,6 +121,7 @@ class QuarterlyMetricsSection:
 
 Section = (
     SummarySection
+    | OpeningSummarySection
     | ScoreSummarySection
     | ValuationTableSection
     | ScoreCategorySection

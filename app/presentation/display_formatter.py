@@ -11,6 +11,7 @@ from app.domain.models.display_sections import (
     FinancialMetricsSection,
     ForecastTableSection,
     GrowthTimelineSection,
+    OpeningSummarySection,
     QuarterlyMetricsSection,
     RuleNotesSection,
     ScoreCategorySection,
@@ -100,6 +101,38 @@ def _format_market_cap_rank(value: float | None) -> str:
     if oku >= 1_000:
         return "小〜中型"
     return "小型"
+
+
+def _fmt_opening_price(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,.0f}円"
+
+
+def _fmt_opening_market_cap(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value / 100_000_000:,.0f}億円"
+
+
+def format_opening_summary(section: OpeningSummarySection) -> List[str]:
+    market_cap_text = _fmt_opening_market_cap(section.market_cap)
+    if section.market_cap is not None:
+        market_cap_text = f"{market_cap_text}（{_format_market_cap_rank(section.market_cap)}）"
+
+    if section.judgement is None or section.total_points is None or section.max_points is None:
+        score_line = "総合評価 N/A"
+    else:
+        score_line = f"総合評価 {section.judgement}（{section.total_points}/{section.max_points}）"
+
+    return [
+        f"【{section.company_name} ({section.code4})】",
+        f"株価 {_fmt_opening_price(section.price)}　時価総額 {market_cap_text}",
+        "",
+        score_line,
+        f"{section.growth_phase or 'N/A'} / {section.per_level or 'N/A'} / {section.roic_level or 'N/A'}",
+        section.investment_strategy or "投資戦略 N/A",
+    ]
 
 
 def format_summary(section: SummarySection) -> List[str]:
@@ -322,7 +355,9 @@ def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
 def format_sections(sections: DisplaySections) -> str:
     lines: List[str] = []
     for s in sections.sections:
-        if isinstance(s, SummarySection):
+        if isinstance(s, OpeningSummarySection):
+            lines.extend(format_opening_summary(s))
+        elif isinstance(s, SummarySection):
             lines.extend(format_summary(s))
         elif isinstance(s, ScoreSummarySection):
             lines.extend(format_score_summary(s))

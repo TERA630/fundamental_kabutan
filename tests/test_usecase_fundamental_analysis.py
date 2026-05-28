@@ -147,6 +147,14 @@ def test_build_growth_phase_from_forecast_pair():
     assert FundamentalAnalysisService.build_growth_phase(pair) == "成長再加速"
 
 
+def test_build_per_and_roic_levels_from_cf_scoring_input():
+    scoring_input = type("ScoringInput", (), {"per": 31.0, "roic": 12.0})()
+
+    assert FundamentalAnalysisService.build_per_level(cf_scoring_input=scoring_input, industry="Semiconductors") == "高PER"
+    assert FundamentalAnalysisService.build_per_level(cf_scoring_input=scoring_input, industry="Banks") == "超高PER"
+    assert FundamentalAnalysisService.build_roic_level(scoring_input) == "高ROIC"
+
+
 
 def test_build_cf_scoring_input_prefers_next_forecast_eps_for_per():
     pair = KabutanForecastPair(
