@@ -158,7 +158,17 @@ def format_valuation(section: ValuationTableSection) -> List[str]:
     header = "年度|" + "|".join(section.year_labels) if section.year_labels else "年度|N/A"
     per_line = f"PER|{'|'.join(section.per_values) if section.per_values else 'N/A'}"
     div_line = f"配当利回り|{'|'.join(section.dividend_values) if section.dividend_values else 'N/A'}"
-    return ["", "■バリュエーション", header, per_line, div_line]
+    lines = ["", "■株価評価・資本効率", header, per_line]
+    if section.pbr_values is not None:
+        lines.append(f"PBR|{'|'.join(section.pbr_values)}")
+    if section.roe_values is not None:
+        lines.append(f"ROE|{'|'.join(section.roe_values)}")
+    if section.roic_values is not None:
+        lines.append(f"ROIC|{'|'.join(section.roic_values)}")
+    lines.append(div_line)
+    if section.fcf_yield_values is not None:
+        lines.append(f"FCF Yield|{'|'.join(section.fcf_yield_values)}")
+    return lines
 
 
 def format_score_summary(section: ScoreSummarySection) -> List[str]:

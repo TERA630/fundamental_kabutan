@@ -165,8 +165,8 @@ def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
     assert "算出基準：" not in out
     assert "総合評価：" not in out
     assert "Quality: 45/60" in out
-    assert out.find("【Test (1234)】") < out.find("総合評価 A（73/100）") < out.find("■バリュエーション")
-    assert out.find("■バリュエーション") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
+    assert out.find("【Test (1234)】") < out.find("総合評価 A（73/100）") < out.find("■株価評価・資本効率")
+    assert out.find("■株価評価・資本効率") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
 
 
 def test_build_fundamental_output_without_scoring_keeps_previous_behavior():
@@ -198,10 +198,57 @@ def test_build_fundamental_output_sections_and_formatter_produces_valuation_tabl
     assert sections.sections[1].dividend_values == ["N/A"]
 
     formatted = format_sections(sections)
-    assert "■バリュエーション" in formatted
+    assert "■株価評価・資本効率" in formatted
     assert "年度|N/A" in formatted
     assert "PER|N/A" in formatted
     assert "配当利回り|N/A" in formatted
+
+
+def test_build_fundamental_output_integrates_capital_efficiency_into_valuation_block():
+    from app.domain.models.financial_snapshot import FinancialMetricInputRow
+    from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+    from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80, 100.0, 20.0),
+        current_actual=None,
+        current_forecast=None,
+        next_forecast=None,
+    )
+
+    out = build_fundamental_output(
+        name="Test",
+        code4="1234",
+        master=None,
+        price=2000.0,
+        market_cap=10_000_000_000.0,
+        kabutan_forecast_pair=pair,
+        kabutan_cashflow_rows=(KabutanCashflowRow("2025.03", 2025, 3, 200, 300, -100, 0, 500),),
+        financial_metric_rows=(
+            FinancialMetricInputRow(
+                year=2025,
+                net_income=80,
+                equity=400,
+                operating_profit=100,
+                interest_bearing_debt=100,
+                bps=1000.0,
+                price=2000.0,
+            ),
+        ),
+    )
+
+    valuation_pos = out.find("■株価評価・資本効率")
+    forecast_pos = out.find("■株探 通期業績推移")
+    assert valuation_pos != -1
+    assert valuation_pos < forecast_pos
+    assert "PER|20.0倍" in out
+    assert "PBR|2.00倍" in out
+    assert "ROE|20.00%" in out
+    assert "ROIC|14.00%" in out
+    assert "配当利回り|1.00%" in out
+    assert "FCF Yield|2.00%" in out
+    assert "■財務ブロック" not in out
 
 
 def test_format_sections_logs_missing_valuation_values(caplog):

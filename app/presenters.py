@@ -178,6 +178,8 @@ def build_fundamental_output(
             market_cap=market_cap,
             market_snapshot=market_snapshot,
             kabutan_forecast_pair=kabutan_forecast_pair,
+            kabutan_cashflow_rows=kabutan_cashflow_rows,
+            financial_metric_rows=financial_metric_rows,
         )
         if cf_scoring_result is not None:
             sections = _merge_scoring_sections(
@@ -205,5 +207,6 @@ def build_fundamental_output(
         quarterly_metric_rows,
         quarterly_message,
         cf_scoring_result,
+        False,
     )
     return output

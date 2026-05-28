@@ -182,6 +182,7 @@ def build_kabutan_forecast_sections(
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
     quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
     quarterly_message: str | None = None,
+    include_financial_section: bool = True,
 ) -> DisplaySections:
     rows: list[KabutanForecastRow] = []
     if kabutan_forecast_pair is not None:
@@ -206,13 +207,10 @@ def build_kabutan_forecast_sections(
     growth_section = _build_growth_section(rows)
     if growth_section is not None:
         sections.append(growth_section)
-    sections.extend(
-        [
-            _build_cashflow_section(rows, kabutan_cashflow_rows, market_cap),
-            _build_financial_section(financial_metric_rows),
-            QuarterlyMetricsSection(rows=list(quarterly_metric_rows), message=quarterly_message),
-        ]
-    )
+    sections.append(_build_cashflow_section(rows, kabutan_cashflow_rows, market_cap))
+    if include_financial_section:
+        sections.append(_build_financial_section(financial_metric_rows))
+    sections.append(QuarterlyMetricsSection(rows=list(quarterly_metric_rows), message=quarterly_message))
     return DisplaySections(sections=sections)
 
 
@@ -231,6 +229,7 @@ def build_kabutan_forecast_output(
     quarterly_metric_rows: tuple[QuarterlyMetricRow, ...] = (),
     quarterly_message: str | None = None,
     cf_scoring_result: CfScoringResult | None = None,
+    include_financial_section: bool = True,
 ) -> str:
     sections = build_kabutan_forecast_sections(
         kabutan_forecast_pair,
@@ -241,6 +240,7 @@ def build_kabutan_forecast_output(
         financial_metric_rows,
         quarterly_metric_rows,
         quarterly_message,
+        include_financial_section,
     )
     section = format_sections(sections)
     return f"{base_output}\n{section}"

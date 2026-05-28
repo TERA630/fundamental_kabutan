@@ -41,6 +41,10 @@ class ValuationTableSection:
     year_labels: List[str]
     per_values: List[str]
     dividend_values: List[str]
+    pbr_values: List[str] | None = None
+    roe_values: List[str] | None = None
+    roic_values: List[str] | None = None
+    fcf_yield_values: List[str] | None = None
 
 
 @dataclass

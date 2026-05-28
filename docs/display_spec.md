@@ -67,7 +67,7 @@
 ### 5.0 全体表示順
 
 1. 冒頭サマリーブロック（銘柄ヘッダを含む）
-2. バリュエーションブロック
+2. 株価評価・資本効率ブロック
 3. Qualityスコアブロック
 4. Growthスコアブロック
 5. Valuationスコアブロック
@@ -75,8 +75,7 @@
 7. 株探 通期業績推移
 8. 成長性
 9. キャッシュフロー
-10. 財務ブロック
-11. 四半期業績推移
+10. 四半期業績推移
 
 ### 5.1 セクション見出し・ソース表示
 
@@ -222,15 +221,23 @@
 - `{growth_phase}` / `{per_level}` / `{roic_level}` のいずれかが欠損する場合は、該当位置に `N/A` を表示し、区切り `/` は維持する。
 - 投資戦略が欠損する場合は `投資戦略 N/A` と表示する。
 
-### 5.5 バリュエーションブロック
+### 5.5 株価評価・資本効率ブロック
 1.  縦並び表で
    """ 20xx年(実績)|20xx年(実績/予)|20xx年(予)| PER
    PER| xx.x倍|xx.x倍|xx.x倍
+   PBR| x.xx倍|x.xx倍|x.xx倍
+   ROE| x.x%|x.x%|x.x%
+   ROIC| x.x%|x.x%|x.x%
    配当利回り|   x.xx%|x.xx%|x.xx%|
+   FCF Yield| x.x%|x.x%|x.x%
    """
 **算出ルール**
 
 - PER・配当利回りは、株探行データの「修正1株益」「修正1株配当」を基準に算出する。
+- PBR・ROE・ROIC は、財務指標行データの最新3年を基準に算出する。
+- FCF Yield は、CF実績行のフリーCFと時価総額から算出する。
+- 年列は PER・配当利回り・PBR・ROE・ROIC・FCF Yield の表示対象年を統合し、年順で表示する。
+- 指標ごとに該当年の値がない場合は `N/A` と表示する。
 - 表示年の決定：
   - PER行は、修正1株益が取得できた最新年を `Y_per` として `Y_per-2`・`Y_per-1`・`Y_per` の3年を表示する。
   - 配当利回り行は、修正1株配当が取得できた最新年を `Y_div` として `Y_div-2`・`Y_div-1`・`Y_div` の3年を表示する。
@@ -287,13 +294,8 @@
 
 ### 5.11 財務ブロック
 
-- 見出し: `■財務ブロック`
-- ヘッダ: `ROE(%)|ROIC(%)|PBR|`
-- 対象年: ROE・ROIC・PBR の算出に必要な生値が揃う共通有効年の最新3年。
-- 表示桁:
-  - ROE / ROIC: 小数1桁 `%`
-  - PBR: 小数2桁 `倍`
-- 欠損時は `N/A`。
+- フル分析出力では、ROE・ROIC・PBR は 5.5 `株価評価・資本効率ブロック` に統合し、独立した財務ブロックは表示しない。
+- 株探セクション単体出力など、冒頭の株価評価・資本効率ブロックへ統合できない呼び出しでは、従来どおり独立した `■財務ブロック` を表示してよい。
 
 ### 5.12 四半期業績推移
 
@@ -401,6 +403,21 @@
 - UseCase統合テストは、`FundamentalAnalysisService.build_analysis_output()` が `growth_phase` / `per_level` / `roic_level` を `build_output_fn` へ渡すことを確認する。
 - 全体テストは環境依存の `bs4` 未導入により収集で停止したため、依存導入後に再実行する。
 
+### 9.4 Phase 4: 株価評価・資本効率ブロック統合
+
+**状態: 完了（2026-05-29）**
+
+- 旧 `バリュエーション` ブロックを `株価評価・資本効率` ブロックへ変更する。
+- PER・配当利回りに加え、PBR・ROE・ROIC・FCF Yield を同じ年次列へ統合する。
+- フル分析出力では後段の独立 `財務ブロック` を表示せず、ROE・ROIC・PBR の確認箇所を株価評価・資本効率ブロックへ集約する。
+- 株探セクション単体出力では、冒頭側へ統合できないため従来の財務ブロック表示を維持する。
+
+**完了内容**
+
+- `ValuationTableSection` に PBR / ROE / ROIC / FCF Yield の表示行を追加した。
+- Presenter のフル出力経路では、財務指標行とCF実績行をバリュエーションDTOへ渡し、後段の財務ブロック重複を抑止する。
+- 株探セクション単体出力では、従来どおり独立した財務ブロックを表示できる。
+
 ## 10. 検証状況
 
 - Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
@@ -409,3 +426,9 @@
 - 結果: 成功
 - 全体確認: `python -m pytest`
 - 結果: 環境に `bs4` が未導入のため、株探Repository系テスト収集で `ModuleNotFoundError: No module named 'bs4'`
+- Phase 4 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
+- 結果: `42 passed`
+- Phase 4 import確認: `python -B -c "import app.presenters; import app.domain.builders.fundamental_output; import app.domain.builders.fundamental_output_impl; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
+- 結果: 成功
+- Phase 4 py_compile確認: `python -m py_compile app\presenters.py app\domain\builders\fundamental_output.py app\domain\builders\fundamental_output_impl.py app\domain\builders\kabutan_output.py app\domain\models\display_sections.py app\presentation\display_formatter.py`
+- 結果: `__pycache__` 一時ファイル作成の権限エラーで未完了

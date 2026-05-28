@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from typing import Any
+from app.domain.models.financial_snapshot import FinancialMetricInputRow
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.display_sections import SummarySection, ValuationTableSection, DisplaySections
+from app.domain.policies.financial_metrics import calc_pbr, calc_roe, calc_roic_approx
 
 
 
@@ -56,6 +59,20 @@ def calc_dividend_yield_pct(price: float | None, dividend: float | None) -> floa
     return dividend / price * 100
 
 
+def _resolve_fcf_million_yen(row: KabutanCashflowRow) -> int | None:
+    if row.free_cf is not None:
+        return row.free_cf
+    if row.operating_cf is None or row.investing_cf is None:
+        return None
+    return row.operating_cf + row.investing_cf
+
+
+def _calc_fcf_yield_pct(free_cf_million_yen: int | None, market_cap_yen: float | None) -> float | None:
+    if free_cf_million_yen is None or market_cap_yen in (None, 0):
+        return None
+    return ((free_cf_million_yen * 1_000_000) / market_cap_yen) * 100
+
+
 def fetch_kabutan_rows(pair: KabutanForecastPair | None) -> list[KabutanForecastRow]:
     if pair is None:
         return []
@@ -88,6 +105,10 @@ def build_year_label(row: KabutanForecastRow) -> str:
     return f"{row.year}年{suffix}"
 
 
+def build_actual_year_label(year: int) -> str:
+    return f"{year}年(実績)"
+
+
 def _fmt_market_per(value: Any) -> str | None:
     if not isinstance(value, (int, float)):
         return None
@@ -96,27 +117,65 @@ def _fmt_market_per(value: Any) -> str | None:
     return f"{float(value):.1f}倍"
 
 
-def build_fundamental_output_sections_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> DisplaySections:
+def _align_values(year_labels: list[str], values_by_label: dict[str, str]) -> list[str]:
+    if not year_labels:
+        return ["N/A"]
+    return [values_by_label.get(label, "N/A") for label in year_labels]
+
+
+def _label_year(label: str) -> int:
+    try:
+        return int(label[:4])
+    except ValueError:
+        return 0
+
+
+def build_fundamental_output_sections_impl(
+    *,
+    name: str,
+    code4: str,
+    master: dict[str, Any] | None,
+    price: float | None,
+    market_cap: float | None,
+    market_snapshot: dict[str, Any] | None = None,
+    kabutan_forecast_pair: KabutanForecastPair | None = None,
+    kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
+    financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
+) -> DisplaySections:
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
     all_rows = fetch_kabutan_rows(kabutan_forecast_pair)
     per_rows = fetch_display_rows_for_indicator(all_rows, metric="per")
     dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
-    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
-    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
+    per_by_label = {build_year_label(row): f"{_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows}
+    dividend_by_label = {build_year_label(row): _fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend)) for row in dividend_rows}
     market_per = _fmt_market_per((market_snapshot or {}).get("per"))
-    if not per_lines and market_per is not None:
-        per_lines = [f"市場PER {market_per}"]
+    if not per_by_label and market_per is not None:
+        per_by_label = {"市場PER": market_per}
 
-    year_labels: list[str] = []
-    if per_lines:
-        year_labels = [part.split(" ", 1)[0] for part in per_lines]
-    elif dividend_lines:
-        year_labels = [part.split(" ", 1)[0] for part in dividend_lines]
+    pbr_by_label: dict[str, str] = {}
+    roe_by_label: dict[str, str] = {}
+    roic_by_label: dict[str, str] = {}
+    for row in financial_metric_rows:
+        label = build_actual_year_label(row.year)
+        pbr_by_label[label] = f"{_fmt_num(calc_pbr(row.price, row.bps), 2)}倍"
+        roe_by_label[label] = _fmt_plain_pct(calc_roe(row.net_income, row.equity))
+        roic_by_label[label] = _fmt_plain_pct(calc_roic_approx(row.operating_profit, row.equity, row.interest_bearing_debt))
 
-    per_values = [part.split(" ", 1)[1] for part in per_lines] if per_lines else ["N/A"]
-    dividend_values = [part.split(" ", 1)[1] for part in dividend_lines] if dividend_lines else ["N/A"]
+    fcf_yield_by_label: dict[str, str] = {}
+    for row in kabutan_cashflow_rows:
+        fcf_yield_by_label[build_actual_year_label(row.year)] = _fmt_plain_pct(_calc_fcf_yield_pct(_resolve_fcf_million_yen(row), market_cap))
+
+    labels = set(per_by_label) | set(dividend_by_label) | set(pbr_by_label) | set(roe_by_label) | set(roic_by_label) | set(fcf_yield_by_label)
+    year_labels = sorted(labels, key=lambda label: (_label_year(label), label))
+
+    per_values = _align_values(year_labels, per_by_label)
+    dividend_values = _align_values(year_labels, dividend_by_label)
+    pbr_values = _align_values(year_labels, pbr_by_label) if pbr_by_label else None
+    roe_values = _align_values(year_labels, roe_by_label) if roe_by_label else None
+    roic_values = _align_values(year_labels, roic_by_label) if roic_by_label else None
+    fcf_yield_values = _align_values(year_labels, fcf_yield_by_label) if fcf_yield_by_label else None
 
     summary = SummarySection(
         company_name=company_name,
@@ -127,7 +186,15 @@ def build_fundamental_output_sections_impl(*, name: str, code4: str, master: dic
         pbr=(market_snapshot or {}).get("pbr"),
         roe=(market_snapshot or {}).get("roe"),
     )
-    valuation = ValuationTableSection(year_labels=year_labels, per_values=per_values, dividend_values=dividend_values)
+    valuation = ValuationTableSection(
+        year_labels=year_labels,
+        per_values=per_values,
+        dividend_values=dividend_values,
+        pbr_values=pbr_values,
+        roe_values=roe_values,
+        roic_values=roic_values,
+        fcf_yield_values=fcf_yield_values,
+    )
     return DisplaySections(sections=[summary, valuation])
 
 
