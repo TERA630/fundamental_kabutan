@@ -125,6 +125,8 @@ def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_c
     )
 
     assert "2024 | 300.0% | 0.8% | 8.0% | 15.0% | 46.7%" in text
+<<<<<<< ours
+<<<<<<< ours
 
 
 def test_build_kabutan_forecast_output_keeps_negative_operating_cf_sign_for_investment_aggressiveness():
