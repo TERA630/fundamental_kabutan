@@ -21,6 +21,7 @@ from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.policies.cf_scoring import calculate_cf_score
 from app.domain.policies.financial_metrics import calc_roic_approx
 from app.domain.policies.growth_metrics import calc_cagr
+from app.domain.policies.growth_phase import GrowthPhase, classify_growth_phase_from_rows
 
 CACHE_TTL_YF_SEC = 12 * 60 * 60
 MARKET_SNAPSHOT_KEYS = (
@@ -161,6 +162,7 @@ class FundamentalAnalysisService:
             ),
             "quarterly_message": kabutan_fetch_result.quarterly_message,
             "cf_scoring_result": cf_scoring_result,
+            "growth_phase": self.build_growth_phase(kabutan_fetch_result.pair),
         }
         signature = inspect.signature(build_output_fn)
         accepts_var_keyword = any(
@@ -285,6 +287,24 @@ class FundamentalAnalysisService:
             )
         return tuple(out)
 
+    @staticmethod
+    def build_growth_phase(forecast_pair: KabutanForecastPair | None) -> GrowthPhase | None:
+        if forecast_pair is None:
+            return None
+        rows = list(forecast_pair.all_rows) if forecast_pair.all_rows else [
+            row
+            for row in (
+                forecast_pair.previous2_actual,
+                forecast_pair.previous_actual,
+                forecast_pair.current_actual,
+                forecast_pair.current_forecast,
+                forecast_pair.next_forecast,
+            )
+            if row is not None
+        ]
+        if not rows:
+            return None
+        return classify_growth_phase_from_rows(rows)
 
     @staticmethod
     def build_cf_scoring_input(

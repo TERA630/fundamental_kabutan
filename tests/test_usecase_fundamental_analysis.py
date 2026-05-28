@@ -129,6 +129,24 @@ def test_build_quarterly_metric_rows_returns_empty_when_rows_missing():
     assert out == ()
 
 
+def test_build_growth_phase_from_forecast_pair():
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=None,
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 130, 18, 15, 13, 18.0, 2.0),
+        next_forecast=None,
+        all_rows=(
+            KabutanForecastRow("2024.03", 2024, 3, "実績", 100, 10, 9, 8, 10.0, 2.0),
+            KabutanForecastRow("2025.03", 2025, 3, "実績", 103, 9, 8, 7, 9.0, 2.0),
+            KabutanForecastRow("2026.03", 2026, 3, "予想", 110, 12, 11, 10, 12.0, 2.0),
+            KabutanForecastRow("2027.03", 2027, 3, "予想", 130, 18, 15, 13, 18.0, 2.0),
+        ),
+    )
+
+    assert FundamentalAnalysisService.build_growth_phase(pair) == "成長再加速"
+
+
 
 def test_build_cf_scoring_input_prefers_next_forecast_eps_for_per():
     pair = KabutanForecastPair(
