@@ -129,6 +129,22 @@ def test_build_fundamental_output_sections_and_formatter_produces_valuation_tabl
     assert "配当利回り|N/A" in formatted
 
 
+def test_format_sections_logs_missing_valuation_values(caplog):
+    sections = build_fundamental_output_sections(
+        name="Test",
+        code4="1234",
+        master=None,
+        price=1000.0,
+        market_cap=1_000_000_000.0,
+    )
+
+    caplog.set_level("INFO")
+    format_sections(sections)
+
+    assert "取得不可: PER (値欠損)" in caplog.text
+    assert "取得不可: 配当利回り (値欠損)" in caplog.text
+
+
 def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
     scoring = CfScoringResult(
         version="rankcf-v1",

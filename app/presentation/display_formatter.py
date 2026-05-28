@@ -113,6 +113,12 @@ def format_summary(section: SummarySection) -> List[str]:
 
 
 def format_valuation(section: ValuationTableSection) -> List[str]:
+    if not section.year_labels:
+        logger.info("取得不可: バリュエーション年度 (値欠損)")
+    if not section.per_values or section.per_values == ["N/A"]:
+        logger.info("取得不可: PER (値欠損)")
+    if not section.dividend_values or section.dividend_values == ["N/A"]:
+        logger.info("取得不可: 配当利回り (値欠損)")
     header = "年度|" + "|".join(section.year_labels) if section.year_labels else "年度|N/A"
     per_line = f"PER|{'|'.join(section.per_values) if section.per_values else 'N/A'}"
     div_line = f"配当利回り|{'|'.join(section.dividend_values) if section.dividend_values else 'N/A'}"
@@ -216,6 +222,8 @@ def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
 
 def format_forecast_table(section: ForecastTableSection) -> List[str]:
     header = "　　　　　　売上　営業益(営業利益率)　経常益(経常利益率)　最終益　1株益　1株配当"
+    if not section.rows:
+        logger.info("取得不可: 株探通期業績推移 (値欠損)")
     row_lines = [_build_kabutan_row_line(row) for row in section.rows] if section.rows else ["データーが取得できません"]
     return [
         "",
@@ -241,6 +249,8 @@ def _build_cagr_line(title: str, start_year: int | None, end_year: int | None, v
 
 
 def format_growth_timeline(section: GrowthTimelineSection) -> List[str]:
+    if not section.rows:
+        logger.info("取得不可: 成長性経時ブロック (値欠損)")
     return [
         "■成長性",
         _build_growth_metric_line("EPS成長率", section.rows, section.eps_growth_rates),
@@ -252,16 +262,17 @@ def format_growth_timeline(section: GrowthTimelineSection) -> List[str]:
 
 def format_cashflow_timeline(section: CashflowTimelineSection) -> List[str]:
     if not section.actual_rows:
+        logger.info("取得不可: キャッシュフロー (値欠損)")
         return ["■キャッシュフロー", "N/A"]
 
     lines = [
         "■キャッシュフロー",
         "[A] CF実績（百万円）",
-        "年度 | フリーCF | 営業CF | 投資CF | 財務CF | 現金等残高",
+        "年度 | 営業CF | 投資CF | 財務CF | 現金等残高",
     ]
     for row in section.actual_rows:
         lines.append(
-            f"{row.year} | {_fmt_million_yen(row.free_cf)} | {_fmt_million_yen(row.operating_cf)} | {_fmt_million_yen(row.investing_cf)} | {_fmt_million_yen(row.financing_cf)} | {_fmt_million_yen(row.cash_stock)}"
+            f"{row.year} | {_fmt_million_yen(row.operating_cf)} | {_fmt_million_yen(row.investing_cf)} | {_fmt_million_yen(row.financing_cf)} | {_fmt_million_yen(row.cash_stock)}"
         )
 
     lines.extend(
@@ -281,6 +292,7 @@ def format_cashflow_timeline(section: CashflowTimelineSection) -> List[str]:
 def format_financial_metrics(section: FinancialMetricsSection) -> List[str]:
     lines = ["■財務ブロック", "　　　ROE(%)|ROIC(%)|PBR|"]
     if not section.rows:
+        logger.info("取得不可: 財務ブロック (値欠損)")
         lines.append("N/A")
         return lines
     for row in section.rows:
@@ -291,6 +303,7 @@ def format_financial_metrics(section: FinancialMetricsSection) -> List[str]:
 def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
     header = "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|"
     if not section.rows:
+        logger.info("取得不可: 四半期業績推移 (値欠損)")
         detail = f"N/A ({section.message})" if section.message else "N/A"
         return ["■四半期業績推移", header, detail]
 

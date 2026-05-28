@@ -58,6 +58,17 @@ def test_build_kabutan_forecast_output_renders_na_rows_when_none():
     assert "N/A" in text
 
 
+def test_build_kabutan_forecast_output_logs_missing_non_score_blocks(caplog):
+    caplog.set_level("INFO")
+
+    build_kabutan_forecast_output("base output", None, "none", "HTML解析に失敗")
+
+    assert "取得不可: 株探通期業績推移 (値欠損)" in caplog.text
+    assert "取得不可: キャッシュフロー (値欠損)" in caplog.text
+    assert "取得不可: 財務ブロック (値欠損)" in caplog.text
+    assert "取得不可: 四半期業績推移 (値欠損)" in caplog.text
+
+
 def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast():
     base = "base output"
     pair = KabutanForecastPair(
@@ -120,12 +131,12 @@ def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_y
     )
 
     assert "[A] CF実績（百万円）" in text
-    assert "年度 | フリーCF | 営業CF | 投資CF | 財務CF | 現金等残高" in text
+    assert "年度 | 営業CF | 投資CF | 財務CF | 現金等残高" in text
     assert "[B] 指標（%）" in text
     assert "年度 | Cash conversion | FCF Yield | FCFマージン | 営業CFマージン | 投資積極性" in text
-    assert "2022 | 100 | 140 | -40 | 10 | 300" in text
-    assert "2023 | -50 | 120 | -170 | 20 | 280" in text
-    assert "2024 | 80 | 150 | -70 | 30 | 350" in text
+    assert "2022 | 140 | -40 | 10 | 300" in text
+    assert "2023 | 120 | -170 | 20 | 280" in text
+    assert "2024 | 150 | -70 | 30 | 350" in text
     assert "2023 | 300.0% | -0.5% | -5.6% | 13.3% | 141.7%" in text
 
 

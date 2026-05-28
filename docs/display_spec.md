@@ -169,6 +169,7 @@
 - PERソース優先順：
   - 第1優先：forecast EPS（来期予想→今期予想の順で採用）
   - 第2優先：market PER（forecast EPS が取得不可の場合のみフォールバック）
+- market PER フォールバック時は、年ヘッダを `市場PER` として `PER|xx.x倍` を表示する。
 
 ### 5.6 　Quality スコアブロック 
 **表示順**
@@ -199,7 +200,7 @@
 
 **表示順**
 
-1. 営業CF ／ 投資CF ／ 財務CF ／ 現金等残高
+1. 営業CF ／ 投資CF ／ 財務CF ／ 現金等残高（CF実績表ではフリーCF列は表示しない）
 2. Cash Conversion
 3. FCF Yield
 4. FCFマージン ／ 営業CFマージン

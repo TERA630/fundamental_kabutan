@@ -85,7 +85,15 @@ def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow], *, metric: 
 
 def build_year_label(row: KabutanForecastRow) -> str:
     suffix = "(予)" if row.section == "予想" else "(実績)"
-    return f"{row.year}/{row.month:02d}{suffix}"
+    return f"{row.year}年{suffix}"
+
+
+def _fmt_market_per(value: Any) -> str | None:
+    if not isinstance(value, (int, float)):
+        return None
+    if value <= 0:
+        return None
+    return f"{float(value):.1f}倍"
 
 
 def build_fundamental_output_sections_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> DisplaySections:
@@ -97,6 +105,9 @@ def build_fundamental_output_sections_impl(*, name: str, code4: str, master: dic
     dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
     per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
     dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
+    market_per = _fmt_market_per((market_snapshot or {}).get("per"))
+    if not per_lines and market_per is not None:
+        per_lines = [f"市場PER {market_per}"]
 
     year_labels: list[str] = []
     if per_lines:
@@ -165,6 +176,9 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
     dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
     per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
     dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
+    market_per = _fmt_market_per((market_snapshot or {}).get("per"))
+    if not per_lines and market_per is not None:
+        per_lines = [f"市場PER {market_per}"]
 
     indicator_lines = build_indicator_lines(
         price=price,
