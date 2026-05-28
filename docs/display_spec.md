@@ -281,16 +281,32 @@
 
 **表示順**
 
-1. 営業CF ／ 投資CF ／ 財務CF ／ 現金等残高（CF実績表ではフリーCF列は表示しない）
-2. Cash Conversion
-3. FCF Yield
-4. FCFマージン ／ 営業CFマージン
-5. 投資積極性
+会社のキャッシュ創出力と投資姿勢を直感的に読むため、1表に集約して表示する。
+
+```
+■キャッシュフロー
+年度 | 営業CF | FCF | 投資積極性 | 現金残高
+YYYY | xxx | xxx | xx.x% | xxx
+```
+
+- 営業CF / FCF / 現金残高は百万円単位で表示する。
+- FCF が欠損し、営業CF・投資CFが取得できる場合は `営業CF + 投資CF` で補完する。
+- 投資積極性は `abs(投資CF) / 営業CF * 100` を表示する。
+- Cash Conversion / FCF Yield / FCFマージン / 営業CFマージンは、スコアブロックや株価評価・資本効率ブロックで確認できるため、本ブロックでは表示しない。
 
 ### 5.10  成長性経時ブロック
 
-1.　`EPS成長率　202x年　+xx.x%　202x年　-xx.x%　202x年　-xx.x%`
-2. `営業利益成長率　202x年　+xx.x%　202x年　-xx.x%　202x年　-xx.x%`
+単年成長率列は表示せず、CAGRのみを表示する。
+
+```
+■成長性
+売上CAGR YYYY→YYYY xx.x%
+営業利益CAGR YYYY→YYYY xx.x%
+EPS CAGR YYYY→YYYY xx.x%
+```
+
+- CAGR の開始年・終了年を解決できない場合は、該当行を `N/A` と表示する。
+- 極小利益からの反転で単年成長率が過大表示されるノイズを避けるため、`EPS成長率` / `営業利益成長率` の年次列は表示しない。
 
 ### 5.11 財務ブロック
 
@@ -418,6 +434,30 @@
 - Presenter のフル出力経路では、財務指標行とCF実績行をバリュエーションDTOへ渡し、後段の財務ブロック重複を抑止する。
 - 株探セクション単体出力では、従来どおり独立した財務ブロックを表示できる。
 
+### 9.5 Phase 5: 成長性ブロックのCAGR集約
+
+**状態: 完了（2026-05-29）**
+
+- 成長性ブロックから単年の `EPS成長率` / `営業利益成長率` 列を外し、売上CAGR・営業利益CAGR・EPS CAGR の3行へ集約する。
+- `GrowthTimelineSection` に売上CAGRを追加し、既存の営業利益CAGR・EPS CAGR と同じ開始年・終了年で表示する。
+
+**完了内容**
+
+- `format_growth_timeline()` は、`■成長性` 配下に CAGR 3行だけを表示する。
+- 極小利益からの反転で単年成長率が極端に大きくなるケースでも、成長性ブロックの視認性を維持する。
+
+### 9.6 Phase 6: CFブロックの意思決定順表示
+
+**状態: 完了（2026-05-29）**
+
+- CFブロックを2表構成から、営業CF・FCF・投資積極性・現金残高の1表へ集約する。
+- FCF 欠損時は、従来どおり営業CF + 投資CFで補完した値を表示する。
+
+**完了内容**
+
+- `format_cashflow_timeline()` は、会社のキャッシュ創出力、投資姿勢、手元流動性を1行で確認できる表示に変更した。
+- Cash Conversion / FCF Yield / FCFマージン / 営業CFマージンは、重複を避けるため CFブロック本文から外した。
+
 ## 10. 検証状況
 
 - Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
@@ -425,10 +465,14 @@
 - 追加確認: `python -m py_compile app/presenters.py app/domain/usecases/fundamental_analysis.py app/domain/models/display_sections.py app/presentation/display_formatter.py`
 - 結果: 成功
 - 全体確認: `python -m pytest`
-- 結果: 環境に `bs4` が未導入のため、株探Repository系テスト収集で `ModuleNotFoundError: No module named 'bs4'`
+- 結果: `192 passed, 1 warning`
 - Phase 4 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `42 passed`
 - Phase 4 import確認: `python -B -c "import app.presenters; import app.domain.builders.fundamental_output; import app.domain.builders.fundamental_output_impl; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
 - 結果: 成功
 - Phase 4 py_compile確認: `python -m py_compile app\presenters.py app\domain\builders\fundamental_output.py app\domain\builders\fundamental_output_impl.py app\domain\builders\kabutan_output.py app\domain\models\display_sections.py app\presentation\display_formatter.py`
 - 結果: `__pycache__` 一時ファイル作成の権限エラーで未完了
+- Phase 5/6 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
+- 結果: `42 passed`
+- Phase 5/6 import確認: `python -B -c "import app.presenters; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
+- 結果: 成功

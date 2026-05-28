@@ -79,7 +79,8 @@ def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast
         next_forecast=KabutanForecastRow("2027.03", 2027, 3, "予想", 1350, 150, 140, 120),
     )
     text = build_kabutan_forecast_output(base, pair, "html", None)
-    assert "2026/03(予)" not in text.split("営業利益成長率", 1)[1]
+    assert "EPS成長率" not in text
+    assert "営業利益成長率" not in text
     assert "2027/03(予)" in text
 
 
@@ -105,7 +106,7 @@ def test_build_kabutan_forecast_output_uses_all_rows_when_available():
     assert "2027/03(予)" in text
 
 
-def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_yield():
+def test_build_kabutan_forecast_output_builds_cashflow_intention_table():
     base = "base output"
     pair = KabutanForecastPair(
         previous2_actual=KabutanForecastRow("2022.03", 2022, 3, "実績", 800, 80, 70, 60),
@@ -130,14 +131,11 @@ def test_build_kabutan_forecast_output_builds_cashflow_two_tables_and_negative_y
         10_000_000_000.0,
     )
 
-    assert "[A] CF実績（百万円）" in text
-    assert "年度 | 営業CF | 投資CF | 財務CF | 現金等残高" in text
-    assert "[B] 指標（%）" in text
-    assert "年度 | Cash conversion | FCF Yield | FCFマージン | 営業CFマージン | 投資積極性" in text
-    assert "2022 | 140 | -40 | 10 | 300" in text
-    assert "2023 | 120 | -170 | 20 | 280" in text
-    assert "2024 | 150 | -70 | 30 | 350" in text
-    assert "2023 | 300.0% | -0.5% | -5.6% | 13.3% | 141.7%" in text
+    assert "年度 | 営業CF | FCF | 投資積極性 | 現金残高" in text
+    assert "Cash conversion" not in text
+    assert "2022 | 140 | 100 | 28.6% | 300" in text
+    assert "2023 | 120 | -50 | 141.7% | 280" in text
+    assert "2024 | 150 | 80 | 46.7% | 350" in text
 
 
 def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_cf_missing():
@@ -161,7 +159,7 @@ def test_build_kabutan_forecast_output_uses_operating_plus_investing_when_free_c
         10_000_000_000.0,
     )
 
-    assert "2024 | 300.0% | 0.8% | 8.0% | 15.0% | 46.7%" in text
+    assert "2024 | 150 | 80 | 46.7% | 350" in text
 
 
 def test_build_kabutan_forecast_output_keeps_negative_operating_cf_sign_for_investment_aggressiveness():
@@ -185,7 +183,7 @@ def test_build_kabutan_forecast_output_keeps_negative_operating_cf_sign_for_inve
         10_000_000_000.0,
     )
 
-    assert "2024 | -200.0% | -1.5% | -15.0% | -10.0% | -50.0%" in text
+    assert "2024 | -100 | -150 | -50.0% | 350" in text
 
 
 def test_build_kabutan_forecast_output_appends_financial_block_with_formats():
@@ -232,7 +230,7 @@ def test_build_kabutan_forecast_output_financial_block_na_when_empty():
     assert "N/A" in text
 
 
-def test_build_kabutan_output_includes_3y_cagr_lines():
+def test_build_kabutan_output_summarizes_growth_with_cagr_lines():
     from app.domain.builders.kabutan_output import build_kabutan_forecast_output
     from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
@@ -253,8 +251,11 @@ def test_build_kabutan_output_includes_3y_cagr_lines():
 
     out = build_kabutan_forecast_output("base", pair, "html", None)
 
-    assert "3年営業利益CAGR 2023→2026" in out
-    assert "3年EPS CAGR 2023→2026" in out
+    assert "売上CAGR 2023→2026" in out
+    assert "営業利益CAGR 2023→2026" in out
+    assert "EPS CAGR 2023→2026" in out
+    assert "EPS成長率" not in out
+    assert "営業利益成長率" not in out
 
 
 from app.domain.models.quarterly_financials import Quarter, QuarterlyMetricRow

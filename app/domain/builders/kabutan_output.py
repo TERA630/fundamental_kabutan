@@ -151,6 +151,11 @@ def _build_growth_section(rows: list[KabutanForecastRow]) -> GrowthTimelineSecti
             end_row.operating_profit if end_row else None,
             years=3,
         )
+        sales_cagr = calc_cagr(
+            start_row.sales if start_row else None,
+            end_row.sales if end_row else None,
+            years=3,
+        )
         eps_cagr = calc_cagr(
             start_row.revised_eps if start_row else None,
             end_row.revised_eps if end_row else None,
@@ -159,6 +164,7 @@ def _build_growth_section(rows: list[KabutanForecastRow]) -> GrowthTimelineSecti
     else:
         cagr_start_year = None
         cagr_end_year = None
+        sales_cagr = None
         operating_cagr = None
         eps_cagr = None
 
@@ -166,6 +172,7 @@ def _build_growth_section(rows: list[KabutanForecastRow]) -> GrowthTimelineSecti
         rows=growth_rows,
         eps_growth_rates=eps_growth_rates,
         operating_growth_rates=operating_growth_rates,
+        sales_cagr=sales_cagr,
         operating_cagr=operating_cagr,
         eps_cagr=eps_cagr,
         cagr_start_year=cagr_start_year,

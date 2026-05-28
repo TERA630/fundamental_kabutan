@@ -83,6 +83,7 @@ class GrowthTimelineSection:
     rows: List[KabutanForecastRow]
     eps_growth_rates: List[float | None]
     operating_growth_rates: List[float | None]
+    sales_cagr: float | None
     operating_cagr: float | None
     eps_cagr: float | None
     cagr_start_year: int | None

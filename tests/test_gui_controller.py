@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.data.file_cache import FileCache
 from app.gui_controller import FundamentalGuiController
 
 
@@ -18,7 +19,10 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
     def build_service(_cache):
         return dummy_service
 
-    controller = FundamentalGuiController(build_fundamental_service=build_service)
+    controller = FundamentalGuiController(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_fundamental_service=build_service,
+    )
     output_cache = {}
     cache_key = "k1"
 
@@ -42,7 +46,7 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
 
 
 def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
-    controller = FundamentalGuiController()
+    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
     target = tmp_path / "kabutan"
     target.mkdir()
 
@@ -54,7 +58,7 @@ def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
 
 
 def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
-    controller = FundamentalGuiController()
+    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
     target = tmp_path / "watchlist.md"
     target.write_text("トヨタ (7203)\n", encoding="utf-8")
 

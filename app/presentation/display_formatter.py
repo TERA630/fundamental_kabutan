@@ -19,6 +19,7 @@ from app.domain.models.display_sections import (
     SummarySection,
     ValuationTableSection,
 )
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastRow
 
 
@@ -280,14 +281,6 @@ def format_forecast_table(section: ForecastTableSection) -> List[str]:
     ]
 
 
-def _build_growth_metric_line(title: str, rows: list[KabutanForecastRow], values: list[float | None]) -> str:
-    parts = [title]
-    for row, value in zip(rows, values):
-        year_label = f"{row.year}/{row.month:02d}(予)" if row.section == "予想" else f"{row.year}/{row.month:02d}"
-        parts.append(f"{year_label} {_fmt_percent(value)}")
-    return "　".join(parts)
-
-
 def _build_cagr_line(title: str, start_year: int | None, end_year: int | None, value: float | None) -> str:
     if start_year is None or end_year is None:
         return f"{title} N/A"
@@ -299,11 +292,18 @@ def format_growth_timeline(section: GrowthTimelineSection) -> List[str]:
         logger.info("取得不可: 成長性経時ブロック (値欠損)")
     return [
         "■成長性",
-        _build_growth_metric_line("EPS成長率", section.rows, section.eps_growth_rates),
-        _build_growth_metric_line("営業利益成長率", section.rows, section.operating_growth_rates),
-        _build_cagr_line("3年営業利益CAGR", section.cagr_start_year, section.cagr_end_year, section.operating_cagr),
-        _build_cagr_line("3年EPS CAGR", section.cagr_start_year, section.cagr_end_year, section.eps_cagr),
+        _build_cagr_line("売上CAGR", section.cagr_start_year, section.cagr_end_year, section.sales_cagr),
+        _build_cagr_line("営業利益CAGR", section.cagr_start_year, section.cagr_end_year, section.operating_cagr),
+        _build_cagr_line("EPS CAGR", section.cagr_start_year, section.cagr_end_year, section.eps_cagr),
     ]
+
+
+def _resolve_fcf_million_yen(row: KabutanCashflowRow) -> int | None:
+    if row.free_cf is not None:
+        return row.free_cf
+    if row.operating_cf is None or row.investing_cf is None:
+        return None
+    return row.operating_cf + row.investing_cf
 
 
 def format_cashflow_timeline(section: CashflowTimelineSection) -> List[str]:
@@ -311,26 +311,16 @@ def format_cashflow_timeline(section: CashflowTimelineSection) -> List[str]:
         logger.info("取得不可: キャッシュフロー (値欠損)")
         return ["■キャッシュフロー", "N/A"]
 
+    metric_by_year = {row.year: row for row in section.metric_rows}
     lines = [
         "■キャッシュフロー",
-        "[A] CF実績（百万円）",
-        "年度 | 営業CF | 投資CF | 財務CF | 現金等残高",
+        "年度 | 営業CF | FCF | 投資積極性 | 現金残高",
     ]
     for row in section.actual_rows:
+        metric_row = metric_by_year.get(row.year)
+        investment_aggressiveness_pct = metric_row.investment_aggressiveness_pct if metric_row else None
         lines.append(
-            f"{row.year} | {_fmt_million_yen(row.operating_cf)} | {_fmt_million_yen(row.investing_cf)} | {_fmt_million_yen(row.financing_cf)} | {_fmt_million_yen(row.cash_stock)}"
-        )
-
-    lines.extend(
-        [
-            "",
-            "[B] 指標（%）",
-            "年度 | Cash conversion | FCF Yield | FCFマージン | 営業CFマージン | 投資積極性",
-        ]
-    )
-    for row in section.metric_rows:
-        lines.append(
-            f"{row.year} | {_fmt_percent(row.cash_conversion_pct)} | {_fmt_percent(row.fcf_yield_pct)} | {_fmt_percent(row.fcf_margin_pct)} | {_fmt_percent(row.operating_cf_margin_pct)} | {_fmt_percent(row.investment_aggressiveness_pct)}"
+            f"{row.year} | {_fmt_million_yen(row.operating_cf)} | {_fmt_million_yen(_resolve_fcf_million_yen(row))} | {_fmt_percent(investment_aggressiveness_pct)} | {_fmt_million_yen(row.cash_stock)}"
         )
     return lines
 
