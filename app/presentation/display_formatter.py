@@ -6,16 +6,28 @@ from typing import List
 from app.domain.models.display_sections import DisplaySections, SummarySection, ValuationTableSection
 
 
+def _format_market_cap_rank(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    oku = value / 100_000_000
+    if oku >= 100_000:
+        return "超大型"
+    if oku >= 10_000:
+        return "大型主役"
+    if oku >= 3_000:
+        return "中型主役"
+    if oku >= 1_000:
+        return "小〜中型"
+    return "小型"
+
+
 def format_summary(section: SummarySection) -> List[str]:
     lines: List[str] = []
     lines.append(f"【銘柄】{section.company_name} ({section.code4})")
-    lines.append("■指標")
     price = "N/A" if section.price is None else f"{section.price:,.0f}"
-    pbr = "N/A" if section.pbr is None else f"{section.pbr:.2f}"
-    roe = "N/A" if section.roe is None else f"{section.roe:.2f}%"
-    lines.append(f"株価：{price}円 / PBR {pbr} / ROE {roe}")
+    lines.append(f"株価：{price}円")
     cap_text = "N/A" if section.market_cap is None else f"{section.market_cap/100_000_000:,.1f}億円"
-    lines.append(f"業種：{section.industry}　時価総額：{cap_text}")
+    lines.append(f"時価総額：{cap_text}({_format_market_cap_rank(section.market_cap)})")
     return lines
 
 

@@ -15,9 +15,9 @@ def test_build_output_shows_indicator_when_fy_missing():
             next_forecast=None,
         ),
     )
-    assert '■指標' in text
-    assert '株価：4,850円 / PBR 3.28 / ROE N/A' in text
-    assert '業種：非鉄金属' in text
+    assert '■指標' not in text
+    assert '株価：4,850円' in text
+    assert '時価総額：80,299.5億円(大型主役)' in text
     assert '■バリュエーション' in text
     assert '年度|2025/03(実績)|2026/03(実績)|2027/03(予)' in text
     assert 'PER|24.2倍|22.0倍|19.4倍' in text

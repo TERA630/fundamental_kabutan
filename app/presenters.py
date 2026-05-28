@@ -105,17 +105,18 @@ def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
 
 
 def build_cf_scoring_summary_lines(scoring: CfScoringResult) -> list[str]:
+    as_of = scoring.as_of[:7] if scoring.as_of and len(scoring.as_of) >= 7 else scoring.as_of
     return [
         f"総合評価：　{scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
         f"投資分類： {scoring.total.investment_category}",
         f"投資戦略：　{scoring.total.investment_strategy}",
-        f"算出基準： {scoring.as_of or 'N/A'}",
+        f"算出基準： {as_of or 'N/A'}",
     ]
 
 
 def _insert_summary_after_indicator(base_output: str, scoring: CfScoringResult) -> str:
     lines = base_output.splitlines()
-    insert_at = next((index + 1 for index, line in enumerate(lines) if line.startswith("業種：")), None)
+    insert_at = next((index + 1 for index, line in enumerate(lines) if line.startswith("時価総額：")), None)
     if insert_at is None:
         insert_at = 1 if lines else 0
     return "\n".join([*lines[:insert_at], *build_cf_scoring_summary_lines(scoring), *lines[insert_at:]])

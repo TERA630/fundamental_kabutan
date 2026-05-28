@@ -75,9 +75,9 @@ def test_build_fundamental_output_appends_scoring_when_present():
     assert "総合評価：　A (73/100点) バージョン: rankcf-v1" in out
     assert "投資分類： 標準的な強銘柄" in out
     assert "投資戦略：　トレンド・地合い次第で順張り。" in out
-    assert "算出基準： 2026-05-27" in out
+    assert "算出基準： 2026-05" in out
     assert "Quality: 45/60" in out
-    assert out.find("業種：") < out.find("総合評価：") < out.find("■バリュエーション")
+    assert out.find("株価：") < out.find("時価総額：") < out.find("総合評価：") < out.find("■バリュエーション")
     assert out.find("■バリュエーション") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
 
 
