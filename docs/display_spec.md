@@ -359,25 +359,53 @@
 
 ### 9.1 Phase 1: 冒頭サマリーDTO / Formatter追加
 
+**状態: 完了（2026-05-28）**
+
 - `OpeningSummarySection` を追加し、冒頭サマリーブロックの表示に必要な値を保持する。
 - `format_opening_summary()` を追加し、5.4 の表示形式に従ってテキスト化する。
 - 既存の `SummarySection` / `ScoreSummarySection` の出力はこの段階では変更しない。
 - Formatter単体テストで、通常表示と欠損時フォールバックを確認する。
 
+**完了内容**
+
+- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準、投資戦略ラベルを保持する。
+- `format_opening_summary()` は、5.4 の表示形式に従い、通常表示と欠損値の `N/A` フォールバックを扱う。
+- Phase 1 では Presenter 結合を行わず、既存の `SummarySection` / `ScoreSummarySection` の出力を維持する。
+
 ### 9.2 Phase 2: Presenter結合
+
+**状態: 完了（2026-05-28）**
 
 - `build_fundamental_output()` が `growth_phase` / `per_level` / `roic_level` を受け取る。
 - `SummarySection` と `ScoreSummarySection` を冒頭で統合し、`OpeningSummarySection` に変換する。
 - 旧表示の `投資分類` / `算出基準` は冒頭サマリーからは出さない。
 - `Quality` / `Growth` / `Valuation` の詳細スコア、ルール注記、バリュエーション表以降の表示順は維持する。
 
+**完了内容**
+
+- `build_fundamental_output()` は `growth_phase` / `per_level` / `roic_level` を受け取り、rankCF結果がある場合に既存の `SummarySection` を `OpeningSummarySection` へ置換する。
+- 冒頭サマリーでは `ScoreSummarySection` の旧形式出力を使わず、総合評価、3分類タグ、投資戦略のみを表示する。
+- `投資分類` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
+
 ### 9.3 Phase 3: 統合テスト更新
+
+**状態: 完了（2026-05-28）**
 
 - `build_fundamental_output()` の期待出力を新冒頭サマリーへ更新する。
 - `FundamentalAnalysisService.build_analysis_output()` から渡される `growth_phase` / `per_level` / `roic_level` が表示へ反映されることを確認する。
 - 全体テスト `python -m pytest` を通す。
 
+**完了内容**
+
+- Presenter統合テストは、新冒頭サマリー、旧 `投資分類` / `算出基準` の非表示、詳細スコアと後続セクション順序の維持を確認する。
+- UseCase統合テストは、`FundamentalAnalysisService.build_analysis_output()` が `growth_phase` / `per_level` / `roic_level` を `build_output_fn` へ渡すことを確認する。
+- 全体テストは環境依存の `bs4` 未導入により収集で停止したため、依存導入後に再実行する。
+
 ## 10. 検証状況
 
-- 直近確認: `python -m pytest`
-- 結果: `188 passed, 1 warning`
+- Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
+- 結果: `24 passed`
+- 追加確認: `python -m py_compile app/presenters.py app/domain/usecases/fundamental_analysis.py app/domain/models/display_sections.py app/presentation/display_formatter.py`
+- 結果: 成功
+- 全体確認: `python -m pytest`
+- 結果: 環境に `bs4` が未導入のため、株探Repository系テスト収集で `ModuleNotFoundError: No module named 'bs4'`
