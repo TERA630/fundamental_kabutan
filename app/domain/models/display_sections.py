@@ -26,6 +26,7 @@ class OpeningSummarySection:
     code4: str
     price: float | None
     market_cap: float | None
+    market_cap_class: str | None
     judgement: str | None
     total_points: int | None
     max_points: int | None

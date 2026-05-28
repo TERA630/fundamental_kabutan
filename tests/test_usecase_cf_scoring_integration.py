@@ -4,6 +4,7 @@ from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService, KabutanFetchResult
+from app.presenters import build_fundamental_output
 
 
 class DummyCache:
@@ -67,6 +68,9 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert captured["cf_scoring_result"] is not None
     assert captured["cf_scoring_result"].total.max_points == 100
     assert captured["cf_scoring_result"].as_of == "2025-03"
+    assert captured["growth_phase"] is not None
+    assert captured["per_level"] == "割安PER"
+    assert captured["roic_level"] == "高ROIC"
 
 
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():
@@ -84,7 +88,30 @@ def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missin
     assert out == "ok"
     assert "cf_scoring_result" in captured
     assert captured["cf_scoring_result"] is None
+    assert captured["growth_phase"] is None
+    assert captured["per_level"] is None
+    assert captured["roic_level"] is None
 
+
+
+def test_build_analysis_output_reflects_opening_summary_labels_in_display():
+    pair = _pair_with_actual_rows()
+    fetch_result = KabutanFetchResult(
+        pair=pair,
+        source="html",
+        cashflow_rows=(KabutanCashflowRow("2025.03", 2025, 3, 600, 1000, -400, -100, 300),),
+        balance_sheet_rows=(KabutanBalanceSheetRow("2025.03", 2025, 3, 1500.0, None, None, 4000, None, 0.5),),
+    )
+    service = ServiceForTest(fetch_result)
+
+    out = service.build_analysis_output("Test", "1234", build_fundamental_output)
+
+    assert "【Test (1234)】" in out
+    assert "総合評価" in out
+    assert "割安PER" in out
+    assert "高ROIC" in out
+    assert "投資分類：" not in out
+    assert "算出基準：" not in out
 
 def test_resolve_cf_scoring_as_of_falls_back_to_latest_observed_minus_one_when_actual_missing():
     rows = (

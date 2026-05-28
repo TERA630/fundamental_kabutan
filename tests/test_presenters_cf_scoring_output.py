@@ -92,6 +92,7 @@ def test_format_opening_summary_section():
                     code4="6324",
                     price=7690.0,
                     market_cap=727_900_000_000.0,
+                    market_cap_class="中型主役",
                     judgement="B",
                     total_points=49,
                     max_points=100,
@@ -123,6 +124,7 @@ def test_format_opening_summary_section_fallbacks():
                     code4="1234",
                     price=None,
                     market_cap=None,
+                    market_cap_class=None,
                     judgement=None,
                     total_points=None,
                     max_points=None,
@@ -141,7 +143,7 @@ def test_format_opening_summary_section_fallbacks():
     assert "投資戦略 N/A" in formatted
 
 
-def test_build_fundamental_output_appends_scoring_when_present():
+def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
     out = build_fundamental_output(
         name="Test",
         code4="1234",
@@ -149,14 +151,21 @@ def test_build_fundamental_output_appends_scoring_when_present():
         price=1000.0,
         market_cap=1_000_000_000.0,
         cf_scoring_result=_sample_scoring(),
+        growth_phase="安定成長",
+        per_level="適正PER",
+        roic_level="高ROIC",
     )
     assert "■rankCF スコア" not in out
-    assert "総合評価：　A (73/100点) バージョン: rankcf-v1" in out
-    assert "投資分類： 標準的な強銘柄" in out
-    assert "投資戦略：　トレンド・地合い次第で順張り。" in out
-    assert "算出基準： 2026-05" in out
+    assert "【Test (1234)】" in out
+    assert "株価 1,000円　時価総額 10億円（小型）" in out
+    assert "総合評価 A（73/100）" in out
+    assert "安定成長 / 適正PER / 高ROIC" in out
+    assert "トレンド・地合い次第で順張り。" in out
+    assert "投資分類：" not in out
+    assert "算出基準：" not in out
+    assert "総合評価：" not in out
     assert "Quality: 45/60" in out
-    assert out.find("株価：") < out.find("時価総額：") < out.find("総合評価：") < out.find("■バリュエーション")
+    assert out.find("【Test (1234)】") < out.find("総合評価 A（73/100）") < out.find("■バリュエーション")
     assert out.find("■バリュエーション") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
 
 

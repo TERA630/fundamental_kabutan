@@ -117,8 +117,11 @@ def _fmt_opening_market_cap(value: float | None) -> str:
 
 def format_opening_summary(section: OpeningSummarySection) -> List[str]:
     market_cap_text = _fmt_opening_market_cap(section.market_cap)
-    if section.market_cap is not None:
-        market_cap_text = f"{market_cap_text}（{_format_market_cap_rank(section.market_cap)}）"
+    market_cap_class = section.market_cap_class
+    if market_cap_class is None and section.market_cap is not None:
+        market_cap_class = _format_market_cap_rank(section.market_cap)
+    if market_cap_class is not None:
+        market_cap_text = f"{market_cap_text}（{market_cap_class}）"
 
     if section.judgement is None or section.total_points is None or section.max_points is None:
         score_line = "総合評価 N/A"
