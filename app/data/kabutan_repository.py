@@ -14,6 +14,7 @@ from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.quarterly_financials import QuarterlyActual
+from app.domain.policies.kabutan_forecast_snapshot import build_kabutan_forecast_snapshot
 
 
 KABUTAN_HEADER_ALIASES = {
@@ -715,6 +716,7 @@ class KabutanForecastRepository:
 
 __all__ = [
     "KabutanForecastRepository",
+    "build_kabutan_forecast_snapshot",
     "_parse_kabutan_forecast_rows",
     "_extract_kabutan_visible_body",
     "parse_kabutan_quarterly_actual_rows",

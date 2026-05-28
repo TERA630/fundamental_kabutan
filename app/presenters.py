@@ -6,7 +6,16 @@ from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text, build_fundamental_output_sections
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
-from app.domain.models.cf_scoring_result import CfScoringResult, MetricScore
+from app.domain.models.cf_scoring_result import CfScoringResult
+from app.domain.models.display_sections import (
+    DisplaySections,
+    RuleNotesSection,
+    ScoreCategorySection,
+    ScoreSummarySection,
+    Section,
+    SummarySection,
+    ValuationTableSection,
+)
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
@@ -14,104 +23,71 @@ from app.domain.models.quarterly_financials import QuarterlyMetricRow
 from app.presentation.display_formatter import format_sections
 
 
-METRIC_LABELS = {
-    "roic": "ROIC",
-    "cash_conversion_np": "Cash Conversion(OCF/純利益)",
-    "ocf_margin": "営業CFマージン",
-    "op_margin": "営業利益率",
-    "fcf_ratio": "FCF Ratio(FCF/OCF)",
-    "eps_cagr_3y": "EPS CAGR(3y)",
-    "sales_cagr_3y": "売上CAGR(3y)",
-    "fcf_yield": "FCF Yield",
-    "per": "PER",
-}
-
 logger = logging.getLogger(__name__)
 
-RULE_NOTE_JA_MAP = {
-    "high_growth_bonus": "高グロース株加点",
-    "growth_floor": "高成長考慮による下限補正",
-    "growth_exemption": "成長投資免責によるランク引き上げ",
-    "quality_filter": "品質フィルター適用（OCF/営業利益）",
-    "invalid_per": "PER算出値不正",
-}
 
-RULE_NOTE_EXACT_MAP = {
-    "invalid_sign: net_income <= 0": "純利益符号不正",
-    "invalid_sign: ocf <= 0": "営業CF符号不正",
-    "invalid_sign: ocf == 0": "営業CFゼロ",
-    "invalid_sign: ocf < 0": "営業CFマイナス",
-}
-
-
-def _format_rule_note(note: str) -> str:
-    if note in RULE_NOTE_EXACT_MAP:
-        return RULE_NOTE_EXACT_MAP[note]
-    key = note.split(":", 1)[0].strip()
-    if key in RULE_NOTE_JA_MAP:
-        return RULE_NOTE_JA_MAP[key]
-    return f"未定義ルール: {note}"
-
-
-def _format_metric_score(metric: MetricScore) -> str | None:
-    label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
-    if metric.raw_value is None:
-        reason = "値欠損"
-        logger.info("取得不可: %s (%s)", label, reason)
-        logger.debug(
-            "N/A項目を表示省略: metric_id=%s rank=%s points=%s/%s rule_notes=%s reason=%s",
-            metric.metric_id,
-            metric.rank,
-            metric.points,
-            metric.max_points,
-            metric.rule_notes,
-            reason,
+def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool = False) -> list[Section]:
+    sections: list[Section] = []
+    if include_summary:
+        sections.append(
+            ScoreSummarySection(
+                judgement=scoring.total.judgement,
+                total_points=scoring.total.total_points,
+                max_points=scoring.total.max_points,
+                version=scoring.version,
+                investment_category=scoring.total.investment_category,
+                investment_strategy=scoring.total.investment_strategy,
+                as_of=scoring.as_of,
+            )
         )
-        return None
 
-    raw = f"{metric.raw_value:.2f}"
-    if metric.metric_id == "fcf_yield":
-        raw = f"{metric.raw_value:.2f}%"
-    return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
+    sections.extend(
+        [
+            ScoreCategorySection("Quality", scoring.quality.subtotal, scoring.quality.max_points, list(scoring.quality.metrics)),
+            ScoreCategorySection("Growth", scoring.growth.subtotal, scoring.growth.max_points, list(scoring.growth.metrics)),
+            ScoreCategorySection("Valuation", scoring.valuation.subtotal, scoring.valuation.max_points, list(scoring.valuation.metrics)),
+            RuleNotesSection(
+                [
+                    note
+                    for category in (scoring.quality, scoring.growth, scoring.valuation)
+                    for metric in category.metrics
+                    for note in metric.rule_notes
+                ]
+            ),
+        ]
+    )
+    return sections
 
 
 def build_cf_scoring_summary_text(scoring: CfScoringResult) -> str:
-    lines: list[str] = [
-        "",
-        f"Quality: {scoring.quality.subtotal}/{scoring.quality.max_points}",
-    ]
-    for metric in scoring.quality.metrics:
-        formatted = _format_metric_score(metric)
-        if formatted is not None:
-            lines.append(formatted)
-    lines.append(f"Growth: {scoring.growth.subtotal}/{scoring.growth.max_points}")
-    for metric in scoring.growth.metrics:
-        formatted = _format_metric_score(metric)
-        if formatted is not None:
-            lines.append(formatted)
-    lines.append(f"Valuation: {scoring.valuation.subtotal}/{scoring.valuation.max_points}")
-    for metric in scoring.valuation.metrics:
-        formatted = _format_metric_score(metric)
-        if formatted is not None:
-            lines.append(formatted)
+    return "\n" + format_sections(DisplaySections(sections=build_cf_scoring_sections(scoring)))
 
-    notes = [note for category in (scoring.quality, scoring.growth, scoring.valuation) for metric in category.metrics for note in metric.rule_notes]
-    lines.append("ルール注記:")
-    if notes:
-        lines.extend(f"- {_format_rule_note(note)}" for note in notes)
-    else:
-        lines.append("- なし")
-    return "\n".join(lines)
+
+def _merge_scoring_sections(sections: DisplaySections, scoring: CfScoringResult) -> DisplaySections:
+    merged: list[Section] = []
+    scoring_summary = build_cf_scoring_sections(scoring, include_summary=True)[:1]
+    scoring_details = build_cf_scoring_sections(scoring)
+    inserted_summary = False
+    inserted_details = False
+
+    for section in sections.sections:
+        merged.append(section)
+        if isinstance(section, SummarySection) and not inserted_summary:
+            merged.extend(scoring_summary)
+            inserted_summary = True
+        if isinstance(section, ValuationTableSection) and not inserted_details:
+            merged.extend(scoring_details)
+            inserted_details = True
+    if not inserted_summary:
+        merged = [*scoring_summary, *merged]
+    if not inserted_details:
+        merged.extend(scoring_details)
+    return DisplaySections(sections=merged)
 
 
 def build_cf_scoring_summary_lines(scoring: CfScoringResult) -> list[str]:
-    as_of = scoring.as_of[:7] if scoring.as_of and len(scoring.as_of) >= 7 else scoring.as_of
-    return [
-        f"総合評価：　{scoring.total.judgement} ({scoring.total.total_points}/{scoring.total.max_points}点) バージョン: {scoring.version}",
-        f"投資分類： {scoring.total.investment_category}",
-        f"投資戦略：　{scoring.total.investment_strategy}",
-        f"算出基準： {as_of or 'N/A'}",
-    ]
+    text = format_sections(DisplaySections(sections=build_cf_scoring_sections(scoring, include_summary=True)[:1]))
+    return text.splitlines()
 
 
 def _insert_summary_after_indicator(base_output: str, scoring: CfScoringResult) -> str:
@@ -160,11 +136,13 @@ def build_fundamental_output(
             market_snapshot=market_snapshot,
             kabutan_forecast_pair=kabutan_forecast_pair,
         )
+        if cf_scoring_result is not None:
+            sections = _merge_scoring_sections(sections, cf_scoring_result)
         base_output = format_sections(sections)
     except Exception:
         # If anything goes wrong, keep using the legacy text builder
         logger.debug("DTO formatting path failed, using legacy text builder", exc_info=True)
-    if cf_scoring_result is not None:
+    if cf_scoring_result is not None and "総合評価：" not in base_output:
         base_output = _insert_summary_after_indicator(base_output, cf_scoring_result)
         base_output = f"{base_output}\n{build_cf_scoring_summary_text(cf_scoring_result)}"
     output = build_kabutan_forecast_output(

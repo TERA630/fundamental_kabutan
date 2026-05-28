@@ -2,9 +2,9 @@ import pytest
 
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
 from app.domain.builders.fundamental_output import build_fundamental_output_sections
-from app.domain.models.display_sections import SummarySection, ValuationTableSection
+from app.domain.models.display_sections import RuleNotesSection, ScoreCategorySection, ScoreSummarySection, SummarySection, ValuationTableSection
 from app.presentation.display_formatter import format_sections
-from app.presenters import build_cf_scoring_summary_text, build_fundamental_output
+from app.presenters import build_cf_scoring_sections, build_cf_scoring_summary_text, build_fundamental_output
 
 
 def _sample_scoring() -> CfScoringResult:
@@ -60,6 +60,19 @@ def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     assert "ROIC: 18.20 -> B(9/15)" in text
     assert "ルール注記:" in text
     assert "成長投資免責によるランク引き上げ" in text
+
+
+def test_build_cf_scoring_sections_builds_score_display_dtos():
+    sections = build_cf_scoring_sections(_sample_scoring(), include_summary=True)
+
+    assert isinstance(sections[0], ScoreSummarySection)
+    assert isinstance(sections[1], ScoreCategorySection)
+    assert isinstance(sections[2], ScoreCategorySection)
+    assert isinstance(sections[3], ScoreCategorySection)
+    assert isinstance(sections[4], RuleNotesSection)
+    assert sections[1].title == "Quality"
+    assert sections[2].title == "Growth"
+    assert sections[3].title == "Valuation"
 
 
 def test_build_fundamental_output_appends_scoring_when_present():

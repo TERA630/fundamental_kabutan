@@ -1,6 +1,14 @@
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.presenters import build_kabutan_forecast_output
+from app.domain.builders.kabutan_output import build_kabutan_forecast_sections
+from app.domain.models.display_sections import (
+    CashflowTimelineSection,
+    FinancialMetricsSection,
+    ForecastTableSection,
+    GrowthTimelineSection,
+    QuarterlyMetricsSection,
+)
 
 
 def test_build_kabutan_forecast_output_appends_section():
@@ -19,6 +27,24 @@ def test_build_kabutan_forecast_output_appends_section():
     assert "2025/03" in text
     assert "2026/03(予)" in text
     assert "2027/03(予)" in text
+
+
+def test_build_kabutan_forecast_sections_builds_display_dtos():
+    pair = KabutanForecastPair(
+        previous2_actual=None,
+        previous_actual=KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 100, 90, 80),
+        current_actual=None,
+        current_forecast=KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 130, 120, 110),
+        next_forecast=None,
+    )
+
+    sections = build_kabutan_forecast_sections(pair, "html", None)
+
+    assert isinstance(sections.sections[0], ForecastTableSection)
+    assert isinstance(sections.sections[1], GrowthTimelineSection)
+    assert isinstance(sections.sections[2], CashflowTimelineSection)
+    assert isinstance(sections.sections[3], FinancialMetricsSection)
+    assert isinstance(sections.sections[4], QuarterlyMetricsSection)
 
 
 def test_build_kabutan_forecast_output_renders_na_rows_when_none():
