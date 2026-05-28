@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
+from app.domain.models.display_sections import SummarySection, ValuationTableSection, DisplaySections
 
 
 
@@ -85,6 +86,38 @@ def fetch_display_rows_for_indicator(rows: list[KabutanForecastRow], *, metric: 
 def build_year_label(row: KabutanForecastRow) -> str:
     suffix = "(予)" if row.section == "予想" else "(実績)"
     return f"{row.year}/{row.month:02d}{suffix}"
+
+
+def build_fundamental_output_sections_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> DisplaySections:
+    company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
+    industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
+
+    all_rows = fetch_kabutan_rows(kabutan_forecast_pair)
+    per_rows = fetch_display_rows_for_indicator(all_rows, metric="per")
+    dividend_rows = fetch_display_rows_for_indicator(all_rows, metric="dividend")
+    per_lines = [f"{build_year_label(row)} {_fmt_num(calc_per_times(price, row.revised_eps),1)}倍" for row in per_rows]
+    dividend_lines = [f"{build_year_label(row)} {_fmt_plain_pct(calc_dividend_yield_pct(price, row.dividend))}" for row in dividend_rows]
+
+    year_labels: list[str] = []
+    if per_lines:
+        year_labels = [part.split(" ", 1)[0] for part in per_lines]
+    elif dividend_lines:
+        year_labels = [part.split(" ", 1)[0] for part in dividend_lines]
+
+    per_values = [part.split(" ", 1)[1] for part in per_lines] if per_lines else ["N/A"]
+    dividend_values = [part.split(" ", 1)[1] for part in dividend_lines] if dividend_lines else ["N/A"]
+
+    summary = SummarySection(
+        company_name=company_name,
+        code4=code4,
+        price=price,
+        market_cap=market_cap,
+        industry=industry_name,
+        pbr=(market_snapshot or {}).get("pbr"),
+        roe=(market_snapshot or {}).get("roe"),
+    )
+    valuation = ValuationTableSection(year_labels=year_labels, per_values=per_values, dividend_values=dividend_values)
+    return DisplaySections(sections=[summary, valuation])
 
 
 

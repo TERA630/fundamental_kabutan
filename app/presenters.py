@@ -4,13 +4,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.domain.builders.fundamental_output import build_fundamental_output_text
+from app.domain.builders.fundamental_output import build_fundamental_output_text, build_fundamental_output_sections
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
 from app.domain.models.cf_scoring_result import CfScoringResult, MetricScore
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
+from app.presentation.display_formatter import format_sections
 
 
 METRIC_LABELS = {
@@ -147,6 +148,21 @@ def build_fundamental_output(
         market_snapshot=market_snapshot,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
+    # Prefer DTO-based path: build sections and format them. Fallback to legacy text builder.
+    try:
+        sections = build_fundamental_output_sections(
+            name=name,
+            code4=code4,
+            master=master,
+            price=price,
+            market_cap=market_cap,
+            market_snapshot=market_snapshot,
+            kabutan_forecast_pair=kabutan_forecast_pair,
+        )
+        base_output = format_sections(sections)
+    except Exception:
+        # If anything goes wrong, keep using the legacy text builder
+        logger.debug("DTO formatting path failed, using legacy text builder", exc_info=True)
     if cf_scoring_result is not None:
         base_output = _insert_summary_after_indicator(base_output, cf_scoring_result)
         base_output = f"{base_output}\n{build_cf_scoring_summary_text(cf_scoring_result)}"
