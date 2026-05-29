@@ -33,7 +33,6 @@ class OpeningSummarySection:
     growth_phase: str | None
     per_level: str | None
     roic_level: str | None
-    investment_strategy: str | None
 
 
 @dataclass
@@ -54,7 +53,6 @@ class ScoreSummarySection:
     max_points: int
     version: str
     investment_category: str
-    investment_strategy: str
     as_of: str | None
 
 

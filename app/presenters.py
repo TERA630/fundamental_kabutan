@@ -37,7 +37,6 @@ def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool
                 max_points=scoring.total.max_points,
                 version=scoring.version,
                 investment_category=scoring.total.investment_category,
-                investment_strategy=scoring.total.investment_strategy,
                 as_of=scoring.as_of,
             )
         )
@@ -84,7 +83,6 @@ def _build_opening_summary_section(
         growth_phase=growth_phase,
         per_level=per_level,
         roic_level=roic_level,
-        investment_strategy=scoring.total.investment_strategy,
     )
 
 

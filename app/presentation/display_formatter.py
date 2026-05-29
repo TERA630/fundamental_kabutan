@@ -184,7 +184,6 @@ def format_score_summary(section: ScoreSummarySection) -> List[str]:
     return [
         f"総合評価：　{section.judgement} ({section.total_points}/{section.max_points}点) バージョン: {section.version}",
         f"投資分類： {section.investment_category}",
-        f"投資戦略：　{section.investment_strategy}",
         f"算出基準： {as_of or 'N/A'}",
     ]
 

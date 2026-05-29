@@ -48,7 +48,6 @@ def _sample_scoring() -> CfScoringResult:
             max_points=100,
             judgement="A",
             investment_category="標準的な強銘柄",
-            investment_strategy="トレンド・地合い次第で順張り。",
             priority_hint=None,
         ),
     )
@@ -99,7 +98,6 @@ def test_format_opening_summary_section():
                     growth_phase="利益改善型",
                     per_level="超高PER",
                     roic_level="低ROIC",
-                    investment_strategy="順張り対象外・逆張り限定",
                 )
             ]
         )
@@ -130,7 +128,6 @@ def test_format_opening_summary_section_fallbacks():
                     growth_phase=None,
                     per_level=None,
                     roic_level=None,
-                    investment_strategy=None,
                 )
             ]
         )
@@ -298,7 +295,6 @@ def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
             max_points=100,
             judgement="C",
             investment_category="対象外",
-            investment_strategy="基本ノータッチ",
             priority_hint=None,
         ),
     )
@@ -332,7 +328,6 @@ def test_build_cf_scoring_summary_text_rule_note_fallback_for_unknown_key():
             max_points=100,
             judgement="C",
             investment_category="対象外",
-            investment_strategy="基本ノータッチ",
             priority_hint=None,
         ),
     )
@@ -366,7 +361,7 @@ def test_build_cf_scoring_summary_text_localizes_rule_notes(raw_note, expected):
         ),
         growth=CategoryScore(category="growth", subtotal=0, max_points=25, metrics=()),
         valuation=CategoryScore(category="valuation", subtotal=0, max_points=15, metrics=()),
-        total=TotalScore(10, 100, "C", "対象外", "基本ノータッチ", None),
+        total=TotalScore(10, 100, "C", "対象外", None),
     )
     text = build_cf_scoring_summary_text(scoring)
     assert expected in text

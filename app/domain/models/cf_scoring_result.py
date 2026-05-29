@@ -34,7 +34,6 @@ class TotalScore:
     max_points: int
     judgement: str
     investment_category: str
-    investment_strategy: str
     priority_hint: str | None
 
 

@@ -106,11 +106,8 @@
 
 | 行ラベル | 表示形式 |
 |---------|---------|
-| 前々々期実績 | `YYYY年` |
-| 前々期実績 | `YYYY年` |
-| 前期実績 | `YYYY年` |
-| 今期予想 | `YYYY年(予)` |
-| 来期予想 | `YYYY年(予)` |
+| 実績行 | `YYYY/MM` |
+| 予想行 | `YYYY/MM(予)` |
 
 **数値フォーマット**
 
@@ -134,8 +131,7 @@
 **目的**
 
 - 出力冒頭で、銘柄・現在株価・時価総額・総合評価・3分類タグを短く提示する。
-- 旧仕様の `投資分類` / `投資戦略` / `算出基準` をフラットに並べる形式は廃止する。
-- 投資戦略ラベルは rankCF ドメイン結果には残すが、冒頭サマリーでは当面表示しない。
+- 旧仕様の `投資分類` / `算出基準` をフラットに並べる形式は廃止する。
 
 **表示形式**
 
@@ -214,10 +210,10 @@
    """ 20xx年(実績)|20xx年(実績/予)|20xx年(予)| PER
    PER| xx.x倍|xx.x倍|xx.x倍
    PBR| x.xx倍|x.xx倍|x.xx倍
-   ROE| x.x%|x.x%|x.x%
-   ROIC| x.x%|x.x%|x.x%
+   ROE| x.xx%|x.xx%|x.xx%
+   ROIC| x.xx%|x.xx%|x.xx%
    配当利回り|   x.xx%|x.xx%|x.xx%|
-   FCF Yield| x.x%|x.x%|x.x%
+   FCF Yield| x.xx%|x.xx%|x.xx%
    """
 **算出ルール**
 
@@ -322,7 +318,7 @@ YYYY | xxx | xxx | xx.x% | xxx
 EPS CAGR YYYY→YYYY xx.x%
 ```
 
-- CAGR の開始年・終了年を解決できない場合は、該当行を `N/A` と表示する。
+- CAGR の開始年・終了年を解決できない場合は、該当行をラベル付きの `売上CAGR N/A` / `営業利益CAGR N/A` / `EPS CAGR N/A` と表示する。
 - 極小利益からの反転で単年成長率が過大表示されるノイズを避けるため、`EPS成長率` / `営業利益成長率` の年次列は表示しない。
 
 ### 5.11 財務ブロック
@@ -417,7 +413,7 @@ EPS CAGR YYYY→YYYY xx.x%
 
 **完了内容**
 
-- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準を表示する。投資戦略ラベルはDTO上に保持してもよいが、冒頭サマリーでは表示しない。
+- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準を表示する。
 - `format_opening_summary()` は、5.4 の表示形式に従い、通常表示と欠損値の `N/A` フォールバックを扱う。
 - Phase 1 では Presenter 結合を行わず、既存の `SummarySection` / `ScoreSummarySection` の出力を維持する。
 
@@ -434,7 +430,7 @@ EPS CAGR YYYY→YYYY xx.x%
 
 - `build_fundamental_output()` は `growth_phase` / `per_level` / `roic_level` を受け取り、rankCF結果がある場合に既存の `SummarySection` を `OpeningSummarySection` へ置換する。
 - 冒頭サマリーでは `ScoreSummarySection` の旧形式出力を使わず、総合評価と3分類タグのみを表示する。
-- `投資分類` / `投資戦略` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
+- `投資分類` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
 
 ### 9.3 Phase 3: 統合テスト更新
 
@@ -539,7 +535,7 @@ EPS CAGR YYYY→YYYY xx.x%
 **完了内容**
 
 - 冒頭サマリー、株価評価・資本効率、スコア内訳、成長性、CF、四半期トレンドは本書の正本仕様へ反映済み。
-- 通期業績推移の重要指標化と、冒頭サマリーの投資戦略表示は保留とした。
+- 通期業績推移の重要指標化は保留とした。
 - `docs/new_display_proposal_from_GPT.md` は採用状況メモへ更新した。
 
 ## 10. 検証状況

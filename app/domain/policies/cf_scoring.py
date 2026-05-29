@@ -232,16 +232,6 @@ def build_investment_category(total_points: int) -> str:
     return "対象外"
 
 
-def build_investment_strategy(total_points: int) -> str:
-    if total_points >= 80:
-        return "押し目で積極監視"
-    if total_points >= 60:
-        return "トレンド・地合い次第で順張り。"
-    if total_points >= 40:
-        return "順張り対象外。逆張り限定"
-    return "基本ノータッチ"
-
-
 def calculate_cf_score(input_data: CfScoringInput) -> CfScoringResult:
     cash_conv = score_cash_conversion_np(input_data.ocf, input_data.net_income)
     cash_conv = apply_quality_filter_ocf_op(cash_conv, input_data.ocf, input_data.operating_income)
@@ -271,7 +261,6 @@ def calculate_cf_score(input_data: CfScoringInput) -> CfScoringResult:
         100,
         build_total_judgement(total_points),
         build_investment_category(total_points),
-        build_investment_strategy(total_points),
         None,
     )
     return CfScoringResult(SCORING_VERSION, input_data.as_of, quality, growth, valuation, total)
@@ -282,7 +271,6 @@ __all__ = [
     "apply_quality_filter_ocf_op",
     "build_total_judgement",
     "build_investment_category",
-    "build_investment_strategy",
     "calculate_cf_score",
     "score_cash_conversion_np",
     "score_eps_cagr_3y",
