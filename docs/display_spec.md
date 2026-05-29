@@ -529,6 +529,19 @@ EPS CAGR YYYY→YYYY xx.x%
 - `format_quarterly_metrics()` は通常出力として四半期トレンド簡略版を返す。
 - `_format_quarterly_metrics_detail()` は詳細版表示として保持する。
 
+### 9.10 Phase 10: 表示提案メモの正本反映整理
+
+**状態: 完了（2026-05-29）**
+
+- `docs/new_display_proposal_from_GPT.md` の提案内容について、採用済み・保留を整理する。
+- 採用済みの表示仕様は本書へ集約し、提案メモは正本ではなく参考メモとして扱う。
+
+**完了内容**
+
+- 冒頭サマリー、株価評価・資本効率、スコア内訳、成長性、CF、四半期トレンドは本書の正本仕様へ反映済み。
+- 通期業績推移の重要指標化と、冒頭サマリーの投資戦略表示は保留とした。
+- `docs/new_display_proposal_from_GPT.md` は採用状況メモへ更新した。
+
 ## 10. 検証状況
 
 - Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
@@ -552,4 +565,6 @@ EPS CAGR YYYY→YYYY xx.x%
 - Phase 9 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_quarterly_growth_metrics.py tests/test_usecase_quarterly_financial_table.py`
 - 結果: `41 passed`
 - Phase 9 import確認: `python -B -c "import app.domain.models.quarterly_financials; import app.presentation.display_formatter; print('imports ok')"`
+- 結果: 成功
+- Phase 10 docs確認: `rg -n "正本ではない|採用済み|保留|Phase 10" docs`
 - 結果: 成功
