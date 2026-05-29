@@ -111,7 +111,6 @@ def test_format_opening_summary_section():
         "",
         "総合評価 B（49/100）",
         "利益改善型 / 超高PER / 低ROIC",
-        "順張り対象外・逆張り限定",
     ]
 
 
@@ -140,7 +139,7 @@ def test_format_opening_summary_section_fallbacks():
     assert "株価 N/A　時価総額 N/A" in formatted
     assert "総合評価 N/A" in formatted
     assert "N/A / N/A / N/A" in formatted
-    assert "投資戦略 N/A" in formatted
+    assert "投資戦略" not in formatted
 
 
 def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
@@ -160,7 +159,9 @@ def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
     assert "株価 1,000円　時価総額 10億円（小型）" in out
     assert "総合評価 A（73/100）" in out
     assert "安定成長 / 適正PER / 高ROIC" in out
-    assert "トレンド・地合い次第で順張り。" in out
+    assert "トレンド・地合い次第で順張り。" not in out
+    assert "逆張り" not in out
+    assert "投資戦略" not in out
     assert "投資分類：" not in out
     assert "算出基準：" not in out
     assert "総合評価：" not in out

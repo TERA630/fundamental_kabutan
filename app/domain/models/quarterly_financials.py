@@ -20,6 +20,7 @@ class YoYStatus(str, Enum):
 
 
 class GrowthMetricKind(str, Enum):
+    SALES = "sales"
     OPERATING_PROFIT = "operating_profit"
     OPERATING_MARGIN = "operating_margin"
     REVISED_EPS = "revised_eps"
@@ -47,11 +48,10 @@ class YoYMetric:
 
 @dataclass(frozen=True)
 class QuarterlyGrowthMetrics:
+    sales_yoy: YoYMetric
     operating_profit_yoy: YoYMetric
     operating_margin_yoy: YoYMetric
     revised_eps_yoy: YoYMetric
-
-
 
 
 @dataclass(frozen=True)
@@ -67,6 +67,7 @@ class QuarterlyMetricRow:
     operating_profit_yoy_pct: float | None
     revised_eps_yoy_pct: float | None
     operating_margin_pct: float | None
+    sales_yoy_pct: float | None = None
 
 
 @dataclass(frozen=True)

@@ -71,6 +71,8 @@ def test_build_quarterly_growth_metrics() -> None:
 
     metrics = build_quarterly_growth_metrics(previous=previous, current=current)
 
+    assert metrics.sales_yoy.status == YoYStatus.OK
+    assert metrics.sales_yoy.value_pct == 10.0
     assert metrics.operating_profit_yoy.status == YoYStatus.TURNAROUND_TO_PROFIT
     assert metrics.revised_eps_yoy.status == YoYStatus.TURNAROUND_TO_PROFIT
     assert metrics.operating_margin_yoy.status == YoYStatus.OK
@@ -92,6 +94,7 @@ def test_build_quarterly_growth_metrics_returns_na_when_previous_missing() -> No
 
     metrics = build_quarterly_growth_metrics(previous=None, current=current)
 
+    assert metrics.sales_yoy.status == YoYStatus.NA
     assert metrics.operating_profit_yoy.status == YoYStatus.NA
     assert metrics.operating_margin_yoy.status == YoYStatus.NA
     assert metrics.revised_eps_yoy.status == YoYStatus.NA

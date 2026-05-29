@@ -75,7 +75,7 @@
 7. 株探 通期業績推移
 8. 成長性
 9. キャッシュフロー
-10. 四半期業績推移
+10. 四半期トレンド
 
 ### 5.1 セクション見出し・ソース表示
 
@@ -133,8 +133,9 @@
 
 **目的**
 
-- 出力冒頭で、銘柄・現在株価・時価総額・総合評価・投資判断の方向性を短く提示する。
-- 旧仕様の `投資分類` / `投資戦略` / `算出基準` をフラットに並べる形式は廃止し、投資判断に必要な要約ラベルを3分類タグとして表示する。
+- 出力冒頭で、銘柄・現在株価・時価総額・総合評価・3分類タグを短く提示する。
+- 旧仕様の `投資分類` / `投資戦略` / `算出基準` をフラットに並べる形式は廃止する。
+- 投資戦略ラベルは rankCF ドメイン結果には残すが、冒頭サマリーでは当面表示しない。
 
 **表示形式**
 
@@ -144,7 +145,6 @@
 
 総合評価 {rank}（{score}/100）
 {growth_phase} / {per_level} / {roic_level}
-{investment_strategy}
 ```
 
 **表示例**
@@ -155,7 +155,6 @@
 
 総合評価 B（49/100）
 利益改善型 / 超高PER / 低ROIC
-順張り対象外・逆張り限定
 ```
 
 **各項目**
@@ -172,7 +171,6 @@
 | `{growth_phase}` | 成長フェーズ分類 |
 | `{per_level}` | PER水準分類 |
 | `{roic_level}` | ROIC水準分類 |
-| `{investment_strategy}` | 投資戦略ラベル |
 
 **成長フェーズ分類 `{growth_phase}`**
 
@@ -205,21 +203,11 @@
 - `高ROIC`
 - `超高ROIC`
 
-**投資戦略 `{investment_strategy}`**
-
-以下のいずれかを表示する。
-
-- `押し目で積極監視`
-- `トレンド・地合い次第で順張り`
-- `順張り対象外・逆張り限定`
-- `基本ノータッチ`
-
 **フォールバック**
 
 - 株価が欠損する場合は `株価 N/A` と表示する。
 - 時価総額が欠損する場合は `時価総額 N/A` と表示し、時価総額分類の丸括弧は表示しない。
 - `{growth_phase}` / `{per_level}` / `{roic_level}` のいずれかが欠損する場合は、該当位置に `N/A` を表示し、区切り `/` は維持する。
-- 投資戦略が欠損する場合は `投資戦略 N/A` と表示する。
 
 ### 5.5 株価評価・資本効率ブロック
 1.  縦並び表で
@@ -342,29 +330,43 @@ EPS CAGR YYYY→YYYY xx.x%
 - フル分析出力では、ROE・ROIC・PBR は 5.5 `株価評価・資本効率ブロック` に統合し、独立した財務ブロックは表示しない。
 - 株探セクション単体出力など、冒頭の株価評価・資本効率ブロックへ統合できない呼び出しでは、従来どおり独立した `■財務ブロック` を表示してよい。
 
-### 5.12 四半期業績推移
+### 5.12 四半期トレンド
 
-- 見出し: `■四半期業績推移`
+- 見出し: `■四半期トレンド`
 - 対象: 四半期実績のみ。予想行は表示しない。
 - 対象期間: 直近5四半期。
 - 行ラベル: `YYYY.M`（例: `2025.3`）。
-- カラム順:
-  1. 売上高
-  2. 営業益（前年同期比%）
-  3. 経常益
-  4. 最終益
-  5. 修正1株益（前年同期比%）
-  6. 売上損益率
-- 前年同期比:
-  - 比較対象は `Q(fiscal_year-1, same quarter)`。
-  - `quarter` は通期業績テーブルの決算月を優先して解決する。
-  - 計算式は `((current - previous) / abs(previous)) * 100`。
-  - 比較元なし・欠損・0除算は空白表示。
-- 売上損益率:
-  - HTML値があれば優先する。
-  - HTML値がない場合は `営業益 / 売上 * 100` で補完する。
-  - 営業益が欠損の場合のみ `経常益 / 売上 * 100` で補完する。
-  - 欠損・0除算時は `N/A`。
+- 通常出力では簡略版のみを表示し、詳細版の `■四半期業績推移` は将来の切替用 Formatter としてコード上に保持する。
+
+**表示形式**
+
+```
+■四半期トレンド
+　　　売上|営業利益率|昨年同期比|修正一株益
+2025.3　10.0億|10.0%|-10%|10.0円
+```
+
+**カラム順**
+
+1. 売上
+2. 営業利益率
+3. 昨年同期比（売上の前年同四半期比）
+4. 修正一株益
+
+**前年同期比**
+
+- 比較対象は `Q(fiscal_year-1, same quarter)`。
+- `quarter` は通期業績テーブルの決算月を優先して解決する。
+- 計算式は `((current - previous) / abs(previous)) * 100`。
+- 比較元なし・欠損・0除算は空白表示。
+- 整数値は小数なし、端数がある場合は小数1桁で表示する。
+
+**営業利益率**
+
+- HTML値があれば優先する。
+- HTML値がない場合は `営業益 / 売上 * 100` で補完する。
+- 営業益が欠損の場合のみ `経常益 / 売上 * 100` で補完する。
+- 欠損・0除算時は `N/A`。
 ---
 
 ## 6. 株探データ探索仕様
@@ -415,7 +417,7 @@ EPS CAGR YYYY→YYYY xx.x%
 
 **完了内容**
 
-- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準、投資戦略ラベルを保持する。
+- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準を表示する。投資戦略ラベルはDTO上に保持してもよいが、冒頭サマリーでは表示しない。
 - `format_opening_summary()` は、5.4 の表示形式に従い、通常表示と欠損値の `N/A` フォールバックを扱う。
 - Phase 1 では Presenter 結合を行わず、既存の `SummarySection` / `ScoreSummarySection` の出力を維持する。
 
@@ -431,8 +433,8 @@ EPS CAGR YYYY→YYYY xx.x%
 **完了内容**
 
 - `build_fundamental_output()` は `growth_phase` / `per_level` / `roic_level` を受け取り、rankCF結果がある場合に既存の `SummarySection` を `OpeningSummarySection` へ置換する。
-- 冒頭サマリーでは `ScoreSummarySection` の旧形式出力を使わず、総合評価、3分類タグ、投資戦略のみを表示する。
-- `投資分類` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
+- 冒頭サマリーでは `ScoreSummarySection` の旧形式出力を使わず、総合評価と3分類タグのみを表示する。
+- `投資分類` / `投資戦略` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
 
 ### 9.3 Phase 3: 統合テスト更新
 
@@ -511,6 +513,22 @@ EPS CAGR YYYY→YYYY xx.x%
 - `format_score_category()` は `[Category] subtotal/max_points` と構造化明細を返す。
 - 欠損値の指標行省略と取得不可ログは従来どおり維持する。
 
+### 9.9 Phase 9: 四半期トレンド簡略化
+
+**状態: 完了（2026-05-29）**
+
+- 通常出力の四半期ブロックを `■四半期業績推移` 詳細版から `■四半期トレンド` 簡略版へ変更する。
+- 簡略版のカラムは `売上 / 営業利益率 / 昨年同期比 / 修正一株益` とする。
+- `昨年同期比` は売上の前年同四半期比を表示する。
+- 詳細版 Formatter は将来切替用に内部関数として保持する。
+
+**完了内容**
+
+- `QuarterlyMetricRow` に `sales_yoy_pct` を追加した。
+- `BuildQuarterlyFinancialTableUseCase` は前年同四半期の売上から `sales_yoy_pct` を計算する。
+- `format_quarterly_metrics()` は通常出力として四半期トレンド簡略版を返す。
+- `_format_quarterly_metrics_detail()` は詳細版表示として保持する。
+
 ## 10. 検証状況
 
 - Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
@@ -518,7 +536,7 @@ EPS CAGR YYYY→YYYY xx.x%
 - 追加確認: `python -B -c "import app.presenters; import app.domain.usecases.fundamental_analysis; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
 - 結果: 成功
 - 全体確認: `python -m pytest`
-- 結果: `193 passed, 1 warning`
+- 結果: `194 passed, 1 warning`
 - Phase 4 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `42 passed`
 - Phase 4 import確認: `python -B -c "import app.presenters; import app.domain.builders.fundamental_output; import app.domain.builders.fundamental_output_impl; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
@@ -531,3 +549,7 @@ EPS CAGR YYYY→YYYY xx.x%
 - 結果: 成功
 - Phase 8 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `42 passed`
+- Phase 9 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_quarterly_growth_metrics.py tests/test_usecase_quarterly_financial_table.py`
+- 結果: `41 passed`
+- Phase 9 import確認: `python -B -c "import app.domain.models.quarterly_financials; import app.presentation.display_formatter; print('imports ok')"`
+- 結果: 成功

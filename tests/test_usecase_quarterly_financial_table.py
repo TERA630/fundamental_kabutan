@@ -33,7 +33,9 @@ def test_execute_sets_yoy_na_when_prior_same_quarter_missing() -> None:
 
     assert out[0].operating_profit_yoy_pct is None
     assert out[0].revised_eps_yoy_pct is None
+    assert out[0].sales_yoy_pct is None
     assert out[1].operating_profit_yoy_pct == 40.0
+    assert round(out[1].sales_yoy_pct, 1) == 36.4
 
 
 def test_execute_operating_margin_uses_ordinary_profit_when_operating_missing() -> None:
@@ -64,6 +66,7 @@ def test_execute_resolves_non_march_fiscal_cycle_for_yoy_pairing() -> None:
     assert out[0].quarter == Quarter.Q1
     assert out[1].quarter == Quarter.Q1
     assert out[1].operating_profit_yoy_pct == 50.0
+    assert out[1].sales_yoy_pct == 50.0
 
 
 def test_execute_sorts_by_month_for_non_march_cycle_latest_slice() -> None:

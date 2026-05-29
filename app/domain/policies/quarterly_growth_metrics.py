@@ -82,6 +82,7 @@ def resolve_operating_margin(
 def _build_na_growth_metrics() -> QuarterlyGrowthMetrics:
     na = YoYMetric(status=YoYStatus.NA, value_pct=None)
     return QuarterlyGrowthMetrics(
+        sales_yoy=na,
         operating_profit_yoy=na,
         operating_margin_yoy=na,
         revised_eps_yoy=na,
@@ -104,6 +105,11 @@ def build_quarterly_growth_metrics(*, previous: QuarterlyActual | None, current:
     )
 
     return QuarterlyGrowthMetrics(
+        sales_yoy=calc_yoy_change(
+            previous_value=previous.sales,
+            current_value=current.sales,
+            metric_kind=GrowthMetricKind.SALES,
+        ),
         operating_profit_yoy=calc_yoy_change(
             previous_value=previous.operating_profit,
             current_value=current.operating_profit,

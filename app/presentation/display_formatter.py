@@ -89,6 +89,14 @@ def _fmt_ratio_or_blank(value: float | None) -> str:
     return f"{value:+.1f}%"
 
 
+def _fmt_yoy_percent_or_blank(value: float | None) -> str:
+    if value is None:
+        return ""
+    if float(value).is_integer():
+        return f"{value:.0f}%"
+    return f"{value:.1f}%"
+
+
 def _format_market_cap_rank(value: float | None) -> str:
     if value is None:
         return "N/A"
@@ -135,7 +143,6 @@ def format_opening_summary(section: OpeningSummarySection) -> List[str]:
         "",
         score_line,
         f"{section.growth_phase or 'N/A'} / {section.per_level or 'N/A'} / {section.roic_level or 'N/A'}",
-        section.investment_strategy or "投資戦略 N/A",
     ]
 
 
@@ -341,7 +348,7 @@ def format_financial_metrics(section: FinancialMetricsSection) -> List[str]:
     return lines
 
 
-def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
+def _format_quarterly_metrics_detail(section: QuarterlyMetricsSection) -> List[str]:
     header = "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|"
     if not section.rows:
         logger.info("取得不可: 四半期業績推移 (値欠損)")
@@ -357,6 +364,22 @@ def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
         eps_yoy = _fmt_ratio_or_blank(row.revised_eps_yoy_pct)
         margin = _fmt_percent(row.operating_margin_pct) if row.operating_margin_pct is not None else "N/A"
         lines.append(f"{label}　{_fmt_oku(row.sales)}|{op}({op_yoy})|{_fmt_oku(row.ordinary_profit)}|{_fmt_oku(row.final_profit)}|{eps}({eps_yoy})|{margin}|")
+    return lines
+
+
+def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
+    header = "　　　売上|営業利益率|昨年同期比|修正一株益"
+    if not section.rows:
+        logger.info("取得不可: 四半期トレンド (値欠損)")
+        detail = f"N/A ({section.message})" if section.message else "N/A"
+        return ["■四半期トレンド", header, detail]
+
+    lines = ["■四半期トレンド", header]
+    for row in section.rows:
+        label = f"{row.fiscal_year}.{row.quarter_end_month}" if row.quarter_end_month is not None else str(row.fiscal_year)
+        lines.append(
+            f"{label}　{_fmt_oku(row.sales)}|{_fmt_percent(row.operating_margin_pct)}|{_fmt_yoy_percent_or_blank(row.sales_yoy_pct)}|{_fmt_yen(row.revised_eps)}"
+        )
     return lines
 
 

@@ -66,7 +66,7 @@ def test_build_kabutan_forecast_output_logs_missing_non_score_blocks(caplog):
     assert "取得不可: 株探通期業績推移 (値欠損)" in caplog.text
     assert "取得不可: キャッシュフロー (値欠損)" in caplog.text
     assert "取得不可: 財務ブロック (値欠損)" in caplog.text
-    assert "取得不可: 四半期業績推移 (値欠損)" in caplog.text
+    assert "取得不可: 四半期トレンド (値欠損)" in caplog.text
 
 
 def test_build_kabutan_forecast_output_growth_skips_same_year_actual_to_forecast():
@@ -271,17 +271,17 @@ def test_build_kabutan_forecast_output_includes_quarterly_block():
         None,
         (),
         (
-            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),
-            QuarterlyMetricRow(2026, Quarter.Q1, 3, 1200, 120, 100, 90, 12.0, 20.0, 20.0, 10.0),
+            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0, None),
+            QuarterlyMetricRow(2026, Quarter.Q1, 3, 1200, 120, 100, 90, 12.0, 20.0, 20.0, 10.0, 20.0),
         ),
     )
-    assert "■四半期業績推移" in text
-    assert "売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|" in text
+    assert "■四半期トレンド" in text
+    assert "売上|営業利益率|昨年同期比|修正一株益" in text
     assert "2025.3" in text
     assert "2026.3" in text
 
 
-def test_build_kabutan_forecast_output_quarterly_snapshot():
+def test_build_kabutan_forecast_output_quarterly_trend_snapshot():
     text = build_kabutan_forecast_output(
         "base",
         None,
@@ -291,21 +291,21 @@ def test_build_kabutan_forecast_output_quarterly_snapshot():
         None,
         (),
         (
-            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),
+            QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0, -10.0),
             QuarterlyMetricRow(2025, Quarter.Q2, 6, None, None, 95, None, None, 12.3, None, None),
         ),
     )
     expected_lines = [
-        "■四半期業績推移",
-        "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|",
-        "2025.3　10.0億|1.0億()|0.9億|0.8億|10.0円()|10.0%|",
-        "2025.6　N/A|N/A(+12.3%)|0.9億|N/A|N/A()|N/A|",
+        "■四半期トレンド",
+        "　　　売上|営業利益率|昨年同期比|修正一株益",
+        "2025.3　10.0億|10.0%|-10%|10.0円",
+        "2025.6　N/A|N/A||N/A",
     ]
     for line in expected_lines:
         assert line in text
 
 
-def test_build_kabutan_forecast_output_quarterly_snapshot_all_yoy_blank():
+def test_build_kabutan_forecast_output_quarterly_trend_all_yoy_blank():
     text = build_kabutan_forecast_output(
         "base",
         None,
@@ -319,8 +319,8 @@ def test_build_kabutan_forecast_output_quarterly_snapshot_all_yoy_blank():
             QuarterlyMetricRow(2025, Quarter.Q2, 6, 1100, 120, 95, 82, 11.0, None, None, 10.9),
         ),
     )
-    assert "2025.3　10.0億|1.0億()|0.9億|0.8億|10.0円()|10.0%|" in text
-    assert "2025.6　11.0億|1.2億()|0.9億|0.8億|11.0円()|10.9%|" in text
+    assert "2025.3　10.0億|10.0%||10.0円" in text
+    assert "2025.6　11.0億|10.9%||11.0円" in text
 
 
 def test_build_kabutan_forecast_output_section_order_includes_quarterly_after_annual():
@@ -342,13 +342,13 @@ def test_build_kabutan_forecast_output_section_order_includes_quarterly_after_an
         (QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, None, None, 10.0),),
     )
     annual_pos = text.find("■株探 通期業績推移")
-    quarterly_pos = text.find("■四半期業績推移")
+    quarterly_pos = text.find("■四半期トレンド")
     assert annual_pos != -1
     assert quarterly_pos != -1
     assert annual_pos < quarterly_pos
 
 
-def test_build_kabutan_forecast_output_quarterly_snapshot_non_standard_month_label():
+def test_build_kabutan_forecast_output_quarterly_trend_non_standard_month_label():
     text = build_kabutan_forecast_output(
         "base",
         None,
@@ -358,9 +358,24 @@ def test_build_kabutan_forecast_output_quarterly_snapshot_non_standard_month_lab
         None,
         (),
         (
-            QuarterlyMetricRow(2025, Quarter.Q1, 12, 1000, 100, 90, 80, 10.0, 20.0, 15.0, 10.0),
-            QuarterlyMetricRow(2026, Quarter.Q1, 12, 1100, 120, 100, 90, 12.0, None, None, 10.9),
+            QuarterlyMetricRow(2025, Quarter.Q1, 12, 1000, 100, 90, 80, 10.0, 20.0, 15.0, 10.0, 8.5),
+            QuarterlyMetricRow(2026, Quarter.Q1, 12, 1100, 120, 100, 90, 12.0, None, None, 10.9, None),
         ),
     )
-    assert "2025.12　10.0億|1.0億(+20.0%)|0.9億|0.8億|10.0円(+15.0%)|10.0%|" in text
-    assert "2026.12　11.0億|1.2億()|1.0億|0.9億|12.0円()|10.9%|" in text
+    assert "2025.12　10.0億|10.0%|8.5%|10.0円" in text
+    assert "2026.12　11.0億|10.9%||12.0円" in text
+
+
+def test_format_quarterly_detail_formatter_is_kept_for_future_switching():
+    from app.presentation.display_formatter import _format_quarterly_metrics_detail
+
+    lines = _format_quarterly_metrics_detail(
+        QuarterlyMetricsSection(
+            rows=[
+                QuarterlyMetricRow(2025, Quarter.Q1, 3, 1000, 100, 90, 80, 10.0, 20.0, 15.0, 10.0),
+            ],
+        )
+    )
+
+    assert "■四半期業績推移" in lines
+    assert "2025.3　10.0億|1.0億(+20.0%)|0.9億|0.8億|10.0円(+15.0%)|10.0%|" in lines

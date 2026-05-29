@@ -1,6 +1,6 @@
 # ドメイン層仕様
 
-最終更新: 2026-05-28
+最終更新: 2026-05-29
 
 本書は、データ取得後のモデル、UseCase、ドメイン計算、出力Builderの責務を定義する。
 表示順・文言・数値表現は `docs/display_spec.md`、rankCF 採点仕様は `docs/rankCF_spec.md` を正とする。
@@ -89,6 +89,23 @@
 `app/domain/models/display_sections.py` は、出力テキストの各ブロックを表すDTOを保持する。
 DTOは表示に必要な値を運ぶだけで、データ取得やHTML解析を行わない。
 
+### 3.4 `QuarterlyMetricRow`
+
+四半期トレンド表示に使う直近四半期の指標行を表す。
+
+- `fiscal_year: int`
+- `quarter: Quarter`
+- `quarter_end_month: int | None`
+- `sales: int | None`
+- `operating_profit: int | None`
+- `ordinary_profit: int | None`
+- `final_profit: int | None`
+- `revised_eps: float | None`
+- `operating_profit_yoy_pct: float | None`
+- `revised_eps_yoy_pct: float | None`
+- `operating_margin_pct: float | None`
+- `sales_yoy_pct: float | None`
+
 ---
 
 ## 4. UseCase
@@ -100,7 +117,14 @@ DTOは表示に必要な値を運ぶだけで、データ取得やHTML解析を�
 - `calculate_cf_score()` を呼び、`CfScoringResult` を出力Builderへ渡す。
 - J-Quants 由来の `summary_rows` や旧FY/四半期補完モデルには依存しない。
 
-### 4.2 `FetchKabutanForecastUseCase`
+### 4.2 `BuildQuarterlyFinancialTableUseCase`
+
+- 四半期実績行を直近5四半期へ絞り込む。
+- 決算月から四半期を補完する。
+- 前年同四半期の探索と、四半期トレンドに必要な `sales_yoy_pct` / `operating_profit_yoy_pct` / `revised_eps_yoy_pct` / `operating_margin_pct` の組み立てを行う。
+- 前年同四半期比の純計算は `build_quarterly_growth_metrics()` に委譲する。
+
+### 4.3 `FetchKabutanForecastUseCase`
 
 - 株探の通期業績行取得をリポジトリへ委譲する。
 - HTMLフォルダ指定時はローカルHTMLを優先する。
@@ -116,6 +140,9 @@ DTOは表示に必要な値を運ぶだけで、データ取得やHTML解析を�
 - 営業利益成長率は `((current - previous) / abs(previous)) * 100`。
 - EPS成長率は表示仕様で定めた式に従う。
 - 比較元なし、欠損、0除算相当は `None` を返す。
+
+四半期トレンドでは、前年同四半期の売上高を比較元として `sales_yoy_pct` を算出する。
+四半期の前年比計算は `build_quarterly_growth_metrics(previous, current)` に集約し、UseCase は計算結果の値を `QuarterlyMetricRow` へ詰める。
 
 ### 5.2 CF経時ブロック
 

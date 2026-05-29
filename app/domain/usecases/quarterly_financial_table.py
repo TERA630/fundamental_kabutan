@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMetricRow
-from app.domain.models.quarterly_financials import GrowthMetricKind
-from app.domain.policies.quarterly_growth_metrics import assign_quarter, calc_yoy_change, resolve_operating_margin
+from app.domain.policies.quarterly_growth_metrics import assign_quarter, build_quarterly_growth_metrics, resolve_operating_margin
 
 
 @dataclass(frozen=True)
@@ -28,16 +27,7 @@ class BuildQuarterlyFinancialTableUseCase:
         out: list[QuarterlyMetricRow] = []
         for row in latest:
             previous = prior_lookup.get((row.fiscal_year - 1, row.quarter))
-            operating_yoy = calc_yoy_change(
-                previous_value=previous.operating_profit if previous else None,
-                current_value=row.operating_profit,
-                metric_kind=GrowthMetricKind.OPERATING_PROFIT
-            )
-            eps_yoy = calc_yoy_change(
-                previous_value=previous.revised_eps if previous else None,
-                current_value=row.revised_eps,
-                metric_kind=GrowthMetricKind.REVISED_EPS
-            )
+            growth = build_quarterly_growth_metrics(previous=previous, current=row)
             operating_margin = resolve_operating_margin(
                 row.operating_margin,
                 sales=row.sales,
@@ -53,9 +43,10 @@ class BuildQuarterlyFinancialTableUseCase:
                     ordinary_profit=row.ordinary_profit,
                     final_profit=row.final_profit,
                     revised_eps=row.revised_eps,
-                    operating_profit_yoy_pct=operating_yoy.value_pct,
-                    revised_eps_yoy_pct=eps_yoy.value_pct,
+                    operating_profit_yoy_pct=growth.operating_profit_yoy.value_pct,
+                    revised_eps_yoy_pct=growth.revised_eps_yoy.value_pct,
                     operating_margin_pct=operating_margin,
+                    sales_yoy_pct=growth.sales_yoy.value_pct,
                 )
             )
         return tuple(out)
