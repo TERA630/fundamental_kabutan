@@ -191,7 +191,13 @@ def _format_rule_note(note: str) -> str:
     return f"未定義ルール: {note}"
 
 
-def _format_metric_score(metric: MetricScore) -> str | None:
+def _format_metric_raw_value(metric: MetricScore) -> str:
+    if metric.metric_id == "fcf_yield":
+        return f"{metric.raw_value:.2f}%"
+    return f"{metric.raw_value:.2f}"
+
+
+def _format_metric_score(metric: MetricScore, label_width: int) -> str | None:
     label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
     if metric.raw_value is None:
         reason = "値欠損"
@@ -207,16 +213,15 @@ def _format_metric_score(metric: MetricScore) -> str | None:
         )
         return None
 
-    raw = f"{metric.raw_value:.2f}"
-    if metric.metric_id == "fcf_yield":
-        raw = f"{metric.raw_value:.2f}%"
-    return f"- {label}: {raw} -> {metric.rank}({metric.points}/{metric.max_points})"
+    return f"{label:<{label_width}} {metric.rank:<3} {metric.points:>2}/{metric.max_points:<2} {_format_metric_raw_value(metric)}"
 
 
 def format_score_category(section: ScoreCategorySection) -> List[str]:
-    lines = [f"{section.title}: {section.subtotal}/{section.max_points}"]
+    labels = [METRIC_LABELS.get(metric.metric_id, metric.metric_id) for metric in section.metrics if metric.raw_value is not None]
+    label_width = max([len(label) for label in labels] + [12])
+    lines = [f"[{section.title}] {section.subtotal}/{section.max_points}"]
     for metric in section.metrics:
-        formatted = _format_metric_score(metric)
+        formatted = _format_metric_score(metric, label_width)
         if formatted is not None:
             lines.append(formatted)
     return lines

@@ -117,4 +117,4 @@ rankCF 採点仕様の正本は `docs/rankCF_spec.md`。本書は実装構成、
 ## 8. 検証状況
 
 - 直近確認: `python -m pytest`
-- 結果: `148 passed, 1 warning`
+- 結果: `193 passed, 1 warning`

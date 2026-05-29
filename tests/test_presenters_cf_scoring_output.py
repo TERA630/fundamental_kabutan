@@ -61,11 +61,11 @@ def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     assert "投資分類" not in text
     assert "投資戦略" not in text
     assert "合計: 73/100" not in text
-    assert "Quality: 45/60" in text
-    assert "Growth: 20/25" in text
-    assert "Valuation: 8/15" in text
-    assert "FCF Yield: 2.50% -> B(4/10)" in text
-    assert "ROIC: 18.20 -> B(9/15)" in text
+    assert "[Quality] 45/60" in text
+    assert "[Growth] 20/25" in text
+    assert "[Valuation] 8/15" in text
+    assert "FCF Yield    B    4/10 2.50%" in text
+    assert "ROIC               B    9/15 18.20" in text
     assert "ルール注記:" in text
     assert "成長投資免責によるランク引き上げ" in text
 
@@ -164,9 +164,9 @@ def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
     assert "投資分類：" not in out
     assert "算出基準：" not in out
     assert "総合評価：" not in out
-    assert "Quality: 45/60" in out
+    assert "[Quality] 45/60" in out
     assert out.find("【Test (1234)】") < out.find("総合評価 A（73/100）") < out.find("■株価評価・資本効率")
-    assert out.find("■株価評価・資本効率") < out.find("Quality: 45/60") < out.find("■株探 通期業績推移")
+    assert out.find("■株価評価・資本効率") < out.find("[Quality] 45/60") < out.find("■株探 通期業績推移")
 
 
 def test_build_fundamental_output_without_scoring_keeps_previous_behavior():
@@ -303,9 +303,9 @@ def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
     )
     caplog.set_level("DEBUG")
     text = build_cf_scoring_summary_text(scoring)
-    assert "Quality: 0/60" in text
-    assert "Growth: 0/25" in text
-    assert "Valuation: 0/15" in text
+    assert "[Quality] 0/60" in text
+    assert "[Growth] 0/25" in text
+    assert "[Valuation] 0/15" in text
     assert "投資分類" not in text
     assert "投資戦略" not in text
     assert "ROIC:" not in text

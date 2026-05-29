@@ -252,23 +252,52 @@
   - 第2優先：market PER（forecast EPS が取得不可の場合のみフォールバック）
 - market PER フォールバック時は、年ヘッダを `市場PER` として `PER|xx.x倍` を表示する。
 
-### 5.6 　Quality スコアブロック 
-**表示順**
-　-　`Quality　xx/60`
-　-　`ROIC:　xx.xx -> {S/A/B/C/D}　(xx/15)`
-　-　`Cash Conversion:　x.xx -> {S/A/B/C/D}　(xx/15)`（倍率表示）
-　-　`営業CFマージン:　xx.xx -> {S/A/B/C/D}　(xx/10)`
-　-　`営業利益率:　xx.xx% -> {S/A/B/C/D}　(xx/10)`
-　-　`FCF Ratio(FCF/OCF):　x.xx -> {S/A/B/C/D}　xx/10点`（倍率表示）
+### 5.6 Quality スコアブロック
+
+**表示形式**
+
+```
+[Quality] xx/60
+ROIC                 B    9/15 xx.xx
+Cash Conversion...  S   15/15 x.xx
+営業CFマージン       B    6/10 xx.xx
+営業利益率           D    0/10 xx.xx
+FCF Ratio...        B    4/10 x.xx
+```
+
+- 1行目は `[Quality] {subtotal}/{max_points}` とする。
+- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- 値欠損の指標行は省略可能とし、内部ログに `取得不可: {指標名} (値欠損)` を出力する。
+
 ### 5.7 Growth スコアブロック
- -  `Growth: {xx}/25`
- -  `EPS CAGR(3y): -x.xx -> {S/A/B/C/D} ({xx}/15)`
- - `売上CAGR(3y): x.xx -> {S/A/B/C/D}({xx}/10)`
+
+**表示形式**
+
+```
+[Growth] xx/25
+EPS CAGR(3y)        S   15/15 xx.xx
+売上CAGR(3y)        A    8/10 xx.xx
+```
+
+- 1行目は `[Growth] {subtotal}/{max_points}` とする。
+- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+
 ### 5.8 Valuation スコアブロック
- - `Valuation: {xx}/15`
- - `FCF Yield: x.xx% -> {S/A/B/C/D}({x}/10)`
- -  `PER: xx.xx倍 -> {S/A/B/C/D}({x}/5)`
- - `ルール注記: {なし/...}`（日本語表示）
+
+**表示形式**
+
+```
+[Valuation] xx/15
+FCF Yield           D    0/10 x.xx%
+PER                 D    1/5  xx.xx
+ルール注記:
+- なし
+```
+
+- 1行目は `[Valuation] {subtotal}/{max_points}` とする。
+- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- `FCF Yield` の値は `%` 付きで表示する。
+- `ルール注記` は日本語表示とし、内部識別子（英語キー）は表示しない。
 
 **欠損値の表示ルール**
 - 欠損値（N/A）は、本文の当該行を省略可能とする。
@@ -458,21 +487,47 @@ EPS CAGR YYYY→YYYY xx.x%
 - `format_cashflow_timeline()` は、会社のキャッシュ創出力、投資姿勢、手元流動性を1行で確認できる表示に変更した。
 - Cash Conversion / FCF Yield / FCFマージン / 営業CFマージンは、重複を避けるため CFブロック本文から外した。
 
+### 9.7 Phase 7: 検証記録の更新
+
+**状態: 完了（2026-05-29）**
+
+- 古い `py_compile` 未完了記録を、`python -B -c ...` による import 確認へ代替済みとして整理する。
+- 全体テスト件数を直近の結果へ更新する。
+
+**完了内容**
+
+- `__pycache__` 作成権限に依存する `py_compile` ではなく、`python -B -c` の import 確認を採用する。
+- 全体確認は `python -m pytest` で行う。
+
+### 9.8 Phase 8: スコア内訳の構造化表示
+
+**状態: 完了（2026-05-29）**
+
+- 旧 `Metric: raw -> rank(points)` 形式を廃止し、カテゴリごとに `[Quality] 45/60` の見出しと列揃えの明細行を表示する。
+- 明細行は `指標名 / ランク / 点数 / 値` の順に表示する。
+
+**完了内容**
+
+- `format_score_category()` は `[Category] subtotal/max_points` と構造化明細を返す。
+- 欠損値の指標行省略と取得不可ログは従来どおり維持する。
+
 ## 10. 検証状況
 
 - Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `24 passed`
-- 追加確認: `python -m py_compile app/presenters.py app/domain/usecases/fundamental_analysis.py app/domain/models/display_sections.py app/presentation/display_formatter.py`
+- 追加確認: `python -B -c "import app.presenters; import app.domain.usecases.fundamental_analysis; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
 - 結果: 成功
 - 全体確認: `python -m pytest`
-- 結果: `192 passed, 1 warning`
+- 結果: `193 passed, 1 warning`
 - Phase 4 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `42 passed`
 - Phase 4 import確認: `python -B -c "import app.presenters; import app.domain.builders.fundamental_output; import app.domain.builders.fundamental_output_impl; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
 - 結果: 成功
-- Phase 4 py_compile確認: `python -m py_compile app\presenters.py app\domain\builders\fundamental_output.py app\domain\builders\fundamental_output_impl.py app\domain\builders\kabutan_output.py app\domain\models\display_sections.py app\presentation\display_formatter.py`
-- 結果: `__pycache__` 一時ファイル作成の権限エラーで未完了
+- Phase 7 import確認: `python -B -c "import app.presenters; import app.presentation.display_formatter; print('imports ok')"`
+- 結果: 成功
 - Phase 5/6 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
 - 結果: `42 passed`
 - Phase 5/6 import確認: `python -B -c "import app.presenters; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
 - 結果: 成功
+- Phase 8 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
+- 結果: `42 passed`
