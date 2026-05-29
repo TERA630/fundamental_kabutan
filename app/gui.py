@@ -52,6 +52,7 @@ class FundamentalApp:
             on_copy=self.copy_text,
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
+            on_summary=self.generate_summary,
         )
         self.state.output_cache = self.controller.fetch_output_cache_for_today()
         self.state.output_cache_date = current_date_iso()
@@ -151,6 +152,10 @@ class FundamentalApp:
         self.set_busy(False, self.view_model.build_fetch_failed_status())
         messagebox.showerror("取得失敗", message)
 
+    def _handle_summary_error(self, message: str):
+        self.set_busy(False, self.view_model.build_summary_failed_status())
+        messagebox.showerror("サマリ作成失敗", message)
+
     def _fetch_worker(self, name: str, code4: str, cache_key: str):
         try:
             output = self.controller.fetch_analysis_output(
@@ -164,6 +169,17 @@ class FundamentalApp:
             self.master.after(0, lambda: self._render_output(output, self.view_model.build_generated_status(name, code4)))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
+
+    def _summary_worker(self, output_dir: Path):
+        try:
+            output_path = self.controller.build_and_save_fundamental_summary(
+                watchlist_entries=self.state.watchlist,
+                output_dir=output_dir,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+            )
+            self.master.after(0, lambda path=output_path: self.set_busy(False, self.view_model.build_saved_status(str(path))))
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_summary_error(msg))
 
     def _require_kabutan_html_dir(self) -> bool:
         if self.state.kabutan_html_dir is None:
@@ -211,6 +227,22 @@ class FundamentalApp:
             return
 
         self._start_fetch_thread(name, code4, cache_key)
+
+    def generate_summary(self):
+        if self.state.is_fetching:
+            return
+
+        if not self.state.watchlist:
+            self.status_var.set(self.view_model.build_missing_stock_status())
+            return
+
+        if not self._require_kabutan_html_dir():
+            return
+
+        output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
+        self.set_busy(True, self.view_model.build_summary_running_status())
+        thread = threading.Thread(target=self._summary_worker, args=(output_dir,), daemon=True)
+        thread.start()
 
     def copy_text(self):
         content = self.view.get_text_content()

@@ -13,7 +13,11 @@ from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, R
 from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
+from app.domain.usecases.fundamental_summary import FundamentalSummaryService
+from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.presenters import build_fundamental_output
+
+FUNDAMENTAL_SUMMARY_FILENAME = "fundamental_summery.md"
 
 
 def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
@@ -86,5 +90,19 @@ class FundamentalGuiController:
         output_cache[output_cache_key] = output
         return output
 
+    def build_and_save_fundamental_summary(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+        output_dir: Path,
+        kabutan_html_dir: Path | None = None,
+    ) -> Path:
+        service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
+        table = service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
+        markdown = build_fundamental_summary_markdown(table)
+        output_path = output_dir / FUNDAMENTAL_SUMMARY_FILENAME
+        output_path.write_text(markdown, encoding="utf-8")
+        return output_path
 
-__all__ = ["FundamentalGuiController"]
+
+__all__ = ["FUNDAMENTAL_SUMMARY_FILENAME", "FundamentalGuiController"]

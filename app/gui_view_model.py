@@ -67,6 +67,14 @@ class GuiViewModel:
         return "取得に失敗しました。"
 
     @staticmethod
+    def build_summary_running_status() -> str:
+        return "サマリ作成中です。"
+
+    @staticmethod
+    def build_summary_failed_status() -> str:
+        return "サマリ作成に失敗しました。"
+
+    @staticmethod
     def build_kabutan_dir_selected_status() -> str:
         return "株探HTMLフォルダを設定しました（出力キャッシュをクリア）。"
 

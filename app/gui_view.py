@@ -23,7 +23,7 @@ class FundamentalView:
         self.status_var = status_var
         self.kabutan_dir_var = kabutan_dir_var
 
-    def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir) -> None:
+    def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir, on_summary) -> None:
         root = ttk.Frame(self.master, padding=10)
         root.pack(fill="both", expand=True)
 
@@ -48,6 +48,8 @@ class FundamentalView:
         ttk.Label(control, text="株価: yFinance固定").pack(side="left", padx=(0, 12))
         self.fetch_button = ttk.Button(control, text="取得", command=on_fetch)
         self.fetch_button.pack(side="left", padx=(0, 6))
+        self.summary_button = ttk.Button(control, text="サマリ出力", command=on_summary)
+        self.summary_button.pack(side="left", padx=(0, 6))
         self.copy_button = ttk.Button(control, text="コピー", command=on_copy)
         self.copy_button.pack(side="left", padx=(0, 6))
         self.save_button = ttk.Button(control, text="保存", command=on_save)
@@ -72,6 +74,7 @@ class FundamentalView:
         self.open_button.configure(state=state)
         self.open_kabutan_dir_button.configure(state=state)
         self.fetch_button.configure(state=state)
+        self.summary_button.configure(state=state)
         self.copy_button.configure(state=state)
         self.save_button.configure(state=state)
         self.stock_combo.configure(state=readonly_state)

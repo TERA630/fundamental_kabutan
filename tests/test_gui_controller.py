@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.data.file_cache import FileCache
-from app.gui_controller import FundamentalGuiController
+from app.gui_controller import FUNDAMENTAL_SUMMARY_FILENAME, FundamentalGuiController
 
 
 class DummyService:
@@ -67,3 +67,33 @@ def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
 
     assert resolved.status == "ok"
     assert resolved.file_path == target.resolve()
+
+
+def test_build_and_save_fundamental_summary_writes_fixed_filename(tmp_path: Path, monkeypatch):
+    class DummySummaryService:
+        def __init__(self, service):
+            self.service = service
+
+        def build_summary_table(self, watchlist_entries, *, kabutan_html_dir=None):
+            assert watchlist_entries == [("トヨタ", "7203")]
+            assert kabutan_html_dir == tmp_path / "html"
+            return "TABLE"
+
+    monkeypatch.setattr("app.gui_controller.FundamentalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.gui_controller.build_fundamental_summary_markdown", lambda table: f"MD:{table}\n")
+
+    controller = FundamentalGuiController(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_fundamental_service=lambda _cache: object(),
+    )
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    output_path = controller.build_and_save_fundamental_summary(
+        watchlist_entries=[("トヨタ", "7203")],
+        output_dir=output_dir,
+        kabutan_html_dir=tmp_path / "html",
+    )
+
+    assert output_path == output_dir / FUNDAMENTAL_SUMMARY_FILENAME
+    assert output_path.read_text(encoding="utf-8") == "MD:TABLE\n"
