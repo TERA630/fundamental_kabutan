@@ -813,7 +813,7 @@ Technicalドメインは既存 `app/domain` 構造に分解して実装する。
 
 ### PR-3: yFinance Data Port拡張
 
-**状態: 未着手**
+**状態: 完了（2026-05-31）**
 
 目的:
 
@@ -823,10 +823,14 @@ Technicalドメインは既存 `app/domain` 構造に分解して実装する。
 
 - 日足履歴取得、日中足取得、VWAPフォールバックを追加する。
 - 日中足と日足のキャッシュキー・TTLを分離する。
+- 日足TTLは12時間、日中足TTLは5分とする。
+- DataFrameの永続キャッシュ接続は後続UseCase実装時に行う。本PRではキャッシュキー生成関数とTTL定数をData Portで公開する。
+- `yf.download()` のMultiIndex列は単一銘柄向けに正規化する。
+- 日中足VWAPが取得できない場合は、日足最終行の `(High + Low + Close) / 3` を `日足参考値` として返す。
 
 ### PR-4: Technical UseCase / Builder
 
-**状態: 未着手**
+**状態: 完了（2026-05-31）**
 
 目的:
 
@@ -839,9 +843,17 @@ Technicalドメインは既存 `app/domain` 構造に分解して実装する。
 - `tests/test_usecase_technical_analysis.py`
 - `tests/test_technical_output.py`
 
+実装内容:
+
+- PR3のData Portから日足・日中足を取得し、PR2のTechnical Policyで `TechnicalSnapshot` を作成する。
+- 日足・日中足は別キャッシュキーで保存する。
+- 日中足が取得できない場合は日足参考値VWAPへフォールバックする。
+- Technical画面本文をBuilderでMarkdown風テキストへ変換する。
+- GUIタブ統合は本PRでは行わない。
+
 ### PR-5: GUI統合
 
-**状態: 未着手**
+**状態: 完了（2026-05-31）**
 
 目的:
 
@@ -853,3 +865,9 @@ Technicalドメインは既存 `app/domain` 構造に分解して実装する。
 - TechnicalタブはTechnical UseCaseを呼ぶ。
 - コピー・保存は固定パネルを含めず、現在タブ本文だけを対象にする。
 - Technicalタブ選択時のサマリ出力は何もしない。
+- 機関投資サマリ固定パネルはタブ本文とは別に表示する。
+- `取得` ボタンは、現在選択中タブに応じてFundamental / Technicalの取得処理を切り替える。
+- Technical取得は株探HTMLフォルダ未設定でも実行できる。
+- Fundamental取得は従来どおり株探HTMLフォルダを要求する。
+- 機関投資サマリは取得時に更新する。
+- Fundamental Scoreに必要な株探データがない場合は、固定パネル内のFundamental Scoreを `N/A` とする。

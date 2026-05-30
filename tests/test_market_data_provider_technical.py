@@ -1,0 +1,129 @@
+import pandas as pd
+
+from app.data import market_data_provider as provider
+
+
+def _history() -> pd.DataFrame:
+    index = pd.date_range("2026-05-29 09:00", periods=3, freq="5min")
+    return pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0],
+            "High": [102.0, 103.0, 104.0],
+            "Low": [99.0, 100.0, 101.0],
+            "Close": [101.0, 102.0, 103.0],
+            "Volume": [1000.0, 0.0, 2000.0],
+        },
+        index=index,
+    )
+
+
+def test_technical_cache_keys_and_ttls():
+    assert provider.TECH_DAILY_HISTORY_TTL_SEC == 12 * 60 * 60
+    assert provider.TECH_INTRADAY_HISTORY_TTL_SEC == 5 * 60
+    assert provider.build_technical_daily_history_cache_key("7203") == "tech_daily_7203_4mo_1d"
+    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_5m"
+
+
+def test_fetch_yfinance_daily_history_uses_ticker_history(monkeypatch):
+    class FakeTicker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        def history(self, *, period, interval, auto_adjust):
+            assert self.symbol == "7203.T"
+            assert period == "4mo"
+            assert interval == "1d"
+            assert auto_adjust is False
+            return _history()
+
+    class FakeYf:
+        Ticker = FakeTicker
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    out = provider.fetch_yfinance_daily_history("7203")
+
+    assert list(out.columns) == list(provider.TECH_DAILY_COLUMNS)
+    assert len(out) == 3
+    assert out.iloc[-1]["Close"] == 103.0
+
+
+def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypatch):
+    base = _history()
+    multi = pd.concat({"7203.T": base}, axis=1).swaplevel(0, 1, axis=1)
+
+    class FakeYf:
+        @staticmethod
+        def download(symbol, *, period, interval, auto_adjust, progress):
+            assert symbol == "7203.T"
+            assert period == "1d"
+            assert interval == "5m"
+            assert auto_adjust is False
+            assert progress is False
+            return multi
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    out = provider.fetch_yfinance_intraday_history("7203")
+
+    assert list(out.columns) == list(provider.TECH_DAILY_COLUMNS)
+    assert len(out) == 3
+
+
+def test_build_intraday_vwap_snapshot_filters_zero_volume():
+    snapshot = provider.build_intraday_vwap_snapshot(_history())
+
+    typical_1 = (102 + 99 + 101) / 3
+    typical_3 = (104 + 101 + 103) / 3
+    expected_vwap = ((typical_1 * 1000) + (typical_3 * 2000)) / 3000
+    assert snapshot["latest"] == 103.0
+    assert snapshot["open"] == 100.0
+    assert snapshot["high"] == 104.0
+    assert snapshot["low"] == 99.0
+    assert snapshot["volume"] == 3000.0
+    assert snapshot["vwap"] == expected_vwap
+    assert snapshot["latest_bar_time"] == "09:10"
+    assert snapshot["latest_price_source"] == "intraday_5m"
+    assert snapshot["vwap_source"] == "本日5分足"
+
+
+def test_build_daily_reference_vwap_snapshot():
+    daily = pd.DataFrame(
+        {
+            "Open": [100.0],
+            "High": [110.0],
+            "Low": [90.0],
+            "Close": [105.0],
+            "Volume": [1234.0],
+        },
+        index=pd.to_datetime(["2026-05-29"]),
+    )
+
+    snapshot = provider.build_daily_reference_vwap_snapshot(daily)
+
+    assert snapshot["latest"] == 105.0
+    assert snapshot["vwap"] == (110 + 90 + 105) / 3
+    assert snapshot["latest_bar_time"] == "終値"
+    assert snapshot["latest_price_source"] == "daily_close"
+    assert snapshot["vwap_source"] == "日足参考値"
+    assert snapshot["vwap_timestamp"] == "2026-05-29 終値"
+
+
+def test_fetch_yfinance_vwap_snapshot_falls_back_to_daily_reference(monkeypatch):
+    daily = pd.DataFrame(
+        {
+            "Open": [100.0],
+            "High": [110.0],
+            "Low": [90.0],
+            "Close": [105.0],
+            "Volume": [1234.0],
+        },
+        index=pd.to_datetime(["2026-05-29"]),
+    )
+
+    monkeypatch.setattr(provider, "fetch_yfinance_intraday_history", lambda code4, interval="5m": pd.DataFrame())
+
+    snapshot = provider.fetch_yfinance_vwap_snapshot("7203", daily_history=daily)
+
+    assert snapshot["vwap_source"] == "日足参考値"
+    assert snapshot["vwap"] == (110 + 90 + 105) / 3

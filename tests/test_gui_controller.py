@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import date
+from types import SimpleNamespace
 
 from app.data.file_cache import FileCache
 from app.gui_controller import FundamentalGuiController, build_fundamental_summary_filename
@@ -103,3 +104,69 @@ def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path
 
     assert output_path == output_dir / "fundamental_summery-2026-05-30.md"
     assert output_path.read_text(encoding="utf-8") == "MD:TABLE\n"
+
+
+def test_fetch_technical_output_uses_injected_technical_service(tmp_path: Path, monkeypatch):
+    result = object()
+
+    class DummyTechnicalService:
+        def __init__(self):
+            self.calls = []
+
+        def build_analysis_result(self, *, name, code4):
+            self.calls.append((name, code4))
+            return result
+
+    dummy_service = DummyTechnicalService()
+    monkeypatch.setattr("app.gui_controller.build_technical_output", lambda value: "TECH" if value is result else "BAD")
+    controller = FundamentalGuiController(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_technical_service=lambda _cache: dummy_service,
+    )
+
+    output = controller.fetch_technical_output(name="トヨタ", code4="7203")
+
+    assert output == "TECH"
+    assert dummy_service.calls == [("トヨタ", "7203")]
+
+
+def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path: Path):
+    technical_result = SimpleNamespace(
+        snapshot=SimpleNamespace(
+            price=SimpleNamespace(close=2000.0, volume=10_000_000.0, volume_avg20=8_000_000.0, latest=2000.0),
+            moving_average=SimpleNamespace(ma5=1900.0, ma25=2100.0),
+        ),
+        vwap_snapshot={"vwap": 1950.0, "vwap_source": "本日5分足"},
+    )
+
+    class DummyTechnicalService:
+        def build_analysis_result(self, *, name, code4):
+            return technical_result
+
+    class DummyFundamentalService:
+        def fetch_price_snapshot(self, code4):
+            return {
+                "price": 2000.0,
+                "market_cap": 3_000_000_000_000.0,
+                "per": None,
+                "pbr": None,
+                "industry": None,
+                "div_yield": None,
+                "payout_ratio": None,
+                "as_of": None,
+            }
+
+    controller = FundamentalGuiController(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_fundamental_service=lambda _cache: DummyFundamentalService(),
+        build_technical_service=lambda _cache: DummyTechnicalService(),
+    )
+
+    text = controller.fetch_institutional_summary_text(name="トヨタ", code4="7203", kabutan_html_dir=None)
+
+    assert "機関投資サマリ" in text
+    assert "時価総額：30,000.0億円（超大型）" in text
+    assert "売買代金 200.0億円" in text
+    assert "機関投資スコア：10/20点" in text
+    assert "Fundamental Score：N/A" in text
+    assert "Technical：VWAP ○ / 5日線 ○ / 25日線 ×" in text

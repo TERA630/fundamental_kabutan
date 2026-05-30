@@ -16,14 +16,16 @@ class FundamentalView:
         stock_var: tk.StringVar,
         status_var: tk.StringVar,
         kabutan_dir_var: tk.StringVar,
+        institutional_summary_var: tk.StringVar,
     ):
         self.master = master
         self.path_var = path_var
         self.stock_var = stock_var
         self.status_var = status_var
         self.kabutan_dir_var = kabutan_dir_var
+        self.institutional_summary_var = institutional_summary_var
 
-    def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir, on_summary) -> None:
+    def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir, on_summary, on_tab_changed) -> None:
         root = ttk.Frame(self.master, padding=10)
         root.pack(fill="both", expand=True)
 
@@ -57,13 +59,31 @@ class FundamentalView:
 
         ttk.Label(root, textvariable=self.status_var).pack(fill="x", pady=(0, 6))
 
-        text_frame = ttk.Frame(root)
+        summary_frame = ttk.LabelFrame(root, text="機関投資サマリ", padding=8)
+        summary_frame.pack(fill="x", pady=(0, 8))
+        ttk.Label(summary_frame, textvariable=self.institutional_summary_var, justify="left").pack(fill="x")
+
+        self.notebook = ttk.Notebook(root)
+        self.notebook.pack(fill="both", expand=True)
+        self.notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
+
+        self.fundamental_frame = ttk.Frame(self.notebook)
+        self.technical_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.fundamental_frame, text="Fundamental")
+        self.notebook.add(self.technical_frame, text="Technical")
+
+        self.fundamental_text = self._build_text_area(self.fundamental_frame)
+        self.technical_text = self._build_text_area(self.technical_frame)
+
+    def _build_text_area(self, parent: ttk.Frame) -> tk.Text:
+        text_frame = ttk.Frame(parent)
         text_frame.pack(fill="both", expand=True)
-        self.text = tk.Text(text_frame, wrap="word", font=("Yu Gothic UI", 11))
-        self.text.pack(side="left", fill="both", expand=True)
-        scroll = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
+        text = tk.Text(text_frame, wrap="word", font=("Yu Gothic UI", 11))
+        text.pack(side="left", fill="both", expand=True)
+        scroll = ttk.Scrollbar(text_frame, orient="vertical", command=text.yview)
         scroll.pack(side="right", fill="y")
-        self.text.configure(yscrollcommand=scroll.set)
+        text.configure(yscrollcommand=scroll.set)
+        return text
 
     def set_stock_choices(self, values: list[str]) -> None:
         self.stock_combo["values"] = values
@@ -83,14 +103,31 @@ class FundamentalView:
         self.master.update_idletasks()
 
     def clear_text(self) -> None:
-        self.text.delete("1.0", tk.END)
+        self.current_text_widget().delete("1.0", tk.END)
+
+    def clear_all_text(self) -> None:
+        self.fundamental_text.delete("1.0", tk.END)
+        self.technical_text.delete("1.0", tk.END)
 
     def get_text_content(self) -> str:
-        return self.text.get("1.0", tk.END).strip()
+        return self.current_text_widget().get("1.0", tk.END).strip()
 
-    def render_output(self, output: str) -> None:
-        self.clear_text()
-        self.text.insert("1.0", output)
+    def render_output(self, output: str, mode: str | None = None) -> None:
+        text = self.text_widget_for_mode(mode or self.current_mode())
+        text.delete("1.0", tk.END)
+        text.insert("1.0", output)
+
+    def current_mode(self) -> str:
+        selected = self.notebook.select()
+        if selected == str(self.technical_frame):
+            return "technical"
+        return "fundamental"
+
+    def current_text_widget(self) -> tk.Text:
+        return self.text_widget_for_mode(self.current_mode())
+
+    def text_widget_for_mode(self, mode: str) -> tk.Text:
+        return self.technical_text if mode == "technical" else self.fundamental_text
 
 
 __all__ = ["FundamentalView"]

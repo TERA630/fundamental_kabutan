@@ -36,6 +36,7 @@ class FundamentalApp:
         self.kabutan_dir_var = tk.StringVar(value="株探HTMLフォルダ未選択")
         self.stock_var = tk.StringVar()
         self.status_var = tk.StringVar(value=GuiViewModel.build_initial_status())
+        self.institutional_summary_var = tk.StringVar(value="機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A")
 
         self.view_model = GuiViewModel()
         self.view = FundamentalView(
@@ -44,6 +45,7 @@ class FundamentalApp:
             self.stock_var,
             self.status_var,
             self.kabutan_dir_var,
+            self.institutional_summary_var,
         )
         self.view.build_ui(
             on_open=self.open_watchlist,
@@ -53,6 +55,7 @@ class FundamentalApp:
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
             on_summary=self.generate_summary,
+            on_tab_changed=self.on_tab_changed,
         )
         self.state.output_cache = self.controller.fetch_output_cache_for_today()
         self.state.output_cache_date = current_date_iso()
@@ -128,10 +131,13 @@ class FundamentalApp:
             self.status_var.set(self.view_model.build_loaded_status(len(values)))
         else:
             self.stock_var.set("")
-            self.view.clear_text()
+            self.view.clear_all_text()
             self.status_var.set(self.view_model.build_no_stock_found_status())
 
     def on_stock_selected(self, _event=None):
+        self.status_var.set(self.view_model.build_selected_status())
+
+    def on_tab_changed(self, _event=None):
         self.status_var.set(self.view_model.build_selected_status())
 
     def selected_stock(self) -> tuple[str, str] | None:
@@ -144,9 +150,13 @@ class FundamentalApp:
             return None
         return selected
 
-    def _render_output(self, output: str, status: str):
-        self.view.render_output(output)
+    def _render_output(self, output: str, status: str, mode: str | None = None):
+        self.view.render_output(output, mode=mode)
         self.set_busy(False, status)
+
+    def _render_output_with_summary(self, output: str, summary: str, status: str, mode: str):
+        self.institutional_summary_var.set(summary)
+        self._render_output(output, status, mode=mode)
 
     def _handle_fetch_error(self, message: str):
         self.set_busy(False, self.view_model.build_fetch_failed_status())
@@ -165,8 +175,25 @@ class FundamentalApp:
                 output_cache_key=cache_key,
                 kabutan_html_dir=self.state.kabutan_html_dir,
             )
+            summary = self.controller.fetch_institutional_summary_text(
+                name=name,
+                code4=code4,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+            )
             self.controller.save_output_cache_for_today(self.state.output_cache)
-            self.master.after(0, lambda: self._render_output(output, self.view_model.build_generated_status(name, code4)))
+            self.master.after(0, lambda: self._render_output_with_summary(output, summary, self.view_model.build_generated_status(name, code4), "fundamental"))
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
+
+    def _technical_fetch_worker(self, name: str, code4: str):
+        try:
+            output = self.controller.fetch_technical_output(name=name, code4=code4)
+            summary = self.controller.fetch_institutional_summary_text(
+                name=name,
+                code4=code4,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+            )
+            self.master.after(0, lambda: self._render_output_with_summary(output, summary, self.view_model.build_generated_status(name, code4), "technical"))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
@@ -208,6 +235,11 @@ class FundamentalApp:
         thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
         thread.start()
 
+    def _start_technical_fetch_thread(self, name: str, code4: str) -> None:
+        self.set_busy(True, self.view_model.build_fetching_status(name, code4))
+        thread = threading.Thread(target=self._technical_fetch_worker, args=(name, code4), daemon=True)
+        thread.start()
+
     def generate_text(self):
         if self.state.is_fetching:
             return
@@ -219,6 +251,10 @@ class FundamentalApp:
             return
 
         name, code4 = selected
+        if self.view.current_mode() == "technical":
+            self._start_technical_fetch_thread(name, code4)
+            return
+
         if not self._require_kabutan_html_dir():
             return
 
@@ -230,6 +266,8 @@ class FundamentalApp:
 
     def generate_summary(self):
         if self.state.is_fetching:
+            return
+        if self.view.current_mode() == "technical":
             return
 
         if not self.state.watchlist:

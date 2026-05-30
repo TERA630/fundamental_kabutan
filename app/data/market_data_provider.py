@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+import pandas as pd
+
 from app.data.utils import safe_float
 
 try:
     import yfinance as yf
 except ImportError:
     yf = None
+
+TECH_DAILY_HISTORY_TTL_SEC = 12 * 60 * 60
+TECH_INTRADAY_HISTORY_TTL_SEC = 5 * 60
+TECH_DAILY_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
 
 
 def fetch_yfinance_snapshot(code4: str) -> dict[str, float | str | None]:
@@ -41,4 +49,163 @@ def fetch_yfinance_snapshot(code4: str) -> dict[str, float | str | None]:
     return result
 
 
-__all__ = ["fetch_yfinance_snapshot"]
+def build_technical_daily_history_cache_key(code4: str, *, period: str = "4mo", interval: str = "1d") -> str:
+    return f"tech_daily_{code4}_{period}_{interval}"
+
+
+def build_technical_intraday_history_cache_key(code4: str, *, interval: str = "5m") -> str:
+    return f"tech_intraday_{code4}_{interval}"
+
+
+def _empty_history() -> pd.DataFrame:
+    return pd.DataFrame(columns=list(TECH_DAILY_COLUMNS))
+
+
+def _normalize_history_frame(history: Any) -> pd.DataFrame:
+    if history is None:
+        return _empty_history()
+    frame = pd.DataFrame(history).copy()
+    if frame.empty:
+        return _empty_history()
+
+    if isinstance(frame.columns, pd.MultiIndex):
+        if len(frame.columns.names) >= 2:
+            level_values = set(frame.columns.get_level_values(0))
+            if set(TECH_DAILY_COLUMNS).issubset(level_values):
+                frame.columns = frame.columns.get_level_values(0)
+            else:
+                frame.columns = frame.columns.get_level_values(-1)
+        else:
+            frame.columns = frame.columns.get_level_values(0)
+
+    missing = [column for column in TECH_DAILY_COLUMNS if column not in frame.columns]
+    if missing:
+        return _empty_history()
+
+    out = frame.loc[:, list(TECH_DAILY_COLUMNS)].copy()
+    for column in TECH_DAILY_COLUMNS:
+        out[column] = pd.to_numeric(out[column], errors="coerce")
+    out = out.dropna(subset=["Open", "High", "Low", "Close"])
+    if hasattr(out.index, "tz") and out.index.tz is not None:
+        out.index = out.index.tz_localize(None)
+    return out
+
+
+def fetch_yfinance_daily_history(code4: str, *, period: str = "4mo", interval: str = "1d") -> pd.DataFrame:
+    if yf is None:
+        return _empty_history()
+    try:
+        ticker = yf.Ticker(f"{code4}.T")
+        history = ticker.history(period=period, interval=interval, auto_adjust=False)
+        return _normalize_history_frame(history)
+    except Exception:
+        return _empty_history()
+
+
+def fetch_yfinance_intraday_history(code4: str, *, interval: str = "5m") -> pd.DataFrame:
+    if yf is None:
+        return _empty_history()
+    try:
+        history = yf.download(f"{code4}.T", period="1d", interval=interval, auto_adjust=False, progress=False)
+        return _normalize_history_frame(history)
+    except Exception:
+        return _empty_history()
+
+
+def _latest_timestamp_label(index_value: Any, *, fallback_suffix: str) -> str | None:
+    try:
+        timestamp = pd.Timestamp(index_value)
+    except Exception:
+        return fallback_suffix
+    if pd.isna(timestamp):
+        return fallback_suffix
+    timestamp = timestamp.tz_localize(None) if timestamp.tzinfo is not None else timestamp
+    if fallback_suffix == "終値":
+        return f"{timestamp.date().isoformat()} 終値"
+    return f"{timestamp.date().isoformat()} {timestamp.strftime('%H:%M')}"
+
+
+def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str, float | str | None]:
+    daily = _normalize_history_frame(daily_history)
+    if daily.empty:
+        return {
+            "latest": None,
+            "open": None,
+            "high": None,
+            "low": None,
+            "volume": None,
+            "vwap": None,
+            "latest_bar_time": None,
+            "latest_price_source": "daily_close",
+            "latest_price_timestamp": None,
+            "vwap_source": "日足参考値",
+            "vwap_timestamp": None,
+        }
+    row = daily.iloc[-1]
+    vwap = (float(row["High"]) + float(row["Low"]) + float(row["Close"])) / 3
+    timestamp = _latest_timestamp_label(daily.index[-1], fallback_suffix="終値")
+    return {
+        "latest": safe_float(row["Close"]),
+        "open": safe_float(row["Open"]),
+        "high": safe_float(row["High"]),
+        "low": safe_float(row["Low"]),
+        "volume": safe_float(row["Volume"]),
+        "vwap": vwap,
+        "latest_bar_time": "終値",
+        "latest_price_source": "daily_close",
+        "latest_price_timestamp": timestamp,
+        "vwap_source": "日足参考値",
+        "vwap_timestamp": timestamp,
+    }
+
+
+def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, float | str | None]:
+    intraday = _normalize_history_frame(intraday_history)
+    intraday = intraday[intraday["Volume"] > 0]
+    if intraday.empty:
+        return build_daily_reference_vwap_snapshot(_empty_history())
+
+    typical_price = (intraday["High"] + intraday["Low"] + intraday["Close"]) / 3
+    weighted = (typical_price * intraday["Volume"]).cumsum()
+    volume_sum = intraday["Volume"].cumsum()
+    vwap_series = weighted / volume_sum
+    row = intraday.iloc[-1]
+    timestamp = _latest_timestamp_label(intraday.index[-1], fallback_suffix="")
+    latest_bar_time = pd.Timestamp(intraday.index[-1]).strftime("%H:%M")
+    return {
+        "latest": safe_float(row["Close"]),
+        "open": safe_float(intraday.iloc[0]["Open"]),
+        "high": safe_float(intraday["High"].max()),
+        "low": safe_float(intraday["Low"].min()),
+        "volume": safe_float(intraday["Volume"].sum()),
+        "vwap": safe_float(vwap_series.iloc[-1]),
+        "latest_bar_time": latest_bar_time,
+        "latest_price_source": "intraday_5m",
+        "latest_price_timestamp": timestamp,
+        "vwap_source": "本日5分足",
+        "vwap_timestamp": timestamp,
+    }
+
+
+def fetch_yfinance_vwap_snapshot(code4: str, *, daily_history: pd.DataFrame | None = None, interval: str = "5m") -> dict[str, float | str | None]:
+    intraday = fetch_yfinance_intraday_history(code4, interval=interval)
+    if not intraday.empty:
+        return build_intraday_vwap_snapshot(intraday)
+
+    daily = daily_history if daily_history is not None else fetch_yfinance_daily_history(code4)
+    return build_daily_reference_vwap_snapshot(daily)
+
+
+__all__ = [
+    "TECH_DAILY_COLUMNS",
+    "TECH_DAILY_HISTORY_TTL_SEC",
+    "TECH_INTRADAY_HISTORY_TTL_SEC",
+    "build_daily_reference_vwap_snapshot",
+    "build_intraday_vwap_snapshot",
+    "build_technical_daily_history_cache_key",
+    "build_technical_intraday_history_cache_key",
+    "fetch_yfinance_daily_history",
+    "fetch_yfinance_intraday_history",
+    "fetch_yfinance_snapshot",
+    "fetch_yfinance_vwap_snapshot",
+]
