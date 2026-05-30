@@ -9,8 +9,8 @@ def build_fundamental_summary_markdown(table: FundamentalSummaryTable) -> str:
     lines = [
         "# Fundamental Summary",
         "",
-        "|銘柄名(銘柄コード)|総合スコア|Quality|Growth|Valuation|ROIC|営業利益率|Cash conversion|PER|",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "|銘柄名(銘柄コード)|総合スコア|Quality|Growth|Valuation|営業利益率|営業利益3年CAGR|ROIC|Cash conversion|PER|投資率|",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     lines.extend(_format_row(row) for row in table.rows)
     return "\n".join(lines) + "\n"
@@ -24,10 +24,12 @@ def _format_row(row: FundamentalSummaryRow) -> str:
         f"|{_format_optional_int(row.quality_score)}"
         f"|{_format_optional_int(row.growth_score)}"
         f"|{_format_optional_int(row.valuation_score)}"
-        f"|{_format_percent(row.roic)}"
         f"|{_format_percent(row.operating_margin)}"
+        f"|{_format_percent(row.operating_profit_cagr_3y)}"
+        f"|{_format_percent(row.roic)}"
         f"|{_format_ratio(row.cash_conversion)}"
-        f"|{_format_per(row.per)}|"
+        f"|{_format_per(row.per)}"
+        f"|{_format_percent(row.investment_rate)}|"
     )
 
 

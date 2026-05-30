@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Callable
 
@@ -17,7 +18,12 @@ from app.domain.usecases.fundamental_summary import FundamentalSummaryService
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.presenters import build_fundamental_output
 
-FUNDAMENTAL_SUMMARY_FILENAME = "fundamental_summery.md"
+FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summery"
+
+
+def build_fundamental_summary_filename(*, today: date | None = None) -> str:
+    target_date = today or date.today()
+    return f"{FUNDAMENTAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
 
 
 def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
@@ -96,13 +102,18 @@ class FundamentalGuiController:
         watchlist_entries: list[tuple[str, str]],
         output_dir: Path,
         kabutan_html_dir: Path | None = None,
+        today: date | None = None,
     ) -> Path:
         service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
         table = service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
         markdown = build_fundamental_summary_markdown(table)
-        output_path = output_dir / FUNDAMENTAL_SUMMARY_FILENAME
+        output_path = output_dir / build_fundamental_summary_filename(today=today)
         output_path.write_text(markdown, encoding="utf-8")
         return output_path
 
 
-__all__ = ["FUNDAMENTAL_SUMMARY_FILENAME", "FundamentalGuiController"]
+__all__ = [
+    "FUNDAMENTAL_SUMMARY_FILENAME_PREFIX",
+    "FundamentalGuiController",
+    "build_fundamental_summary_filename",
+]

@@ -10,9 +10,11 @@ from app.domain.models.fundamental_summary import (
     FundamentalSummaryTable,
     SkippedSummaryStock,
 )
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.policies.cf_scoring import calculate_cf_score
 from app.domain.policies.financial_metrics import calc_roic_approx
+from app.domain.policies.growth_metrics import calc_cagr
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 
 
@@ -94,10 +96,12 @@ class FundamentalSummaryService:
             quality_score=self._category_score_or_none(scoring_result.quality),
             growth_score=self._category_score_or_none(scoring_result.growth),
             valuation_score=self._category_score_or_none(scoring_result.valuation),
-            roic=roic,
             operating_margin=self._latest_operating_margin(kabutan_fetch_result.pair),
+            operating_profit_cagr_3y=self._operating_profit_cagr_3y(kabutan_fetch_result.pair),
+            roic=roic,
             cash_conversion=self._cash_conversion(scoring_result),
             per=cf_scoring_input.per,
+            investment_rate=self._latest_investment_rate(kabutan_fetch_result.cashflow_rows),
         )
 
     @staticmethod
@@ -121,6 +125,28 @@ class FundamentalSummaryService:
             if metric.metric_id == "cash_conversion_np":
                 return metric.raw_value
         return None
+
+    @staticmethod
+    def _operating_profit_cagr_3y(forecast_pair: KabutanForecastPair | None) -> float | None:
+        if forecast_pair is None or not forecast_pair.all_rows:
+            return None
+        rows_by_year = {row.year: row for row in forecast_pair.all_rows if row.operating_profit is not None}
+        if not rows_by_year:
+            return None
+        end_row = max(rows_by_year.values(), key=lambda row: (row.year, row.month))
+        start_row = rows_by_year.get(end_row.year - 3)
+        if start_row is None:
+            return None
+        return calc_cagr(start_row.operating_profit, end_row.operating_profit, 3)
+
+    @staticmethod
+    def _latest_investment_rate(cashflow_rows: tuple[KabutanCashflowRow, ...]) -> float | None:
+        if not cashflow_rows:
+            return None
+        latest_row = max(cashflow_rows, key=lambda row: (row.year, row.month))
+        if latest_row.operating_cf in (None, 0) or latest_row.investing_cf is None:
+            return None
+        return (latest_row.investing_cf / latest_row.operating_cf) * 100
 
     @staticmethod
     def _sort_key(row: FundamentalSummaryRow) -> tuple[int, int, int, str]:

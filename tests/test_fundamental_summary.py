@@ -46,15 +46,16 @@ class FakeFundamentalAnalysisService:
 
 def _forecast_pair() -> KabutanForecastPair:
     rows = (
+        KabutanForecastRow("2023.03", 2023, 3, "実績", 700, 90, 80, 70, 70.0, 8.0),
         KabutanForecastRow("2024.03", 2024, 3, "実績", 800, 120, 110, 90, 80.0, 10.0),
         KabutanForecastRow("2025.03", 2025, 3, "実績", 1000, 200, 180, 100, 100.0, 12.0),
         KabutanForecastRow("2026.03", 2026, 3, "予想", 1200, 300, 280, 150, 125.0, 14.0),
     )
     return KabutanForecastPair(
         previous2_actual=rows[0],
-        previous_actual=rows[0],
-        current_actual=rows[1],
-        current_forecast=rows[2],
+        previous_actual=rows[1],
+        current_actual=rows[2],
+        current_forecast=rows[3],
         next_forecast=None,
         all_rows=rows,
     )
@@ -94,10 +95,12 @@ def test_build_summary_table_sorts_and_builds_metrics():
 
     assert [row.code4 for row in table.rows] == ["1111", "2222"]
     assert table.rows[0].total_score > table.rows[1].total_score
-    assert table.rows[0].roic == pytest.approx(14.0)
     assert table.rows[0].operating_margin == 25.0
+    assert table.rows[0].operating_profit_cagr_3y == pytest.approx(49.38, abs=0.01)
+    assert table.rows[0].roic == pytest.approx(14.0)
     assert table.rows[0].cash_conversion == 2.5
     assert table.rows[0].per == 8.0
+    assert table.rows[0].investment_rate == -60.0
     assert table.rows[1].quality_score is None
 
 
@@ -127,14 +130,16 @@ def test_build_fundamental_summary_markdown_formats_na_values():
                 quality_score=None,
                 growth_score=10,
                 valuation_score=5,
-                roic=None,
                 operating_margin=12.345,
+                operating_profit_cagr_3y=None,
+                roic=None,
                 cash_conversion=None,
                 per=20.0,
+                investment_rate=-60.0,
             ),
         )
     )
 
     markdown = build_fundamental_summary_markdown(table)
 
-    assert "|Sample (1234)|50|N/A|10|5|N/A|12.3%|N/A|20.0倍|" in markdown
+    assert "|Sample (1234)|50|N/A|10|5|12.3%|N/A|N/A|N/A|20.0倍|-60.0%|" in markdown

@@ -1,7 +1,8 @@
 from pathlib import Path
+from datetime import date
 
 from app.data.file_cache import FileCache
-from app.gui_controller import FUNDAMENTAL_SUMMARY_FILENAME, FundamentalGuiController
+from app.gui_controller import FundamentalGuiController, build_fundamental_summary_filename
 
 
 class DummyService:
@@ -69,7 +70,11 @@ def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
     assert resolved.file_path == target.resolve()
 
 
-def test_build_and_save_fundamental_summary_writes_fixed_filename(tmp_path: Path, monkeypatch):
+def test_build_fundamental_summary_filename_uses_date():
+    assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summery-2026-05-30.md"
+
+
+def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path, monkeypatch):
     class DummySummaryService:
         def __init__(self, service):
             self.service = service
@@ -93,7 +98,8 @@ def test_build_and_save_fundamental_summary_writes_fixed_filename(tmp_path: Path
         watchlist_entries=[("トヨタ", "7203")],
         output_dir=output_dir,
         kabutan_html_dir=tmp_path / "html",
+        today=date(2026, 5, 30),
     )
 
-    assert output_path == output_dir / FUNDAMENTAL_SUMMARY_FILENAME
+    assert output_path == output_dir / "fundamental_summery-2026-05-30.md"
     assert output_path.read_text(encoding="utf-8") == "MD:TABLE\n"

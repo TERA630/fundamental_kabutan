@@ -1,6 +1,6 @@
 
 
-監視銘柄より銘柄コードを読み込み、fundamental_summery.mdとして出力する機能追加の仕様書。
+監視銘柄より銘柄コードを読み込み、`fundamental_summery-yyyy-mm-dd.md` として出力する機能追加の仕様書。
 
 # 起動
 　GUI層にサマリ出力ボタンを作成する。　ユーザーがそれをクリックするとサマリ作成ユースケースが起動する。
@@ -14,7 +14,7 @@
 5．　Quality、Growth,Valuationのスコアのいずれかが算出できない場合は算出できないスコアは0点と評価するが、表には算出不可としておく。
 6． 総合スコア順に行データをソートする。
 7． 同スコアの場合は、Growthスコア、Qualityスコアの順に優先。
-8． 行データにヘッダをつけ、ソートした行データを全て書き込み、Markdown文書(fundamental_summery.md)に出力する。
+8． 行データにヘッダをつけ、ソートした行データを全て書き込み、Markdown文書 `fundamental_summery-yyyy-mm-dd.md` に出力する。
 
 # 仕様
 1．　列　　銘柄名(銘柄コード)
@@ -22,10 +22,12 @@
 3．　Quality ：　Qualityスコア(算出は既存ドメインルール通り)
 4．　Growth　：　Growthスコア(算出は既存ドメインルール通り)
 5．　Valuation：　Valuationスコア(算出は既存ドメインルール通り)
-6．　ROIC：　取得できた最新の実績ROIC
-7．　営業利益率：　取得できた最新の(予想でも良い)営業利益率
-8．　Cash conversion：　取得できた最新の実績の Cash conversion
-9.　　PER　　　　：　取得できた最新の(予想でも良い)　PER
+6．　営業利益率：　取得できた最新の(予想でも良い)営業利益率
+7．　営業利益3年CAGR：　取得できた最新の(予想でも良い)営業利益と3年前の営業利益から算出する3年CAGR
+8．　ROIC：　取得できた最新の実績ROIC
+9．　Cash conversion：　取得できた最新の実績の Cash conversion
+10.　PER　　　　：　取得できた最新の(予想でも良い)　PER
+11.　投資率　　　：　取得できた最新の実績の投資率
 
 ---
 
@@ -33,7 +35,8 @@
 
 ドメイン層実装では、以下を確認済み前提として扱う。
 
-1. 出力ファイル名は `fundamental_summery.md` とする。
+1. 出力ファイル名は `fundamental_summery-yyyy-mm-dd.md` とする。
+   - `yyyy-mm-dd` はサマリ作成日の年月日とする。
 2. 総合スコアは、既存の rankCF ドメインルール `calculate_cf_score()` の `total.total_points` を使う。
    - 株探通期業績が取得できず `CfScoringInput` を組み立てられない場合は、総合スコア作成不可として行を出力しない。
 3. Quality / Growth / Valuation は、既存 rankCF のカテゴリ subtotal を使う。
@@ -41,9 +44,14 @@
    - 一部指標だけが欠損している場合は、既存ルールどおり欠損指標を `0` 点として subtotal を表示する。
 4. `ROIC` は、財務指標行から算出できた最新実績 ROIC を使う。
 5. `営業利益率` は、株探通期業績行のうち、予想を含む最新行の `営業利益 ÷ 売上高` を使う。
-6. `Cash conversion` は、既存 rankCF の Cash Conversion と同じく `営業CF ÷ 純利益` で算出する。
+6. `営業利益3年CAGR` は、株探通期業績行のうち、予想を含む最新行を終点、終点年度の3年前の行を始点として `calc_cagr(始点営業利益, 終点営業利益, 3)` で算出する。
+   - 終点または3年前の営業利益が欠損、0以下、または該当年度がない場合は `N/A` とする。
+7. `Cash conversion` は、既存 rankCF の Cash Conversion と同じく `営業CF ÷ 純利益` で算出する。
    - 分母が `0` または欠損、必要値が欠損している場合は `N/A` とする。
-7. `PER` は、既存 rankCF 入力と同じく forecast EPS 由来を優先し、取得不可時のみ market PER を使う。
+8. `PER` は、既存 rankCF 入力と同じく forecast EPS 由来を優先し、取得不可時のみ market PER を使う。
+9. `投資率` は、最新CF実績行の `投資CF ÷ 営業CF × 100` で算出する。
+   - 符号は維持する。
+   - 営業CFが `0` または欠損、投資CFが欠損している場合は `N/A` とする。
 
 # ドメイン実装設計案
 
@@ -63,7 +71,7 @@
 2. `FundamentalSummaryService` が銘柄ごとに既存 `FundamentalAnalysisService` の取得・計算処理を再利用する。
 3. `CfScoringInput` が作成できない銘柄は `SkippedSummaryStock` として保持し、表には出さない。
 4. `CfScoringResult` から総合スコア、Quality、Growth、Valuation を取り出す。
-5. ROIC、営業利益率、Cash conversion、PER を同じ入力データから解決する。
+5. 営業利益率、営業利益3年CAGR、ROIC、Cash conversion、PER、投資率を同じ入力データから解決する。
 6. 総合スコア降順、Growth降順、Quality降順、銘柄コード昇順でソートする。
 7. Builder がMarkdown表を返す。ファイル書き込みはData / GUI結合側で行う。
 
@@ -85,10 +93,12 @@
 | Quality | 整数または `N/A` |
 | Growth | 整数または `N/A` |
 | Valuation | 整数または `N/A` |
-| ROIC | `x.x%` または `N/A` |
 | 営業利益率 | `x.x%` または `N/A` |
+| 営業利益3年CAGR | `x.x%` または `N/A` |
+| ROIC | `x.x%` または `N/A` |
 | Cash conversion | `x.xx` または `N/A` |
 | PER | `x.x倍` または `N/A` |
+| 投資率 | `x.x%` または `N/A` |
 
 # ドメイン層実装工程
 
@@ -130,6 +140,16 @@
 - 値は rankCF の `cash_conversion_np` 指標と同じ計算結果を採用する。
 - Markdown Builder は `Cash conversion` を小数2桁で表示する。
 
+## Phase 5.1: サマリ列と保存名の更新
+
+**状態: 完了（2026-05-30）**
+
+- サマリ列を `総合スコア / Quality / Growth / Valuation / 営業利益率 / 営業利益3年CAGR / ROIC / Cash conversion / PER / 投資率` に更新する。
+- `FundamentalSummaryRow` は `operating_profit_cagr_3y` と `investment_rate` を保持する。
+- `営業利益3年CAGR` は最新通期行（予想含む）と3年前の営業利益から算出する。
+- `投資率` は最新CF実績行の `投資CF ÷ 営業CF × 100` で算出し、符号を維持する。
+- サマリ出力ファイル名を `fundamental_summery-yyyy-mm-dd.md` に変更する。
+
 # GUI結合工程案
 
 ## Phase 6: Controller結合
@@ -138,13 +158,13 @@
 
 - `FundamentalGuiController` にサマリ作成メソッドを追加する。
 - 監視銘柄リスト、株探HTMLフォルダ、保存先ディレクトリを受け取り、`FundamentalSummaryService` と `build_fundamental_summary_markdown()` を呼ぶ。
-- 出力ファイル名は固定で `fundamental_summery.md` とする。
+- 出力ファイル名は作成日付きで `fundamental_summery-yyyy-mm-dd.md` とする。
 - 書き込み成功時は保存先パスを返す。
 
 **完了内容**
 
 - `FundamentalGuiController.build_and_save_fundamental_summary()` を追加した。
-- 保存先は呼び出し元から受け取り、固定ファイル名 `fundamental_summery.md` で書き込む。
+- 保存先は呼び出し元から受け取り、作成日付きファイル名 `fundamental_summery-yyyy-mm-dd.md` で書き込む。
 - GUIからは監視銘柄ファイルの親ディレクトリを保存先として渡す。
 
 ## Phase 7: GUIボタン追加
@@ -166,5 +186,5 @@
 
 **状態: 未着手**
 
-- Controller単体テストで、監視銘柄からMarkdownが作成され `fundamental_summery.md` に保存されることを確認する。
+- Controller単体テストで、監視銘柄からMarkdownが作成され `fundamental_summery-yyyy-mm-dd.md` に保存されることを確認する。
 - GUI状態テストで、ボタン操作時の必須項目チェックと完了ステータスを確認する。

@@ -13,10 +13,12 @@ class FundamentalSummaryRow:
     quality_score: int | None
     growth_score: int | None
     valuation_score: int | None
-    roic: float | None
     operating_margin: float | None
+    operating_profit_cagr_3y: float | None
+    roic: float | None
     cash_conversion: float | None
     per: float | None
+    investment_rate: float | None
 
 
 @dataclass(frozen=True)
