@@ -5,6 +5,7 @@ from app.domain.usecases.technical_analysis import (
     dataframe_from_cache_payload,
     dataframe_to_cache_payload,
 )
+from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 
 
 class InMemoryCache:
@@ -100,3 +101,19 @@ def test_build_analysis_result_falls_back_to_daily_reference_vwap():
 
     assert result.vwap_snapshot["vwap_source"] == "日足参考値"
     assert result.vwap_snapshot["latest_bar_time"] == "終値"
+
+
+def test_build_analysis_result_from_market_data_bundle():
+    bundle = MarketDataBundle(
+        code4="1234",
+        daily_history=_daily_history(),
+        intraday_history=_intraday_history(),
+        snapshot=MarketSnapshot(price=169.0),
+    )
+
+    result = TechnicalAnalysisService.build_analysis_result_from_bundle(name="Sample", bundle=bundle)
+
+    assert result.name == "Sample"
+    assert result.code4 == "1234"
+    assert result.snapshot.price.latest == 169.0
+    assert result.vwap_snapshot["vwap_source"] == "本日5分足"

@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from app.data.utils import safe_float
+from app.domain.models.market_data import MarketSnapshot
 
 try:
     import yfinance as yf
@@ -18,15 +19,15 @@ TECH_INTRADAY_HISTORY_TTL_SEC = 5 * 60
 TECH_DAILY_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
 
 
-def fetch_yfinance_snapshot(code4: str) -> dict[str, float | str | None]:
-    result = {"price": None, "market_cap": None, "per": None, "pbr": None, "industry": None, "div_yield": None, "payout_ratio": None}
+def fetch_yfinance_market_snapshot(code4: str, *, daily_history: pd.DataFrame | None = None) -> MarketSnapshot:
+    result = build_market_snapshot_from_daily_history(daily_history).to_dict() if daily_history is not None else MarketSnapshot.empty().to_dict()
     if yf is None:
-        return result
+        return MarketSnapshot.from_mapping(result)
     try:
         ticker = yf.Ticker(f"{code4}.T")
-        hist = ticker.history(period="5d", auto_adjust=False)
-        if hist is not None and not hist.empty:
-            result["price"] = safe_float(hist["Close"].dropna().iloc[-1])
+        if daily_history is None:
+            hist = ticker.history(period="5d", auto_adjust=False)
+            result.update(build_market_snapshot_from_daily_history(hist).to_dict())
         try:
             info = getattr(ticker, "fast_info", None)
             if info is not None:
@@ -45,8 +46,12 @@ def fetch_yfinance_snapshot(code4: str) -> dict[str, float | str | None]:
         except Exception:
             pass
     except Exception:
-        return result
-    return result
+        return MarketSnapshot.from_mapping(result)
+    return MarketSnapshot.from_mapping(result)
+
+
+def fetch_yfinance_snapshot(code4: str, *, daily_history: pd.DataFrame | None = None) -> dict[str, float | str | None]:
+    return fetch_yfinance_market_snapshot(code4, daily_history=daily_history).to_dict()
 
 
 def build_technical_daily_history_cache_key(code4: str, *, period: str = "4mo", interval: str = "1d") -> str:
@@ -89,6 +94,21 @@ def _normalize_history_frame(history: Any) -> pd.DataFrame:
     if hasattr(out.index, "tz") and out.index.tz is not None:
         out.index = out.index.tz_localize(None)
     return out
+
+
+def build_market_snapshot_from_daily_history(daily_history: pd.DataFrame | None) -> MarketSnapshot:
+    daily = _normalize_history_frame(daily_history)
+    if daily.empty:
+        return MarketSnapshot.empty()
+
+    close = daily["Close"].dropna()
+    if close.empty:
+        return MarketSnapshot.empty()
+
+    return MarketSnapshot(
+        price=safe_float(close.iloc[-1]),
+        as_of=_latest_timestamp_label(daily.index[-1], fallback_suffix="終値"),
+    )
 
 
 def fetch_yfinance_daily_history(code4: str, *, period: str = "4mo", interval: str = "1d") -> pd.DataFrame:
@@ -201,11 +221,13 @@ __all__ = [
     "TECH_DAILY_HISTORY_TTL_SEC",
     "TECH_INTRADAY_HISTORY_TTL_SEC",
     "build_daily_reference_vwap_snapshot",
+    "build_market_snapshot_from_daily_history",
     "build_intraday_vwap_snapshot",
     "build_technical_daily_history_cache_key",
     "build_technical_intraday_history_cache_key",
     "fetch_yfinance_daily_history",
     "fetch_yfinance_intraday_history",
+    "fetch_yfinance_market_snapshot",
     "fetch_yfinance_snapshot",
     "fetch_yfinance_vwap_snapshot",
 ]

@@ -17,6 +17,7 @@ from app.data.market_data_provider import (
     fetch_yfinance_daily_history,
     fetch_yfinance_intraday_history,
 )
+from app.domain.models.market_data import MarketDataBundle
 from app.domain.models.technical_snapshot import TechnicalSnapshot
 from app.domain.policies.technical_indicators import build_technical_snapshot
 
@@ -76,8 +77,32 @@ class TechnicalAnalysisService:
 
     def build_analysis_result(self, *, name: str, code4: str) -> TechnicalAnalysisResult:
         daily_history = self.fetch_daily_history_cached(code4)
-        snapshot = build_technical_snapshot(daily_history)
         intraday_history = self.fetch_intraday_history_cached(code4)
+        return self.build_analysis_result_from_histories(
+            name=name,
+            code4=code4,
+            daily_history=daily_history,
+            intraday_history=intraday_history,
+        )
+
+    @staticmethod
+    def build_analysis_result_from_bundle(*, name: str, bundle: MarketDataBundle) -> TechnicalAnalysisResult:
+        return TechnicalAnalysisService.build_analysis_result_from_histories(
+            name=name,
+            code4=bundle.code4,
+            daily_history=bundle.daily_history,
+            intraday_history=bundle.intraday_history,
+        )
+
+    @staticmethod
+    def build_analysis_result_from_histories(
+        *,
+        name: str,
+        code4: str,
+        daily_history: pd.DataFrame,
+        intraday_history: pd.DataFrame,
+    ) -> TechnicalAnalysisResult:
+        snapshot = build_technical_snapshot(daily_history)
         vwap_snapshot = (
             build_intraday_vwap_snapshot(intraday_history)
             if not intraday_history.empty

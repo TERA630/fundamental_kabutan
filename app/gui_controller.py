@@ -10,11 +10,13 @@ from app.data.file_cache import FileCache
 from app.data.kabutan_repository import KabutanForecastRepository
 from app.data.market_data_provider import fetch_yfinance_snapshot
 from app.data.watchlist_repository import fetch_watchlist_entries
+from app.domain.models.market_data import MarketDataBundle
 from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
 from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
+from app.domain.usecases.market_data import MarketDataService
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.domain.builders.institutional_summary import build_institutional_summary_text
 from app.domain.builders.technical_output import build_technical_output
@@ -46,6 +48,10 @@ def build_default_technical_service(file_cache: FileCache) -> TechnicalAnalysisS
     return TechnicalAnalysisService(file_cache=file_cache)
 
 
+def build_default_market_data_service(file_cache: FileCache) -> MarketDataService:
+    return MarketDataService(file_cache=file_cache)
+
+
 class FundamentalGuiController:
     """GUI層コントローラー: 表示以外のオーケストレーションを担当。"""
 
@@ -54,12 +60,41 @@ class FundamentalGuiController:
         file_cache: FileCache | None = None,
         build_fundamental_service: Callable[[FileCache], FundamentalAnalysisService] | None = None,
         build_technical_service: Callable[[FileCache], TechnicalAnalysisService] | None = None,
+        build_market_data_service: Callable[[FileCache], MarketDataService] | None = None,
     ):
         self.file_cache = file_cache or FileCache()
         self.resolve_kabutan_html_dir_usecase = ResolveKabutanHtmlDirUseCase()
         self.resolve_watchlist_path_usecase = ResolveWatchlistPathUseCase()
+        self._uses_default_fundamental_service = build_fundamental_service is None
+        self._uses_default_technical_service = build_technical_service is None
         self.build_fundamental_service = build_fundamental_service or build_default_fundamental_service
         self.build_technical_service = build_technical_service or build_default_technical_service
+        self.build_market_data_service = build_market_data_service or build_default_market_data_service
+        self._market_data_bundle_cache: dict[str, MarketDataBundle] = {}
+
+    def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
+        cached = self._market_data_bundle_cache.get(code4)
+        if cached is not None:
+            return cached
+        bundle = self.build_market_data_service(self.file_cache).fetch_bundle(code4)
+        self._market_data_bundle_cache[code4] = bundle
+        return bundle
+
+    def _build_default_fundamental_service_with_market_bundle(self, bundle: MarketDataBundle) -> FundamentalAnalysisService:
+        kabutan_repository = KabutanForecastRepository(file_cache=self.file_cache)
+
+        def fetch_market_snapshot(code4: str):
+            if code4 == bundle.code4:
+                return bundle.snapshot.to_dict()
+            return fetch_yfinance_snapshot(code4)
+
+        return FundamentalAnalysisService(
+            file_cache=self.file_cache,
+            fetch_market_snapshot=fetch_market_snapshot,
+            fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
+                repository=kabutan_repository
+            ),
+        )
 
     def fetch_resolved_kabutan_html_dir(self) -> ResolvedKabutanHtmlDir:
         cached_dir = self.file_cache.fetch_kabutan_html_dir_cache()
@@ -97,7 +132,11 @@ class FundamentalGuiController:
         if cached_output is not None:
             return cached_output
 
-        service = self.build_fundamental_service(self.file_cache)
+        if self._uses_default_fundamental_service:
+            bundle = self.fetch_market_data_bundle(code4)
+            service = self._build_default_fundamental_service_with_market_bundle(bundle)
+        else:
+            service = self.build_fundamental_service(self.file_cache)
         output = service.build_analysis_output(
             name,
             code4,
@@ -128,8 +167,12 @@ class FundamentalGuiController:
         name: str,
         code4: str,
     ) -> str:
-        service = self.build_technical_service(self.file_cache)
-        result = service.build_analysis_result(name=name, code4=code4)
+        if self._uses_default_technical_service:
+            bundle = self.fetch_market_data_bundle(code4)
+            result = TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
+        else:
+            service = self.build_technical_service(self.file_cache)
+            result = service.build_analysis_result(name=name, code4=code4)
         return build_technical_output(result)
 
     def fetch_institutional_summary_text(
@@ -139,11 +182,17 @@ class FundamentalGuiController:
         code4: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        technical_service = self.build_technical_service(self.file_cache)
-        technical_result = technical_service.build_analysis_result(name=name, code4=code4)
+        if self._uses_default_technical_service and self._uses_default_fundamental_service:
+            bundle = self.fetch_market_data_bundle(code4)
+            technical_result = TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
+            fundamental_service = self._build_default_fundamental_service_with_market_bundle(bundle)
+            price_snapshot = bundle.snapshot.to_dict()
+        else:
+            technical_service = self.build_technical_service(self.file_cache)
+            technical_result = technical_service.build_analysis_result(name=name, code4=code4)
 
-        fundamental_service = self.build_fundamental_service(self.file_cache)
-        price_snapshot = fundamental_service.fetch_price_snapshot(code4)
+            fundamental_service = self.build_fundamental_service(self.file_cache)
+            price_snapshot = fundamental_service.fetch_price_snapshot(code4)
         cf_scoring_input = None
         if kabutan_html_dir is not None:
             kabutan_fetch_result = fundamental_service.fetch_kabutan_forecast_pair(code4, html_dir=kabutan_html_dir)
@@ -188,5 +237,6 @@ __all__ = [
     "FUNDAMENTAL_SUMMARY_FILENAME_PREFIX",
     "FundamentalGuiController",
     "build_fundamental_summary_filename",
+    "build_default_market_data_service",
     "build_default_technical_service",
 ]

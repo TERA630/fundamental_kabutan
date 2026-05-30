@@ -2,8 +2,40 @@ from pathlib import Path
 from datetime import date
 from types import SimpleNamespace
 
+import pandas as pd
+
 from app.data.file_cache import FileCache
 from app.gui_controller import FundamentalGuiController, build_fundamental_summary_filename
+from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
+
+
+def _daily_history(rows: int = 70) -> pd.DataFrame:
+    index = pd.date_range("2026-01-01", periods=rows, freq="B")
+    close = pd.Series([100 + i for i in range(rows)], index=index, dtype=float)
+    return pd.DataFrame(
+        {
+            "Open": close - 1,
+            "High": close + 2,
+            "Low": close - 3,
+            "Close": close,
+            "Volume": [1000 + i for i in range(rows)],
+        },
+        index=index,
+    )
+
+
+def _intraday_history() -> pd.DataFrame:
+    index = pd.date_range("2026-05-29 09:00", periods=2, freq="5min")
+    return pd.DataFrame(
+        {
+            "Open": [168.0, 169.0],
+            "High": [170.0, 171.0],
+            "Low": [167.0, 168.0],
+            "Close": [169.0, 170.0],
+            "Volume": [1000.0, 2000.0],
+        },
+        index=index,
+    )
 
 
 class DummyService:
@@ -128,6 +160,33 @@ def test_fetch_technical_output_uses_injected_technical_service(tmp_path: Path, 
 
     assert output == "TECH"
     assert dummy_service.calls == [("トヨタ", "7203")]
+
+
+def test_default_controller_reuses_market_data_bundle_for_technical_and_summary(tmp_path: Path, monkeypatch):
+    calls = {"bundle": 0}
+
+    class DummyMarketDataService:
+        def fetch_bundle(self, code4):
+            calls["bundle"] += 1
+            return MarketDataBundle(
+                code4=code4,
+                daily_history=_daily_history(),
+                intraday_history=_intraday_history(),
+                snapshot=MarketSnapshot(price=169.0, market_cap=3_000_000_000_000.0),
+            )
+
+    monkeypatch.setattr("app.gui_controller.build_technical_output", lambda _result: "TECH")
+    controller = FundamentalGuiController(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_market_data_service=lambda _cache: DummyMarketDataService(),
+    )
+
+    output = controller.fetch_technical_output(name="トヨタ", code4="7203")
+    text = controller.fetch_institutional_summary_text(name="トヨタ", code4="7203", kabutan_html_dir=None)
+
+    assert output == "TECH"
+    assert "機関投資サマリ" in text
+    assert calls["bundle"] == 1
 
 
 def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path: Path):

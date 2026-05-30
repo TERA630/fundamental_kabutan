@@ -70,6 +70,37 @@ def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypa
     assert len(out) == 3
 
 
+def test_build_market_snapshot_from_daily_history_uses_latest_close():
+    snapshot = provider.build_market_snapshot_from_daily_history(_history())
+
+    assert snapshot.price == 103.0
+    assert snapshot.as_of == "2026-05-29 終値"
+
+
+def test_fetch_yfinance_market_snapshot_reuses_daily_history_without_history_call(monkeypatch):
+    class FakeTicker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+            self.fast_info = {"market_cap": 123_000_000.0}
+            self.info = {"trailingPE": 12.5, "priceToBook": 1.2, "sector": "輸送用機器"}
+
+        def history(self, **_kwargs):
+            raise AssertionError("daily_history should be reused")
+
+    class FakeYf:
+        Ticker = FakeTicker
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    snapshot = provider.fetch_yfinance_market_snapshot("7203", daily_history=_history())
+
+    assert snapshot.price == 103.0
+    assert snapshot.market_cap == 123_000_000.0
+    assert snapshot.per == 12.5
+    assert snapshot.pbr == 1.2
+    assert snapshot.industry == "輸送用機器"
+
+
 def test_build_intraday_vwap_snapshot_filters_zero_volume():
     snapshot = provider.build_intraday_vwap_snapshot(_history())
 
