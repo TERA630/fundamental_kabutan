@@ -7,11 +7,12 @@ from typing import Any
 from app.domain.builders.fundamental_output import build_fundamental_output_text, build_fundamental_output_sections
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
 from app.domain.models.analyst_estimates import AnalystEstimates
-from app.domain.models.cf_scoring_result import CfScoringResult
+from app.domain.models.cf_scoring_result import CfScoringResult, MetricScore
 from app.domain.models.display_sections import (
     DisplaySections,
     OpeningSummarySection,
     RuleNotesSection,
+    ScoreBreakdownSection,
     ScoreCategorySection,
     ScoreSummarySection,
     Section,
@@ -22,13 +23,39 @@ from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
+from app.domain.policies.cf_scoring import score_sales_cagr_3y
 from app.presentation.display_formatter import format_sections
 
 
 logger = logging.getLogger(__name__)
 
 
-def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool = False) -> list[Section]:
+def _rank_operating_profit_cagr(value: float | None) -> str:
+    return score_sales_cagr_3y(value).rank
+
+
+def _build_growth_display_metrics(scoring: CfScoringResult, operating_profit_cagr_3y: float | None) -> list[MetricScore]:
+    by_id = {metric.metric_id: metric for metric in scoring.growth.metrics}
+    metrics: list[MetricScore] = []
+    for metric_id in ("sales_cagr_3y", "eps_cagr_3y"):
+        metric = by_id.get(metric_id)
+        if metric is not None:
+            metrics.append(metric)
+        if metric_id == "sales_cagr_3y" and operating_profit_cagr_3y is not None:
+            metrics.append(
+                MetricScore(
+                    "operating_profit_cagr_3y",
+                    "growth",
+                    operating_profit_cagr_3y,
+                    _rank_operating_profit_cagr(operating_profit_cagr_3y),
+                    0,
+                    0,
+                )
+            )
+    return metrics
+
+
+def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool = False, operating_profit_cagr_3y: float | None = None) -> list[Section]:
     sections: list[Section] = []
     if include_summary:
         sections.append(
@@ -44,8 +71,13 @@ def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool
 
     sections.extend(
         [
+            ScoreBreakdownSection(
+                quality_points=scoring.quality.subtotal,
+                growth_points=scoring.growth.subtotal,
+                valuation_points=scoring.valuation.subtotal,
+            ),
             ScoreCategorySection("Quality", scoring.quality.subtotal, scoring.quality.max_points, list(scoring.quality.metrics)),
-            ScoreCategorySection("Growth", scoring.growth.subtotal, scoring.growth.max_points, list(scoring.growth.metrics)),
+            ScoreCategorySection("Growth", scoring.growth.subtotal, scoring.growth.max_points, _build_growth_display_metrics(scoring, operating_profit_cagr_3y)),
             ScoreCategorySection("Valuation", scoring.valuation.subtotal, scoring.valuation.max_points, list(scoring.valuation.metrics)),
             RuleNotesSection(
                 [
@@ -92,11 +124,12 @@ def _merge_scoring_sections(
     scoring: CfScoringResult,
     *,
     growth_phase: str | None,
+    operating_profit_cagr_3y: float | None,
     per_level: str | None,
     roic_level: str | None,
 ) -> DisplaySections:
     merged: list[Section] = []
-    scoring_details = build_cf_scoring_sections(scoring)
+    scoring_details = build_cf_scoring_sections(scoring, operating_profit_cagr_3y=operating_profit_cagr_3y)
     inserted_summary = False
     inserted_details = False
 
@@ -157,6 +190,7 @@ def build_fundamental_output(
     growth_phase: str | None = None,
     per_level: str | None = None,
     roic_level: str | None = None,
+    operating_profit_cagr_3y: float | None = None,
 ) -> str:
     """ドメイン層の出力生成ビルダーを呼び出す。"""
     base_output = build_fundamental_output_text(
@@ -188,6 +222,7 @@ def build_fundamental_output(
                 sections,
                 cf_scoring_result,
                 growth_phase=growth_phase,
+                operating_profit_cagr_3y=operating_profit_cagr_3y,
                 per_level=per_level,
                 roic_level=roic_level,
             )

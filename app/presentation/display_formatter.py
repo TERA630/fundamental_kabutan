@@ -16,6 +16,7 @@ from app.domain.models.display_sections import (
     OpeningSummarySection,
     QuarterlyMetricsSection,
     RuleNotesSection,
+    ScoreBreakdownSection,
     ScoreCategorySection,
     ScoreSummarySection,
     SummarySection,
@@ -35,6 +36,7 @@ METRIC_LABELS = {
     "fcf_ratio": "FCF Ratio(FCF/OCF)",
     "eps_cagr_3y": "EPS CAGR(3y)",
     "sales_cagr_3y": "売上CAGR(3y)",
+    "operating_profit_cagr_3y": "営業利益CAGR(3y)",
     "fcf_yield": "FCF Yield",
     "per": "PER",
 }
@@ -200,7 +202,11 @@ def _format_rule_note(note: str) -> str:
 
 
 def _format_metric_raw_value(metric: MetricScore) -> str:
-    if metric.metric_id == "fcf_yield":
+    if metric.raw_value is None:
+        return "N/A"
+    if metric.metric_id == "per":
+        return f"{metric.raw_value:.1f}倍"
+    if metric.metric_id in {"roic", "ocf_margin", "op_margin", "fcf_ratio", "eps_cagr_3y", "sales_cagr_3y", "operating_profit_cagr_3y", "fcf_yield"}:
         return f"{metric.raw_value:.2f}%"
     return f"{metric.raw_value:.2f}"
 
@@ -221,13 +227,17 @@ def _format_metric_score(metric: MetricScore, label_width: int) -> str | None:
         )
         return None
 
-    return f"{label:<{label_width}} {metric.rank:<3} {metric.points:>2}/{metric.max_points:<2} {_format_metric_raw_value(metric)}"
+    return f"{label:<{label_width}} {_format_metric_raw_value(metric)}({metric.rank})"
+
+
+def format_score_breakdown(section: ScoreBreakdownSection) -> List[str]:
+    return [f"Quality {section.quality_points}点 Growth {section.growth_points}点 Valuation {section.valuation_points}点"]
 
 
 def format_score_category(section: ScoreCategorySection) -> List[str]:
     labels = [METRIC_LABELS.get(metric.metric_id, metric.metric_id) for metric in section.metrics if metric.raw_value is not None]
     label_width = max([len(label) for label in labels] + [12])
-    lines = [f"[{section.title}] {section.subtotal}/{section.max_points}"]
+    lines = [f"[{section.title}]"]
     for metric in section.metrics:
         formatted = _format_metric_score(metric, label_width)
         if formatted is not None:
@@ -393,6 +403,8 @@ def format_sections(sections: DisplaySections) -> str:
             lines.extend(format_summary(s))
         elif isinstance(s, ScoreSummarySection):
             lines.extend(format_score_summary(s))
+        elif isinstance(s, ScoreBreakdownSection):
+            lines.extend(format_score_breakdown(s))
         elif isinstance(s, ValuationTableSection):
             lines.extend(format_valuation(s))
         elif isinstance(s, AnalystEstimatesSection):

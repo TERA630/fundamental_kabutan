@@ -171,6 +171,24 @@ def _calculate_growth_score_cagrs(forecast_pair: KabutanForecastPair) -> tuple[f
     )
 
 
+def calculate_operating_profit_cagr_3y(forecast_pair: KabutanForecastPair | None) -> float | None:
+    if forecast_pair is None:
+        return None
+    row_by_year = select_cagr_row_by_year(build_growth_rows(_forecast_rows(forecast_pair)))
+    if not row_by_year:
+        return None
+
+    cagr_end_year = max(row_by_year.keys())
+    cagr_start_year = cagr_end_year - 3
+    start_row = row_by_year.get(cagr_start_year)
+    end_row = row_by_year.get(cagr_end_year)
+    return calc_cagr(
+        start_row.operating_profit if start_row else None,
+        end_row.operating_profit if end_row else None,
+        3,
+    )
+
+
 def build_per_level(*, cf_scoring_input: CfScoringInput | None, industry: float | str | None) -> PerLevel | None:
     industry_text = industry if isinstance(industry, str) else None
     per = cf_scoring_input.per if cf_scoring_input is not None else None
@@ -250,6 +268,7 @@ __all__ = [
     "build_financial_metric_rows",
     "build_growth_phase",
     "build_per_level",
+    "calculate_operating_profit_cagr_3y",
     "build_quarterly_metric_rows",
     "build_roic_level",
     "resolve_cf_scoring_as_of",

@@ -73,6 +73,7 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert captured["per_level"] == "割安PER"
     assert captured["roic_level"] == "高ROIC"
     assert isinstance(captured["analyst_estimates"], AnalystEstimates)
+    assert captured["operating_profit_cagr_3y"] is not None
 
 
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():

@@ -64,6 +64,13 @@ class ScoreSummarySection:
 
 
 @dataclass
+class ScoreBreakdownSection:
+    quality_points: int
+    growth_points: int
+    valuation_points: int
+
+
+@dataclass
 class ScoreCategorySection:
     title: str
     subtotal: int
@@ -135,6 +142,7 @@ Section = (
     | OpeningSummarySection
     | AnalystEstimatesSection
     | ScoreSummarySection
+    | ScoreBreakdownSection
     | ValuationTableSection
     | ScoreCategorySection
     | RuleNotesSection

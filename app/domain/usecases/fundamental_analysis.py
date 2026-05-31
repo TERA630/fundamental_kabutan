@@ -182,6 +182,7 @@ class FundamentalAnalysisService:
                 industry=price_snapshot.get("industry"),
             ),
             "roic_level": self.build_roic_level(cf_scoring_input),
+            "operating_profit_cagr_3y": calculations.calculate_operating_profit_cagr_3y(kabutan_fetch_result.pair),
         }
         signature = inspect.signature(build_output_fn)
         accepts_var_keyword = any(
