@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from app.data.utils import safe_float
-from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPeriod, EpsTrendPeriod
+from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPeriod
 from app.domain.models.market_data import MarketSnapshot
 
 try:
@@ -61,13 +61,10 @@ def fetch_yfinance_analyst_estimates(code4: str) -> AnalystEstimates:
     try:
         ticker = yf.Ticker(f"{code4}.T")
         info = getattr(ticker, "info", None) or {}
-        eps_trend = getattr(ticker, "eps_trend", None)
         eps_revisions = _get_eps_revisions_frame(ticker)
         return AnalystEstimates(
             target_mean_price=safe_float(info.get("targetMeanPrice")),
             number_of_analyst_opinions=_safe_int(info.get("numberOfAnalystOpinions")),
-            current_year_eps_trend=_build_eps_trend_period(eps_trend, "0y"),
-            next_year_eps_trend=_build_eps_trend_period(eps_trend, "+1y"),
             current_year_eps_revisions=_build_eps_revision_period(eps_revisions, "0y"),
             next_year_eps_revisions=_build_eps_revision_period(eps_revisions, "+1y"),
         )
@@ -108,21 +105,9 @@ def _frame_value(frame_like: Any, row_key: str, column: str) -> Any:
     return row[column]
 
 
-def _build_eps_trend_period(frame_like: Any, row_key: str) -> EpsTrendPeriod:
-    return EpsTrendPeriod(
-        current=safe_float(_frame_value(frame_like, row_key, "current")),
-        days_7_ago=safe_float(_frame_value(frame_like, row_key, "7daysAgo")),
-        days_30_ago=safe_float(_frame_value(frame_like, row_key, "30daysAgo")),
-        days_60_ago=safe_float(_frame_value(frame_like, row_key, "60daysAgo")),
-        days_90_ago=safe_float(_frame_value(frame_like, row_key, "90daysAgo")),
-    )
-
-
 def _build_eps_revision_period(frame_like: Any, row_key: str) -> EpsRevisionPeriod:
     return EpsRevisionPeriod(
-        up_last_7_days=_safe_int(_frame_value(frame_like, row_key, "upLast7days")),
         up_last_30_days=_safe_int(_frame_value(frame_like, row_key, "upLast30days")),
-        down_last_7_days=_safe_int(_frame_value(frame_like, row_key, "downLast7days")),
         down_last_30_days=_safe_int(_frame_value(frame_like, row_key, "downLast30days")),
     )
 

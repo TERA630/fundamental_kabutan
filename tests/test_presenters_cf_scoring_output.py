@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPeriod, EpsTrendPeriod
+from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPeriod
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
 from app.domain.builders.fundamental_output import build_fundamental_output_sections
 from app.domain.models.display_sections import (
@@ -208,10 +208,8 @@ def test_build_fundamental_output_formats_analyst_estimates():
     estimates = AnalystEstimates(
         target_mean_price=2500.0,
         number_of_analyst_opinions=9,
-        current_year_eps_trend=EpsTrendPeriod(current=120.0, days_7_ago=118.0, days_30_ago=115.0, days_60_ago=112.0, days_90_ago=110.0),
-        next_year_eps_trend=EpsTrendPeriod(current=140.0, days_7_ago=138.0, days_30_ago=135.0, days_60_ago=132.0, days_90_ago=130.0),
-        current_year_eps_revisions=EpsRevisionPeriod(up_last_7_days=1, up_last_30_days=3, down_last_7_days=5, down_last_30_days=7),
-        next_year_eps_revisions=EpsRevisionPeriod(up_last_7_days=2, up_last_30_days=4, down_last_7_days=6, down_last_30_days=8),
+        current_year_eps_revisions=EpsRevisionPeriod(up_last_30_days=3, down_last_30_days=7),
+        next_year_eps_revisions=EpsRevisionPeriod(up_last_30_days=4, down_last_30_days=8),
     )
 
     out = build_fundamental_output(
@@ -224,9 +222,11 @@ def test_build_fundamental_output_formats_analyst_estimates():
     )
 
     assert "アナリスト目標株価：2,500.0 円 (アナリスト 9人)" in out
-    assert "今期末 110.0→112.0→115.0→118.0→120.0" in out
-    assert "来季末 130.0→132.0→135.0→138.0→140.0" in out
-    assert "今期末： 上方修正 3人（7日 1人）　下方修正 7人（7日 5人）" in out
+    assert "EPS revisions (30日):" in out
+    assert "今期末： 上方修正 3人　下方修正 7人" in out
+    assert "来季末： 上方修正 4人　下方修正 8人" in out
+    assert "EPS trend" not in out
+    assert "7日" not in out
 
 
 def test_build_fundamental_output_integrates_capital_efficiency_into_valuation_block():

@@ -244,16 +244,19 @@
 **表示形式**
 
 ```
-[Quality] xx/60
-ROIC                 B    9/15 xx.xx
-Cash Conversion...  S   15/15 x.xx
-営業CFマージン       B    6/10 xx.xx
-営業利益率           D    0/10 xx.xx
-FCF Ratio...        B    4/10 x.xx
+Quality xx点 Growth xx点 Valuation xx点
+[Quality]
+ROIC                    xx.xx%(E)
+Cash Conversion         x.xx(S)
+営業CFマージン          xx.xx%(B)
+営業利益率              xx.xx%(D)
+FCF Ratio(FCF/OCF)      xx.xx%(B)
 ```
 
-- 1行目は `[Quality] {subtotal}/{max_points}` とする。
-- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- スコア詳細の冒頭に `Quality {quality_subtotal}点 Growth {growth_subtotal}点 Valuation {valuation_subtotal}点` を表示する。
+- カテゴリ見出しは `[Quality]` のみとし、小計・満点は表示しない。
+- 明細行は `指標名 / 値(ランク)` の列順で表示する。
+- メトリクス個別点数は表示しない。
 - 値欠損の指標行は省略可能とし、内部ログに `取得不可: {指標名} (値欠損)` を出力する。
 
 ### 5.7 Growth スコアブロック
@@ -261,30 +264,35 @@ FCF Ratio...        B    4/10 x.xx
 **表示形式**
 
 ```
-[Growth] xx/25
-EPS CAGR(3y)        S   15/15 xx.xx
-売上CAGR(3y)        A    8/10 xx.xx
+[Growth]
+売上CAGR(3y)          xx.xx%(B)
+営業利益CAGR(3y)      xx.xx%(B)
+EPS CAGR(3y)          xx.xx%(A)
 ```
 
-- 1行目は `[Growth] {subtotal}/{max_points}` とする。
-- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- カテゴリ見出しは `[Growth]` のみとし、小計・満点は表示しない。
+- 明細行は `指標名 / 値(ランク)` の列順で表示する。
+- メトリクス個別点数は表示しない。
 - `EPS CAGR(3y)` / `売上CAGR(3y)` は、5.10 `成長性経時ブロック` と同じ終了年判定およびCAGR計算を使う。
+- `営業利益CAGR(3y)` は表示対象とする。ただしrankCF採点メトリクスではないため、ランク付与ルールは実装時に既存成長ランク基準へ合わせる。
 
 ### 5.8 Valuation スコアブロック
 
 **表示形式**
 
 ```
-[Valuation] xx/15
-FCF Yield           D    0/10 x.xx%
-PER                 D    1/5  xx.xx
+[Valuation]
+FCF Yield             x.xx%(D)
+PER                   xxx.x倍(E)
 ルール注記:
 - なし
 ```
 
-- 1行目は `[Valuation] {subtotal}/{max_points}` とする。
-- 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- カテゴリ見出しは `[Valuation]` のみとし、小計・満点は表示しない。
+- 明細行は `指標名 / 値(ランク)` の列順で表示する。
+- メトリクス個別点数は表示しない。
 - `FCF Yield` の値は `%` 付きで表示する。
+- `PER` の値は `倍` 付きで表示する。
 - `ルール注記` は日本語表示とし、内部識別子（英語キー）は表示しない。
 
 **欠損値の表示ルール**

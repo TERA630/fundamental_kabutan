@@ -101,22 +101,10 @@ def test_fetch_yfinance_market_snapshot_reuses_daily_history_without_history_cal
     assert snapshot.industry == "輸送用機器"
 
 
-def test_fetch_yfinance_analyst_estimates_reads_year_rows(monkeypatch):
-    eps_trend = pd.DataFrame(
-        {
-            "current": [120.0, 140.0],
-            "7daysAgo": [118.0, 138.0],
-            "30daysAgo": [115.0, 135.0],
-            "60daysAgo": [112.0, 132.0],
-            "90daysAgo": [110.0, 130.0],
-        },
-        index=["0y", "+1y"],
-    )
+def test_fetch_yfinance_analyst_estimates_reads_year_revision_30day_rows(monkeypatch):
     eps_revisions = pd.DataFrame(
         {
-            "upLast7days": [1, 2],
             "upLast30days": [3, 4],
-            "downLast7days": [5, 6],
             "downLast30days": [7, 8],
         },
         index=["0y", "+1y"],
@@ -126,7 +114,6 @@ def test_fetch_yfinance_analyst_estimates_reads_year_rows(monkeypatch):
         def __init__(self, symbol):
             self.symbol = symbol
             self.info = {"targetMeanPrice": 2500.0, "numberOfAnalystOpinions": 9}
-            self.eps_trend = eps_trend
             self.eps_revisions = eps_revisions
 
     class FakeYf:
@@ -138,11 +125,9 @@ def test_fetch_yfinance_analyst_estimates_reads_year_rows(monkeypatch):
 
     assert estimates.target_mean_price == 2500.0
     assert estimates.number_of_analyst_opinions == 9
-    assert estimates.current_year_eps_trend.days_90_ago == 110.0
-    assert estimates.current_year_eps_trend.current == 120.0
-    assert estimates.next_year_eps_trend.days_7_ago == 138.0
     assert estimates.current_year_eps_revisions.up_last_30_days == 3
-    assert estimates.current_year_eps_revisions.up_last_7_days == 1
+    assert estimates.current_year_eps_revisions.down_last_30_days == 7
+    assert estimates.next_year_eps_revisions.up_last_30_days == 4
     assert estimates.next_year_eps_revisions.down_last_30_days == 8
 
 

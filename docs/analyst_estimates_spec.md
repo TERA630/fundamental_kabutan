@@ -2,8 +2,8 @@
 
 ## 目的
 
-Fundamental画面に、yFinanceから取得できるアナリスト目標株価、EPSトレンド、EPS修正人数を表示する。
-現時点ではyFinanceの取得安定性を確認する段階のため、表示項目は多めに残し、今後の運用で集約する。
+Fundamental画面に、yFinanceから取得できるアナリスト目標株価とEPS修正人数を表示する。
+EPS trendは表示対象から外し、EPS revisionsは過去30日のみを表示する。
 
 ## 取得元
 
@@ -11,7 +11,6 @@ Fundamental画面に、yFinanceから取得できるアナリスト目標株価�
 - 目標株価とアナリスト人数は `ticker.info` から取得する。
   - `targetMeanPrice`
   - `numberOfAnalystOpinions`
-- EPSトレンドは `ticker.eps_trend` のPandas DataFrameから取得する。
 - EPS修正人数は `ticker.eps_revisions` のPandas DataFrameから取得する。
   - 互換性のため、属性名が `eps_revisons` の場合もフォールバックとして参照する。
 
@@ -21,20 +20,19 @@ Fundamental画面に、yFinanceから取得できるアナリスト目標株価�
 - 年度末行のみ表示する。
   - `0y`: 今期末
   - `+1y`: 来季末
-- EPS trendは `90daysAgo -> 60daysAgo -> 30daysAgo -> 7daysAgo -> current` の順で表示する。
-- EPS revisionsは30日を標準表示とし、7日も併記する。
+- EPS revisionsは過去30日のみ表示する。
+  - `upLast30days`: 上方修正人数
+  - `downLast30days`: 下方修正人数
+- 7日修正人数は取得・DTO保持・表示の対象外とする。
+- 目標株価乖離率は `(targetMeanPrice - 現在株価) / 現在株価 * 100` で算出し、符号付き1桁小数の%で表示する。
 
 ## 表示形式
 
 ```text
-■アナリスト予想(yFinance)
-アナリスト目標株価：{targetMeanPrice} 円 (アナリスト {numberOfAnalystOpinions}人)
-EPS trend :
-  今期末 {90daysAgo}→{60daysAgo}→{30daysAgo}→{7daysAgo}→{current}
-  来季末 {90daysAgo}→{60daysAgo}→{30daysAgo}→{7daysAgo}→{current}
-EPS revisions (30日 / 7日):
-今期末： 上方修正 {upLast30days}人（7日 {upLast7days}人）　下方修正 {downLast30days}人（7日 {downLast7days}人）
-来季末： 上方修正 {upLast30days}人（7日 {upLast7days}人）　下方修正 {downLast30days}人（7日 {downLast7days}人）
+■アナリスト
+目標株価 {targetMeanPrice}円(現価格との乖離{targetGapPct}%：アナリスト{numberOfAnalystOpinions}人)
+今期EPS修正 ↑{currentYearUpLast30days} ↓{currentYearDownLast30days}
+来季EPS修正 ↑{nextYearUpLast30days} ↓{nextYearDownLast30days}
 ```
 
 ## 欠損時の扱い
@@ -45,7 +43,7 @@ EPS revisions (30日 / 7日):
 
 ## 実装方針
 
-- `app.domain.models.analyst_estimates` にDTOを追加する。
+- `app.domain.models.analyst_estimates` のDTOからEPS trendと7日修正人数を削除し、30日修正人数のみ保持する。
 - `app.data.market_data_provider.fetch_yfinance_analyst_estimates()` がyFinance値をDTOへ正規化する。
 - `FundamentalAnalysisService` が既存yFinance TTLと同じ12時間でアナリスト予想をキャッシュする。
 - `build_fundamental_output()` のDTO表示経路に `AnalystEstimatesSection` を追加し、株価評価・資本効率ブロックの後、株探ブロックの前に表示する。
