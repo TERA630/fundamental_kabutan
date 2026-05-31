@@ -258,6 +258,32 @@ def test_build_kabutan_output_summarizes_growth_with_cagr_lines():
     assert "営業利益成長率" not in out
 
 
+def test_build_kabutan_output_uses_latest_complete_growth_year_for_cagr():
+    rows = (
+        KabutanForecastRow("2023.03", 2023, 3, "実績", 92242, 49891, 51283, 36296, 1496.6, 300.0),
+        KabutanForecastRow("2024.03", 2024, 3, "実績", 96729, 49501, 51929, 36964, 1524.1, 300.0),
+        KabutanForecastRow("2025.03", 2025, 3, "実績", 105915, 54978, 56101, 39866, 1643.8, 350.0),
+        KabutanForecastRow("2026.03", 2026, 3, "実績", 116929, 59576, 63576, 44519, 1835.6, 550.0),
+        KabutanForecastRow("2027.03", 2027, 3, "予想", None, None, None, None, None, 550.0),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=rows[1],
+        previous_actual=rows[2],
+        current_actual=rows[3],
+        current_forecast=None,
+        next_forecast=rows[4],
+        all_rows=rows,
+    )
+
+    out = build_kabutan_forecast_output("base", pair, "html", None)
+
+    assert "2027/03(予)" in out
+    assert "売上CAGR 2023→2026" in out
+    assert "営業利益CAGR 2023→2026" in out
+    assert "EPS CAGR 2023→2026" in out
+    assert "2024→2027" not in out
+
+
 from app.domain.models.quarterly_financials import Quarter, QuarterlyMetricRow
 
 

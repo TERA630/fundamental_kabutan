@@ -6,7 +6,9 @@ from typing import Any
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
-from app.domain.models.display_sections import SummarySection, ValuationTableSection, DisplaySections
+from app.domain.builders.analyst_estimates_output import build_analyst_estimates_lines
+from app.domain.models.analyst_estimates import AnalystEstimates
+from app.domain.models.display_sections import AnalystEstimatesSection, SummarySection, ValuationTableSection, DisplaySections
 from app.domain.policies.financial_metrics import calc_pbr, calc_roe, calc_roic_approx
 
 
@@ -138,6 +140,7 @@ def build_fundamental_output_sections_impl(
     price: float | None,
     market_cap: float | None,
     market_snapshot: dict[str, Any] | None = None,
+    analyst_estimates: AnalystEstimates | None = None,
     kabutan_forecast_pair: KabutanForecastPair | None = None,
     kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
@@ -195,7 +198,7 @@ def build_fundamental_output_sections_impl(
         roic_values=roic_values,
         fcf_yield_values=fcf_yield_values,
     )
-    return DisplaySections(sections=[summary, valuation])
+    return DisplaySections(sections=[summary, valuation, AnalystEstimatesSection(analyst_estimates or AnalystEstimates.empty())])
 
 
 
@@ -234,7 +237,7 @@ def _build_valuation_lines(per_lines: list[str], dividend_lines: list[str]) -> l
     ]
 
 
-def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> str:
+def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[str, Any] | None, price: float | None, market_cap: float | None, market_snapshot: dict[str, Any] | None = None, analyst_estimates: AnalystEstimates | None = None, kabutan_forecast_pair: KabutanForecastPair | None = None) -> str:
     company_name = str(_first_present(master, ["CompanyName", "Name", "LocalCodeName"]) or name)
     industry_name = str((market_snapshot or {}).get("industry") or _first_present(master, ["S33Nm", "Sector33CodeName", "Sector33Name"]) or "N/A")
 
@@ -255,4 +258,4 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         roe=(market_snapshot or {}).get("roe"),
     )
     valuation_lines = _build_valuation_lines(per_lines, dividend_lines)
-    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines, *valuation_lines])
+    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines, *valuation_lines, *build_analyst_estimates_lines(analyst_estimates)])

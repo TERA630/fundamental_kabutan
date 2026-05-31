@@ -268,6 +268,7 @@ EPS CAGR(3y)        S   15/15 xx.xx
 
 - 1行目は `[Growth] {subtotal}/{max_points}` とする。
 - 明細行は `指標名 / ランク / 点数 / 値` の列順で表示する。
+- `EPS CAGR(3y)` / `売上CAGR(3y)` は、5.10 `成長性経時ブロック` と同じ終了年判定およびCAGR計算を使う。
 
 ### 5.8 Valuation スコアブロック
 
@@ -322,6 +323,9 @@ EPS CAGR YYYY→YYYY xx.x%
 ```
 
 - CAGR の開始年・終了年を解決できない場合は、該当行をラベル付きの `売上CAGR N/A` / `営業利益CAGR N/A` / `EPS CAGR N/A` と表示する。
+- CAGR の終了年は、成長性対象行のうち `売上`・`営業益`・`修正1株益` がすべて取得できている最新年とする。
+- 終了年の翌年以降に、配当のみなど一部指標だけ取得できている予想行が存在しても、CAGR の終了年には採用しない。
+- CAGR の開始年は `終了年 - 3` とする。開始年の行または開始値が欠損する場合、期間ラベルは表示し、値は `N/A` とする。
 - 極小利益からの反転で単年成長率が過大表示されるノイズを避けるため、`EPS成長率` / `営業利益成長率` の年次列は表示しない。
 
 ### 5.11 財務ブロック
@@ -403,167 +407,14 @@ EPS CAGR YYYY→YYYY xx.x%
 
 ---
 
-## 9. GUI層実装工程
+## 9. 実装メモ
 
-### 9.1 Phase 1: 冒頭サマリーDTO / Formatter追加
-
-**状態: 完了（2026-05-28）**
-
-- `OpeningSummarySection` を追加し、冒頭サマリーブロックの表示に必要な値を保持する。
-- `format_opening_summary()` を追加し、5.4 の表示形式に従ってテキスト化する。
-- 既存の `SummarySection` / `ScoreSummarySection` の出力はこの段階では変更しない。
-- Formatter単体テストで、通常表示と欠損時フォールバックを確認する。
-
-**完了内容**
-
-- `OpeningSummarySection` は、銘柄名、4桁コード、株価、時価総額、時価総額分類、総合評価、総合スコア、成長フェーズ、PER水準、ROIC水準を表示する。
-- `format_opening_summary()` は、5.4 の表示形式に従い、通常表示と欠損値の `N/A` フォールバックを扱う。
-- Phase 1 では Presenter 結合を行わず、既存の `SummarySection` / `ScoreSummarySection` の出力を維持する。
-
-### 9.2 Phase 2: Presenter結合
-
-**状態: 完了（2026-05-28）**
-
-- `build_fundamental_output()` が `growth_phase` / `per_level` / `roic_level` を受け取る。
-- `SummarySection` と `ScoreSummarySection` を冒頭で統合し、`OpeningSummarySection` に変換する。
-- 旧表示の `投資分類` / `算出基準` は冒頭サマリーからは出さない。
-- `Quality` / `Growth` / `Valuation` の詳細スコア、ルール注記、バリュエーション表以降の表示順は維持する。
-
-**完了内容**
-
-- `build_fundamental_output()` は `growth_phase` / `per_level` / `roic_level` を受け取り、rankCF結果がある場合に既存の `SummarySection` を `OpeningSummarySection` へ置換する。
-- 冒頭サマリーでは `ScoreSummarySection` の旧形式出力を使わず、総合評価と3分類タグのみを表示する。
-- `投資分類` / `算出基準` は冒頭サマリーから除外し、`Quality` / `Growth` / `Valuation` の詳細スコアと後続セクションの順序は維持する。
-
-### 9.3 Phase 3: 統合テスト更新
-
-**状態: 完了（2026-05-28）**
-
-- `build_fundamental_output()` の期待出力を新冒頭サマリーへ更新する。
-- `FundamentalAnalysisService.build_analysis_output()` から渡される `growth_phase` / `per_level` / `roic_level` が表示へ反映されることを確認する。
-- 全体テスト `python -m pytest` を通す。
-
-**完了内容**
-
-- Presenter統合テストは、新冒頭サマリー、旧 `投資分類` / `算出基準` の非表示、詳細スコアと後続セクション順序の維持を確認する。
-- UseCase統合テストは、`FundamentalAnalysisService.build_analysis_output()` が `growth_phase` / `per_level` / `roic_level` を `build_output_fn` へ渡すことを確認する。
-- 全体テストは環境依存の `bs4` 未導入により収集で停止したため、依存導入後に再実行する。
-
-### 9.4 Phase 4: 株価評価・資本効率ブロック統合
-
-**状態: 完了（2026-05-29）**
-
-- 旧 `バリュエーション` ブロックを `株価評価・資本効率` ブロックへ変更する。
-- PER・配当利回りに加え、PBR・ROE・ROIC・FCF Yield を同じ年次列へ統合する。
-- フル分析出力では後段の独立 `財務ブロック` を表示せず、ROE・ROIC・PBR の確認箇所を株価評価・資本効率ブロックへ集約する。
-- 株探セクション単体出力では、冒頭側へ統合できないため従来の財務ブロック表示を維持する。
-
-**完了内容**
-
-- `ValuationTableSection` に PBR / ROE / ROIC / FCF Yield の表示行を追加した。
-- Presenter のフル出力経路では、財務指標行とCF実績行をバリュエーションDTOへ渡し、後段の財務ブロック重複を抑止する。
-- 株探セクション単体出力では、従来どおり独立した財務ブロックを表示できる。
-
-### 9.5 Phase 5: 成長性ブロックのCAGR集約
-
-**状態: 完了（2026-05-29）**
-
-- 成長性ブロックから単年の `EPS成長率` / `営業利益成長率` 列を外し、売上CAGR・営業利益CAGR・EPS CAGR の3行へ集約する。
-- `GrowthTimelineSection` に売上CAGRを追加し、既存の営業利益CAGR・EPS CAGR と同じ開始年・終了年で表示する。
-
-**完了内容**
-
-- `format_growth_timeline()` は、`■成長性` 配下に CAGR 3行だけを表示する。
-- 極小利益からの反転で単年成長率が極端に大きくなるケースでも、成長性ブロックの視認性を維持する。
-
-### 9.6 Phase 6: CFブロックの意思決定順表示
-
-**状態: 完了（2026-05-29）**
-
-- CFブロックを2表構成から、営業CF・FCF・投資積極性・現金残高の1表へ集約する。
-- FCF 欠損時は、従来どおり営業CF + 投資CFで補完した値を表示する。
-
-**完了内容**
-
-- `format_cashflow_timeline()` は、会社のキャッシュ創出力、投資姿勢、手元流動性を1行で確認できる表示に変更した。
-- Cash Conversion / FCF Yield / FCFマージン / 営業CFマージンは、重複を避けるため CFブロック本文から外した。
-
-### 9.7 Phase 7: 検証記録の更新
-
-**状態: 完了（2026-05-29）**
-
-- 古い `py_compile` 未完了記録を、`python -B -c ...` による import 確認へ代替済みとして整理する。
-- 全体テスト件数を直近の結果へ更新する。
-
-**完了内容**
-
-- `__pycache__` 作成権限に依存する `py_compile` ではなく、`python -B -c` の import 確認を採用する。
-- 全体確認は `python -m pytest` で行う。
-
-### 9.8 Phase 8: スコア内訳の構造化表示
-
-**状態: 完了（2026-05-29）**
-
-- 旧 `Metric: raw -> rank(points)` 形式を廃止し、カテゴリごとに `[Quality] 45/60` の見出しと列揃えの明細行を表示する。
-- 明細行は `指標名 / ランク / 点数 / 値` の順に表示する。
-
-**完了内容**
-
-- `format_score_category()` は `[Category] subtotal/max_points` と構造化明細を返す。
-- 欠損値の指標行省略と取得不可ログは従来どおり維持する。
-
-### 9.9 Phase 9: 四半期トレンド簡略化
-
-**状態: 完了（2026-05-29）**
-
-- 通常出力の四半期ブロックを `■四半期業績推移` 詳細版から `■四半期トレンド` 簡略版へ変更する。
-- 簡略版のカラムは `売上 / 営業利益率 / 昨年同期比 / 修正一株益` とする。
-- `昨年同期比` は売上の前年同四半期比を表示する。
-- 詳細版 Formatter は将来切替用に内部関数として保持する。
-
-**完了内容**
-
-- `QuarterlyMetricRow` に `sales_yoy_pct` を追加した。
-- `BuildQuarterlyFinancialTableUseCase` は前年同四半期の売上から `sales_yoy_pct` を計算する。
-- `format_quarterly_metrics()` は通常出力として四半期トレンド簡略版を返す。
-- `_format_quarterly_metrics_detail()` は詳細版表示として保持する。
-
-### 9.10 Phase 10: 表示提案メモの正本反映整理
-
-**状態: 完了（2026-05-29）**
-
-- `docs/new_display_proposal_from_GPT.md` の提案内容について、採用済み・保留を整理する。
-- 採用済みの表示仕様は本書へ集約し、提案メモは正本ではなく参考メモとして扱う。
-
-**完了内容**
-
-- 冒頭サマリー、株価評価・資本効率、スコア内訳、成長性、CF、四半期トレンドは本書の正本仕様へ反映済み。
-- 通期業績推移の重要指標化は保留とした。
-- `docs/new_display_proposal_from_GPT.md` は採用状況メモへ更新した。
+- 表示DTOは `app/domain/models/display_sections.py` に定義する。
+- 表示文字列への変換は `app/presentation/display_formatter.py` に集約する。
+- 株探通期業績・成長性・CF・四半期トレンドの組み立ては `app/domain/builders/kabutan_output.py` で行う。
+- 本書に反映済みの古いPhase別作業ログは保持しない。未完了の作業が発生した場合のみ、具体的な未解決事項として追記する。
 
 ## 10. 検証状況
 
-- Phase 2/3 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
-- 結果: `24 passed`
-- 追加確認: `python -B -c "import app.presenters; import app.domain.usecases.fundamental_analysis; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
-- 結果: 成功
 - 全体確認: `python -m pytest`
-- 結果: `194 passed, 1 warning`
-- Phase 4 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
-- 結果: `42 passed`
-- Phase 4 import確認: `python -B -c "import app.presenters; import app.domain.builders.fundamental_output; import app.domain.builders.fundamental_output_impl; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
-- 結果: 成功
-- Phase 7 import確認: `python -B -c "import app.presenters; import app.presentation.display_formatter; print('imports ok')"`
-- 結果: 成功
-- Phase 5/6 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`
-- 結果: `42 passed`
-- Phase 5/6 import確認: `python -B -c "import app.presenters; import app.domain.builders.kabutan_output; import app.domain.models.display_sections; import app.presentation.display_formatter; print('imports ok')"`
-- 結果: 成功
-- Phase 8 直近確認: `python -m pytest tests/test_presenters_cf_scoring_output.py tests/test_presenters_kabutan_output.py tests/test_usecase_cf_scoring_integration.py`
-- 結果: `42 passed`
-- Phase 9 直近確認: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_quarterly_growth_metrics.py tests/test_usecase_quarterly_financial_table.py`
-- 結果: `41 passed`
-- Phase 9 import確認: `python -B -c "import app.domain.models.quarterly_financials; import app.presentation.display_formatter; print('imports ok')"`
-- 結果: 成功
-- Phase 10 docs確認: `rg -n "正本ではない|採用済み|保留|Phase 10" docs`
-- 結果: 成功
+- 個別確認の代表例: `python -m pytest tests/test_presenters_kabutan_output.py tests/test_presenters_cf_scoring_output.py tests/test_usecase_cf_scoring_integration.py`

@@ -19,4 +19,12 @@ def build_growth_rows(rows: list[KabutanForecastRow]) -> list[KabutanForecastRow
     return targets
 
 
-__all__ = ["build_growth_rows"]
+def has_complete_cagr_values(row: KabutanForecastRow) -> bool:
+    return row.sales is not None and row.operating_profit is not None and row.revised_eps is not None
+
+
+def select_cagr_row_by_year(growth_rows: list[KabutanForecastRow]) -> dict[int, KabutanForecastRow]:
+    return {row.year: row for row in growth_rows if has_complete_cagr_values(row)}
+
+
+__all__ = ["build_growth_rows", "has_complete_cagr_values", "select_cagr_row_by_year"]

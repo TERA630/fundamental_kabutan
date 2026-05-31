@@ -23,7 +23,7 @@ from app.domain.policies.growth_metrics import (
     calc_operating_growth_rate,
     calc_cagr,
 )
-from app.domain.policies.growth_rows import build_growth_rows
+from app.domain.policies.growth_rows import build_growth_rows, select_cagr_row_by_year
 from app.domain.policies.financial_metrics import calc_pbr, calc_roe, calc_roic_approx
 from app.presentation.display_formatter import format_sections
 
@@ -140,7 +140,7 @@ def _build_growth_section(rows: list[KabutanForecastRow]) -> GrowthTimelineSecti
             )
         )
 
-    row_by_year = _select_cagr_row_by_year(growth_rows)
+    row_by_year = select_cagr_row_by_year(growth_rows)
     if row_by_year:
         cagr_end_year = max(row_by_year.keys())
         cagr_start_year = cagr_end_year - 3
@@ -219,10 +219,6 @@ def build_kabutan_forecast_sections(
         sections.append(_build_financial_section(financial_metric_rows))
     sections.append(QuarterlyMetricsSection(rows=list(quarterly_metric_rows), message=quarterly_message))
     return DisplaySections(sections=sections)
-
-
-def _select_cagr_row_by_year(growth_rows: list[KabutanForecastRow]) -> dict[int, KabutanForecastRow]:
-    return {row.year: row for row in growth_rows}
 
 
 def build_kabutan_forecast_output(

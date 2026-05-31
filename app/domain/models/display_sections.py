@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
+from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.cf_scoring_result import MetricScore
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastRow
@@ -44,6 +45,11 @@ class ValuationTableSection:
     roe_values: List[str] | None = None
     roic_values: List[str] | None = None
     fcf_yield_values: List[str] | None = None
+
+
+@dataclass
+class AnalystEstimatesSection:
+    estimates: AnalystEstimates
 
 
 @dataclass
@@ -126,6 +132,7 @@ class QuarterlyMetricsSection:
 Section = (
     SummarySection
     | OpeningSummarySection
+    | AnalystEstimatesSection
     | ScoreSummarySection
     | ValuationTableSection
     | ScoreCategorySection

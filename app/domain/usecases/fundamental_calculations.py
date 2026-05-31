@@ -11,6 +11,7 @@ from app.domain.models.quarterly_financials import QuarterlyActual, QuarterlyMet
 from app.domain.policies.financial_metrics import calc_roic_approx
 from app.domain.policies.financial_rows import FinancialRowCandidate, select_common_financial_rows
 from app.domain.policies.growth_metrics import calc_cagr
+from app.domain.policies.growth_rows import build_growth_rows, select_cagr_row_by_year
 from app.domain.policies.growth_phase import GrowthPhase, classify_growth_phase_from_rows
 from app.domain.policies.valuation_levels import PerLevel, RoicLevel, classify_per_level, classify_roic_level
 from app.domain.usecases.quarterly_financial_table import BuildQuarterlyFinancialTableUseCase
@@ -141,6 +142,35 @@ def build_growth_phase(forecast_pair: KabutanForecastPair | None) -> GrowthPhase
     return classify_growth_phase_from_rows(rows)
 
 
+def _forecast_rows(forecast_pair: KabutanForecastPair) -> list:
+    return list(forecast_pair.all_rows) if forecast_pair.all_rows else [
+        row
+        for row in (
+            forecast_pair.previous2_actual,
+            forecast_pair.previous_actual,
+            forecast_pair.current_actual,
+            forecast_pair.current_forecast,
+            forecast_pair.next_forecast,
+        )
+        if row is not None
+    ]
+
+
+def _calculate_growth_score_cagrs(forecast_pair: KabutanForecastPair) -> tuple[float | None, float | None]:
+    row_by_year = select_cagr_row_by_year(build_growth_rows(_forecast_rows(forecast_pair)))
+    if not row_by_year:
+        return None, None
+
+    cagr_end_year = max(row_by_year.keys())
+    cagr_start_year = cagr_end_year - 3
+    start_row = row_by_year.get(cagr_start_year)
+    end_row = row_by_year.get(cagr_end_year)
+    return (
+        calc_cagr(start_row.revised_eps if start_row else None, end_row.revised_eps if end_row else None, 3),
+        calc_cagr(start_row.sales if start_row else None, end_row.sales if end_row else None, 3),
+    )
+
+
 def build_per_level(*, cf_scoring_input: CfScoringInput | None, industry: float | str | None) -> PerLevel | None:
     industry_text = industry if isinstance(industry, str) else None
     per = cf_scoring_input.per if cf_scoring_input is not None else None
@@ -194,19 +224,7 @@ def build_cf_scoring_input(
     if per is None and isinstance(market_per, (int, float)):
         per = float(market_per)
 
-    eps_start = latest_actual.revised_eps if latest_actual is not None else None
-    eps_end = forecast_eps
-    eps_years = 1
-    if latest_actual is not None:
-        target_year = forecast_pair.next_forecast.year if forecast_pair.next_forecast is not None else forecast_pair.current_forecast.year
-        eps_years = max(1, target_year - latest_actual.year)
-    eps_cagr_3y = calc_cagr(eps_start, eps_end, eps_years)
-
-    sales_start = latest_actual.sales if latest_actual is not None else None
-    sales_end_row = forecast_pair.next_forecast if forecast_pair.next_forecast is not None else forecast_pair.current_forecast
-    sales_end = sales_end_row.sales
-    sales_years = max(1, sales_end_row.year - latest_actual.year) if latest_actual is not None else 1
-    sales_cagr_3y = calc_cagr(sales_start, sales_end, sales_years)
+    eps_cagr_3y, sales_cagr_3y = _calculate_growth_score_cagrs(forecast_pair)
 
     market_cap_float = float(market_cap) if isinstance(market_cap, (int, float)) else None
     fcf_yield = ((fcf * 1_000_000) / market_cap_float) * 100 if fcf is not None and market_cap_float not in (None, 0.0) else None

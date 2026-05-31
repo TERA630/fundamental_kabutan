@@ -184,3 +184,36 @@ def test_build_cf_scoring_input_prefers_next_forecast_eps_for_per():
     assert scoring_input is not None
     assert scoring_input.per == 10.0
     assert scoring_input.fcf_yield == 2.5
+
+
+def test_build_cf_scoring_input_uses_latest_complete_growth_year_for_cagrs():
+    rows = (
+        KabutanForecastRow("2023.03", 2023, 3, "実績", 92242, 49891, 51283, 36296, 1496.6, 300.0),
+        KabutanForecastRow("2024.03", 2024, 3, "実績", 96729, 49501, 51929, 36964, 1524.1, 300.0),
+        KabutanForecastRow("2025.03", 2025, 3, "実績", 105915, 54978, 56101, 39866, 1643.8, 350.0),
+        KabutanForecastRow("2026.03", 2026, 3, "実績", 116929, 59576, 63576, 44519, 1835.6, 550.0),
+        KabutanForecastRow("2027.03", 2027, 3, "予想", None, None, None, None, None, 550.0),
+    )
+    pair = KabutanForecastPair(
+        previous2_actual=rows[1],
+        previous_actual=rows[2],
+        current_actual=rows[3],
+        current_forecast=rows[4],
+        next_forecast=None,
+        all_rows=rows,
+    )
+
+    scoring_input = FundamentalAnalysisService.build_cf_scoring_input(
+        code4="6861",
+        as_of=None,
+        price=60000.0,
+        market_per=None,
+        market_cap=14_000_000_000_000.0,
+        forecast_pair=pair,
+        cashflow_rows=(),
+        financial_metric_rows=(),
+    )
+
+    assert scoring_input is not None
+    assert round(scoring_input.sales_cagr_3y, 1) == 8.2
+    assert round(scoring_input.eps_cagr_3y, 1) == 7.0

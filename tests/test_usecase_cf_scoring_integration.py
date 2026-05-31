@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
@@ -71,6 +72,7 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert captured["growth_phase"] is not None
     assert captured["per_level"] == "割安PER"
     assert captured["roic_level"] == "高ROIC"
+    assert isinstance(captured["analyst_estimates"], AnalystEstimates)
 
 
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():

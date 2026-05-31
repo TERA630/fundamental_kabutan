@@ -6,6 +6,7 @@ from typing import Any
 
 from app.domain.builders.fundamental_output import build_fundamental_output_text, build_fundamental_output_sections
 from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.models.display_sections import (
     DisplaySections,
@@ -144,6 +145,7 @@ def build_fundamental_output(
     price: float | None,
     market_cap: float | None,
     market_snapshot: dict[str, Any] | None = None,
+    analyst_estimates: AnalystEstimates | None = None,
     kabutan_forecast_pair: KabutanForecastPair | None = None,
     kabutan_source: str = "none",
     kabutan_source_message: str | None = None,
@@ -164,6 +166,7 @@ def build_fundamental_output(
         price=price,
         market_cap=market_cap,
         market_snapshot=market_snapshot,
+        analyst_estimates=analyst_estimates,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
     # Prefer DTO-based path: build sections and format them. Fallback to legacy text builder.
@@ -175,6 +178,7 @@ def build_fundamental_output(
             price=price,
             market_cap=market_cap,
             market_snapshot=market_snapshot,
+            analyst_estimates=analyst_estimates,
             kabutan_forecast_pair=kabutan_forecast_pair,
             kabutan_cashflow_rows=kabutan_cashflow_rows,
             financial_metric_rows=financial_metric_rows,

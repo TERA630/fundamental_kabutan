@@ -4,8 +4,10 @@ from __future__ import annotations
 import logging
 from typing import List
 
+from app.domain.builders.analyst_estimates_output import build_analyst_estimates_lines
 from app.domain.models.cf_scoring_result import MetricScore
 from app.domain.models.display_sections import (
+    AnalystEstimatesSection,
     CashflowTimelineSection,
     DisplaySections,
     FinancialMetricsSection,
@@ -393,6 +395,8 @@ def format_sections(sections: DisplaySections) -> str:
             lines.extend(format_score_summary(s))
         elif isinstance(s, ValuationTableSection):
             lines.extend(format_valuation(s))
+        elif isinstance(s, AnalystEstimatesSection):
+            lines.extend(build_analyst_estimates_lines(s.estimates))
         elif isinstance(s, ScoreCategorySection):
             lines.extend(format_score_category(s))
         elif isinstance(s, RuleNotesSection):

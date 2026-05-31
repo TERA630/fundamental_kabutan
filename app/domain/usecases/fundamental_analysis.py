@@ -11,6 +11,7 @@ import inspect
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
+from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.market_data import MARKET_SNAPSHOT_KEYS, MarketSnapshot
 from app.domain.models.cf_scoring_input import CfScoringInput
@@ -27,6 +28,10 @@ CACHE_TTL_YF_SEC = 12 * 60 * 60
 
 class MarketDataProviderPort(Protocol):
     def __call__(self, code4: str) -> dict[str, float | str | None] | MarketSnapshot: ...
+
+
+class AnalystEstimatesProviderPort(Protocol):
+    def __call__(self, code4: str) -> AnalystEstimates: ...
 
 
 class MarketSnapshotCachePort(Protocol):
@@ -80,14 +85,19 @@ class FundamentalAnalysisService:
         self,
         file_cache: MarketSnapshotCachePort,
         fetch_market_snapshot: MarketDataProviderPort,
+        fetch_analyst_estimates: AnalystEstimatesProviderPort | None = None,
         fetch_kabutan_forecast_usecase: FetchKabutanForecastUseCase | None = None,
     ):
         self.cache = file_cache
         self.fetch_market_snapshot = fetch_market_snapshot
+        self.fetch_analyst_estimates = fetch_analyst_estimates or (lambda _code4: AnalystEstimates.empty())
         self.fetch_kabutan_forecast_usecase = fetch_kabutan_forecast_usecase
 
     def build_cache_key_price_snapshot(self, code4: str) -> str:
         return f"yf_{code4}"
+
+    def build_cache_key_analyst_estimates(self, code4: str) -> str:
+        return f"yf_analyst_{code4}"
 
     def fetch_price_snapshot(self, code4: str) -> dict[str, float | str | None]:
         cache_key = self.build_cache_key_price_snapshot(code4)
@@ -102,6 +112,16 @@ class FundamentalAnalysisService:
             return normalized
         return build_empty_market_snapshot()
 
+    def fetch_cached_analyst_estimates(self, code4: str) -> AnalystEstimates:
+        cache_key = self.build_cache_key_analyst_estimates(code4)
+        cached = self.cache.get(cache_key, CACHE_TTL_YF_SEC)
+        if isinstance(cached, dict):
+            return AnalystEstimates.from_mapping(cached)
+
+        estimates = self.fetch_analyst_estimates(code4)
+        self.cache.set(cache_key, estimates.to_dict())
+        return estimates
+
     def build_analysis_output(
         self,
         name: str,
@@ -111,6 +131,7 @@ class FundamentalAnalysisService:
     ) -> str:
         master: dict[str, Any] | None = None
         price_snapshot = self.fetch_price_snapshot(code4)
+        analyst_estimates = self.fetch_cached_analyst_estimates(code4)
         kabutan_fetch_result = self.fetch_kabutan_forecast_pair(
             code4,
             html_dir=kabutan_html_dir,
@@ -142,6 +163,7 @@ class FundamentalAnalysisService:
             "price": price_snapshot.get("price"),
             "market_cap": price_snapshot.get("market_cap"),
             "market_snapshot": price_snapshot,
+            "analyst_estimates": analyst_estimates,
             "kabutan_forecast_pair": kabutan_fetch_result.pair,
             "kabutan_cashflow_rows": kabutan_fetch_result.cashflow_rows,
             "kabutan_source": kabutan_fetch_result.source,

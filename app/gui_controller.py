@@ -8,7 +8,7 @@ from typing import Callable
 
 from app.data.file_cache import FileCache
 from app.data.kabutan_repository import KabutanForecastRepository
-from app.data.market_data_provider import fetch_yfinance_snapshot
+from app.data.market_data_provider import fetch_yfinance_analyst_estimates, fetch_yfinance_snapshot
 from app.data.watchlist_repository import fetch_watchlist_entries
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
@@ -38,6 +38,7 @@ def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnaly
     return FundamentalAnalysisService(
         file_cache=file_cache,
         fetch_market_snapshot=fetch_yfinance_snapshot,
+        fetch_analyst_estimates=fetch_yfinance_analyst_estimates,
         fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
             repository=kabutan_repository
         ),
@@ -91,6 +92,7 @@ class FundamentalGuiController:
         return FundamentalAnalysisService(
             file_cache=self.file_cache,
             fetch_market_snapshot=fetch_market_snapshot,
+            fetch_analyst_estimates=fetch_yfinance_analyst_estimates,
             fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
                 repository=kabutan_repository
             ),

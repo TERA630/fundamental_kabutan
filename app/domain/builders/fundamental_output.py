@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.builders.fundamental_output_impl import build_fundamental_output_text_impl
+from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair
@@ -19,6 +20,7 @@ def build_fundamental_output_text(
     price: float | None,
     market_cap: float | None,
     market_snapshot: dict[str, Any] | None = None,
+    analyst_estimates: AnalystEstimates | None = None,
     kabutan_forecast_pair: KabutanForecastPair | None = None,
 ) -> str:
     """ドメイン層の出力生成エントリポイント。"""
@@ -29,6 +31,7 @@ def build_fundamental_output_text(
         price=price,
         market_cap=market_cap,
         market_snapshot=market_snapshot,
+        analyst_estimates=analyst_estimates,
         kabutan_forecast_pair=kabutan_forecast_pair,
     )
 
@@ -44,6 +47,7 @@ def build_fundamental_output_sections(
     price: float | None,
     market_cap: float | None,
     market_snapshot: dict[str, Any] | None = None,
+    analyst_estimates: AnalystEstimates | None = None,
     kabutan_forecast_pair: KabutanForecastPair | None = None,
     kabutan_cashflow_rows: tuple[KabutanCashflowRow, ...] = (),
     financial_metric_rows: tuple[FinancialMetricInputRow, ...] = (),
@@ -55,6 +59,7 @@ def build_fundamental_output_sections(
         price=price,
         market_cap=market_cap,
         market_snapshot=market_snapshot,
+        analyst_estimates=analyst_estimates,
         kabutan_forecast_pair=kabutan_forecast_pair,
         kabutan_cashflow_rows=kabutan_cashflow_rows,
         financial_metric_rows=financial_metric_rows,
