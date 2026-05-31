@@ -8,7 +8,7 @@ from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPer
 def _fmt_estimate_num(value: float | None) -> str:
     if value is None:
         return "N/A"
-    return f"{value:,.1f}"
+    return f"{value:.0f}"
 
 
 def _fmt_estimate_count(value: int | None) -> str:
@@ -17,22 +17,24 @@ def _fmt_estimate_count(value: int | None) -> str:
     return str(value)
 
 
+def _fmt_gap_pct(*, target_mean_price: float | None, price: float | None) -> str:
+    if target_mean_price is None or price is None or price == 0:
+        return "N/A"
+    return f"{((target_mean_price - price) / price) * 100:+.1f}%"
+
+
 def _build_eps_revision_line(label: str, revision: EpsRevisionPeriod) -> str:
-    return (
-        f"{label}： 上方修正 {_fmt_estimate_count(revision.up_last_30_days)}人"
-        f"　下方修正 {_fmt_estimate_count(revision.down_last_30_days)}人"
-    )
+    return f"{label}EPS修正 ↑{_fmt_estimate_count(revision.up_last_30_days)} ↓{_fmt_estimate_count(revision.down_last_30_days)}"
 
 
-def build_analyst_estimates_lines(estimates: AnalystEstimates | None) -> list[str]:
+def build_analyst_estimates_lines(estimates: AnalystEstimates | None, *, price: float | None = None) -> list[str]:
     estimates = estimates or AnalystEstimates.empty()
     return [
         "",
-        "■アナリスト予想(yFinance)",
-        f"アナリスト目標株価：{_fmt_estimate_num(estimates.target_mean_price)} 円 (アナリスト {_fmt_estimate_count(estimates.number_of_analyst_opinions)}人)",
-        "EPS revisions (30日):",
-        _build_eps_revision_line("今期末", estimates.current_year_eps_revisions),
-        _build_eps_revision_line("来季末", estimates.next_year_eps_revisions),
+        "■アナリスト",
+        f"目標株価 {_fmt_estimate_num(estimates.target_mean_price)}円(現価格との乖離{_fmt_gap_pct(target_mean_price=estimates.target_mean_price, price=price)}：アナリスト{_fmt_estimate_count(estimates.number_of_analyst_opinions)}人)",
+        _build_eps_revision_line("今期", estimates.current_year_eps_revisions),
+        _build_eps_revision_line("来季", estimates.next_year_eps_revisions),
     ]
 
 

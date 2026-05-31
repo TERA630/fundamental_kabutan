@@ -396,7 +396,7 @@ def format_sections(sections: DisplaySections) -> str:
         elif isinstance(s, ValuationTableSection):
             lines.extend(format_valuation(s))
         elif isinstance(s, AnalystEstimatesSection):
-            lines.extend(build_analyst_estimates_lines(s.estimates))
+            lines.extend(build_analyst_estimates_lines(s.estimates, price=s.price))
         elif isinstance(s, ScoreCategorySection):
             lines.extend(format_score_category(s))
         elif isinstance(s, RuleNotesSection):

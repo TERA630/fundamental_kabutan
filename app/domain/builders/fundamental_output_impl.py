@@ -198,7 +198,7 @@ def build_fundamental_output_sections_impl(
         roic_values=roic_values,
         fcf_yield_values=fcf_yield_values,
     )
-    return DisplaySections(sections=[summary, valuation, AnalystEstimatesSection(analyst_estimates or AnalystEstimates.empty())])
+    return DisplaySections(sections=[summary, valuation, AnalystEstimatesSection(analyst_estimates or AnalystEstimates.empty(), price=price)])
 
 
 
@@ -258,4 +258,4 @@ def build_fundamental_output_text_impl(*, name: str, code4: str, master: dict[st
         roe=(market_snapshot or {}).get("roe"),
     )
     valuation_lines = _build_valuation_lines(per_lines, dividend_lines)
-    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines, *valuation_lines, *build_analyst_estimates_lines(analyst_estimates)])
+    return "\n".join([f"【銘柄】{company_name} ({code4})", *indicator_lines, *valuation_lines, *build_analyst_estimates_lines(analyst_estimates, price=price)])

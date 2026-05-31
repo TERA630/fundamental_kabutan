@@ -50,6 +50,7 @@ class ValuationTableSection:
 @dataclass
 class AnalystEstimatesSection:
     estimates: AnalystEstimates
+    price: float | None = None
 
 
 @dataclass

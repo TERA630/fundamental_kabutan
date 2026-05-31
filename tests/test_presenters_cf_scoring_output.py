@@ -201,7 +201,7 @@ def test_build_fundamental_output_sections_and_formatter_produces_valuation_tabl
     assert "年度|N/A" in formatted
     assert "PER|N/A" in formatted
     assert "配当利回り|N/A" in formatted
-    assert "■アナリスト予想(yFinance)" in formatted
+    assert "■アナリスト" in formatted
 
 
 def test_build_fundamental_output_formats_analyst_estimates():
@@ -221,10 +221,9 @@ def test_build_fundamental_output_formats_analyst_estimates():
         analyst_estimates=estimates,
     )
 
-    assert "アナリスト目標株価：2,500.0 円 (アナリスト 9人)" in out
-    assert "EPS revisions (30日):" in out
-    assert "今期末： 上方修正 3人　下方修正 7人" in out
-    assert "来季末： 上方修正 4人　下方修正 8人" in out
+    assert "目標株価 2500円(現価格との乖離+150.0%：アナリスト9人)" in out
+    assert "今期EPS修正 ↑3 ↓7" in out
+    assert "来季EPS修正 ↑4 ↓8" in out
     assert "EPS trend" not in out
     assert "7日" not in out
 
