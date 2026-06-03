@@ -51,6 +51,8 @@ class TechnicalRangeSnapshot:
 
 @dataclass(frozen=True)
 class PreviousSessionSnapshot:
+    prev_high: float | None
+    prev_low: float | None
     prev_change_pct: float | None
     prev_range: float | None
     prev_range_atr: float | None
@@ -64,15 +66,23 @@ class PreviousSessionSnapshot:
 @dataclass(frozen=True)
 class BreaklineSnapshot:
     recent5_high: float | None
+    recent5_low: float | None
     recent20_high: float | None
+    recent20_low: float | None
     recent60_high: float | None
     recent60_low: float | None
     recent5_high_distance: float | None
+    recent5_low_distance: float | None
     recent20_high_distance: float | None
+    recent20_low_distance: float | None
     recent60_high_distance: float | None
+    recent60_low_distance: float | None
     recent5_high_distance_pct: float | None
+    recent5_low_distance_pct: float | None
     recent20_high_distance_pct: float | None
+    recent20_low_distance_pct: float | None
     recent60_high_distance_pct: float | None
+    recent60_low_distance_pct: float | None
     recent60_range_position: float | None
     recent60_range_position_label: RangePositionLabel
 

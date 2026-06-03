@@ -43,11 +43,16 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "株価：" in output
     assert "トレンド：" in output
     assert "Vwap：" in output
+    assert "前日高値：" in output
+    assert "前日Vwap維持：" in output
     assert "■当日位置・レンジ" in output
     assert "■移動平均・出来高" in output
     assert "■前日評価" in output
     assert "■節目・ブレイクライン" in output
-    assert "■流れ" in output
+    assert "5日安値：" in output
+    assert "20日安値：" in output
+    assert "60日安値：" in output
+    assert "■流れ" not in output
 
 
 def test_build_technical_output_marks_daily_reference_vwap():

@@ -214,7 +214,9 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
 
     shifted = enriched.shift(1)
     recent5_high = _none_if_nan(shifted["High"].rolling(5).max().iloc[-1])
+    recent5_low = _none_if_nan(shifted["Low"].rolling(5).min().iloc[-1])
     recent20_high = _none_if_nan(shifted["High"].rolling(20).max().iloc[-1])
+    recent20_low = _none_if_nan(shifted["Low"].rolling(20).min().iloc[-1])
     recent60_high = _none_if_nan(shifted["High"].rolling(60).max().iloc[-1])
     recent60_low = _none_if_nan(shifted["Low"].rolling(60).min().iloc[-1])
     recent60_width = recent60_high - recent60_low if recent60_high is not None and recent60_low is not None else None
@@ -250,6 +252,8 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         day_close_position_label=label_close_position(day_close_position),
     )
     previous_session = PreviousSessionSnapshot(
+        prev_high=prev_high,
+        prev_low=prev_low,
         prev_change_pct=_pct_change(prev_close, prev_prev_close),
         prev_range=prev_range,
         prev_range_atr=_safe_div(prev_range, atr14),
@@ -261,15 +265,23 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     )
     breakline = BreaklineSnapshot(
         recent5_high=recent5_high,
+        recent5_low=recent5_low,
         recent20_high=recent20_high,
+        recent20_low=recent20_low,
         recent60_high=recent60_high,
         recent60_low=recent60_low,
         recent5_high_distance=latest - recent5_high if latest is not None and recent5_high is not None else None,
+        recent5_low_distance=latest - recent5_low if latest is not None and recent5_low is not None else None,
         recent20_high_distance=latest - recent20_high if latest is not None and recent20_high is not None else None,
+        recent20_low_distance=latest - recent20_low if latest is not None and recent20_low is not None else None,
         recent60_high_distance=latest - recent60_high if latest is not None and recent60_high is not None else None,
+        recent60_low_distance=latest - recent60_low if latest is not None and recent60_low is not None else None,
         recent5_high_distance_pct=_pct_change(latest, recent5_high),
+        recent5_low_distance_pct=_pct_change(latest, recent5_low),
         recent20_high_distance_pct=_pct_change(latest, recent20_high),
+        recent20_low_distance_pct=_pct_change(latest, recent20_low),
         recent60_high_distance_pct=_pct_change(latest, recent60_high),
+        recent60_low_distance_pct=_pct_change(latest, recent60_low),
         recent60_range_position=recent60_range_position,
         recent60_range_position_label=label_range_position(recent60_range_position),
     )
