@@ -421,36 +421,40 @@ flatからstructuredへの変換は `stock_types.to_structured_snapshot()`。
 
 ### 10.2 先頭サマリ
 
-目的は、銘柄ごとの現在位置、短期方向、VWAP・25日線からの距離、RSI、60日レンジ位置を冒頭で一目確認できるようにすること。
+目的は、銘柄ごとの現在位置、短期方向、25日線傾き、VWAP・25日線からの距離、RSI、60日レンジ位置を冒頭で一目確認できるようにすること。
 
 表示位置は銘柄見出しの直後、既存の `■当日位置・レンジ` より前とする。既存の詳細ブロックは削除せず、先頭サマリは詳細ブロックの要約として追加する。
 
-ドメイン層は先頭サマリ用に、前日比の円差 `day_change_price` とトレンド短縮表示 `summary_trend_symbol` / `summary_trend_label` をsnapshotに追加する。数値の小数桁、括弧、円・%などの表示整形はpresentation層で行う。
+取得した株価の時点は `latest_price_timestamp` として保持するが、先頭サマリには表示しない。日中足が取得できた場合は `{日足日付} {HH:MM}`、日中足が取得できない場合は `{日足日付} 終値` を内部値として保持する。
 
 表示テンプレート:
 
 ```text
-【銘柄】　{name}
-{latest_price_timestamp}
-株価：{latest}円　(前日比{day_change_price}円：{day_change_pct})　({day_close_position_zone}{day_close_position}で終了)
-トレンド：　{summary_trend_symbol}　{summary_trend_label}
-Vwap　：　{vwap_diff_price}円　({vwap_diff_pct})
-位置　：　25日線　{dev25}　(ATR比：{ma25_distance_atr})　　60日線レンジ位置　{recent60_range_position}({recent60_range_zone})
-RSI　：　{rsi}
+【銘柄】{name} ({code4})
+株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（当日{day_close_position_zone}{day_close_position}）
+トレンド：{trend_label}　　　25日線傾き：{ma25_slope_symbol}
+
+Vwap：{vwap_diff_price}円（{vwap_diff_pct}、{vwap_diff_atr}ATR）
+位置：25日線 {dev25}（{ma25_distance_atr}ATR）
+前日高値：{prev_high}　前日安値：{prev_low}　　　　{previous_high_evaluation}
+5日高値 {recent5_high_distance_pct}　20日高値まで：{recent20_high_remaining_pct} 　　60日レンジ位置 {recent60_range_position}（{recent60_range_zone}）
+RSI：{rsi}
 ```
 
 項目仕様:
 
 | 表示項目 | snapshot key / 算出 | 表示仕様 |
 |---|---|---|
-| 銘柄 | `name` | `【銘柄】　{name}`。先頭サマリ見出しではコードを表示しない |
-| 時点 | `latest_price_timestamp` | 銘柄行の次行に表示。時刻の `:` は `：` に置換する |
+| 銘柄 | `name`, `code4` | `【銘柄】{name} ({code4})` |
+| 時点 | `latest_price_timestamp` | 内部値として保持する。先頭サマリには表示しない。スクリプト実行時刻は使わない |
 | 株価 | `latest` | `株価：{latest}円`。価格は `fmt_price_current()` + `円` |
 | 前日比 | `day_change_price`, `day_change_pct` | `（前日比{day_change_price}円：{day_change_pct}）`。価格差は符号付き円、率は符号付き・小数1桁の `%` |
-| 終端位置 | `day_close_position`, `day_close_position_label` | `({zone}{position}%で終了)`。zoneは既存ラベルから `高値圏` / `中段` / `安値圏` に短縮する |
-| トレンド | `summary_trend_symbol`, `summary_trend_label` | 記号 + 短縮ラベルで表示 |
-| Vwap | `vwap_diff`, `latest - vwap` | `Vwap　：　{価格差}円　({乖離率})`。価格差を先に表示する |
-| 位置 | `dev25`, `ma25_distance_atr`, `recent60_range_position`, `recent60_range_zone` | 25日線位置と60日線レンジ位置を1行にまとめる |
+| 終端位置 | `day_close_position`, `day_close_position_label` | `（当日{zone}{position}%）`。zoneは既存ラベルから `高値圏` / `中間` / `安値圏` に短縮する |
+| トレンド | `trend` | `上昇` / `もみあい` / `下落` の短縮ラベルで表示 |
+| 25日線傾き | `ma25`, `ma25_prev5` | `ma25 > ma25_prev5` なら `↑`、同値なら `→`、下なら `↓`、欠損なら `N/A` |
+| Vwap | `latest - vwap`, `vwap_diff_pct`, `vwap_diff_atr` | 価格差、乖離率、ATR比を表示する |
+| 位置 | `dev25`, `ma25_distance_atr` | 25日線乖離率とATR比を表示する |
+| 前日評価 | `prev_high`, `prev_low`, `latest` | 前日高値・安値と、前日高値突破 / 前日レンジ / 前日安値割れ評価を表示する |
 | RSI | `rsi` | 小数1桁 |
 | 60日線レンジ位置 | `recent60_range_position`, `recent60_range_zone` | `recent60_range_position * 100` を小数1桁の `%`。ゾーンラベルを括弧で併記 |
 
@@ -458,9 +462,9 @@ RSI　：　{rsi}
 
 | 元ラベル | 先頭サマリ表示 |
 |---|---|
-| 上昇トレンド | ↑ 上昇 |
-| 下落トレンド | ↓ 下落 |
-| もみ合い / 戻り局面 | → もみあい |
+| 上昇トレンド | 上昇 |
+| 下落トレンド | 下落 |
+| もみ合い / 戻り局面 | もみあい |
 
 終端位置ラベルは既存ラベルを維持する。
 
@@ -481,17 +485,61 @@ RSI　：　{rsi}
 
 ```text
 【銘柄】　コムシス
-2026-05-29　15：20
-株価：5452円　(前日比+60円：+1.1%)　(高値圏84.4%で終了)
-トレンド：　→　もみあい
-Vwap　：　+42円　(+0.78%)
-位置　：　25日線　-1.68%　(ATR比：-0.5)　　60日線レンジ位置　43.8%(中段)
-RSI　：　49.3
+株価：5,452円（前日比+60.00円：+1.1%）（当日高値圏84.4%）
+トレンド：もみあい　　　25日線傾き：↑
+
+Vwap：+42.00円（+0.8%、0.50ATR）
+位置：25日線 -1.7%（-0.50ATR）
+前日高値：5,338.00　前日安値：5,210.00　　　　前日高値突破：+2.1%
+5日高値 -0.2%　20日高値まで：12.1% 　　60日レンジ位置 43.8%（中段）
+RSI：49.3
 ```
 
 Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つまり現在値がVWAPより下ならマイナス。
 
-### 10.3 移動平均・出来高ブロック
+### 10.3 前日評価ブロック
+
+表示テンプレート:
+
+```text
+■前日評価
+前日騰落率：{prev_change_pct}
+
+前日Vwap維持：{〇/×/N/A}
+ローソク：{candle} / {wick_shape}
+押し判定：{pullback}
+```
+
+`previous_high_evaluation` は現在値 `latest` と前日高値・前日安値から以下で判定する。
+
+| 条件 | 表示 |
+|---|---|
+| `latest > prev_high` | `前日高値突破：{latest / prev_high - 1}` |
+| `prev_low <= latest <= prev_high` | `前日レンジ：{(latest - prev_low) / (prev_high - prev_low)}（{高値圏/中間/安値圏}）` |
+| `latest < prev_low` | `前日安値：{latest / prev_low - 1}` |
+
+前日VWAP維持は、前日終値が表示に使うVWAP以上なら `〇`、下なら `×`、欠損なら `N/A` とする。
+
+### 10.4 節目・ブレイクライン / 支持線ブロック
+
+節目・ブレイクラインは先頭サマリに統合し、独立した `■節目・ブレイクライン` ブロックは表示しない。
+
+```text
+5日高値 {recent5_high_distance_pct}　20日高値まで：{recent20_high_remaining_pct} 　　60日レンジ位置 {recent60_range_position}（{recent60_range_zone}）
+```
+
+高値までの距離は、現在値が高値未満なら既存の高値距離率の絶対値を小数1桁で表示する。現在値が高値以上なら `突破 {+x.x%}` と表示する。
+
+支持線は最後に表示する。
+
+```text
+■支持線
+前日安値：{prev_low}
+20日安値：{recent20_low}
+60日安値：{recent60_low}
+```
+
+### 10.5 移動平均・出来高ブロック
 
 先頭サマリへの移動に伴い、既存の `■当日テクニカル` は `■移動平均・出来高` に改名する。`VWAP` と `RSI` の行は削除する。
 
@@ -508,9 +556,10 @@ Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つ�
 
 ```text
 25日線：{ma25}（乖離 {dev25} / ATR比 {ma25_distance_atr}倍）
+出来高：20日平均出来高比 {volume_vs_avg20_pct}　（{volume}株）
 ```
 
-### 10.4 ファンダメンタルブロック
+### 10.6 ファンダメンタルブロック
 
 `■ファンダメンタル` に表示する項目:
 
@@ -520,7 +569,7 @@ Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つ�
 
 配当利回りは表示しない。ドメイン・structured snapshotにも配当利回り項目は持たせない。
 
-### 10.5 表示順
+### 10.7 表示順
 
 1. `【銘柄】{name} ({code})`
 2. 先頭サマリ
@@ -529,11 +578,12 @@ Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つ�
 5. `■移動平均・出来高`
 6. `■前日評価`
 7. `■ファンダメンタル`
-8. `■節目・ブレイクライン`
-9. `■流れ`
-10. 任意で `■市況`
+8. `■支持線`
+9. 任意で `■市況`
 
-### 10.6 市況ブロック
+`■流れ` ブロックと `■節目・ブレイクライン` ブロックは先頭サマリと情報が重複するため表示しない。
+
+### 10.8 市況ブロック
 
 市況ブロックはチェック有効時のみ末尾に追加する。表示順は WTI、銅、NASDAQ。
 
