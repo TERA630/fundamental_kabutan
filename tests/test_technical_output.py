@@ -41,7 +41,7 @@ def test_build_technical_output_contains_summary_and_sections():
 
     assert "【銘柄】Sample (1234)" in output
     assert "株価：" in output
-    assert "当日高値圏" in output
+    assert "終端位置" in output
     assert "トレンド：" in output
     assert "25日線傾き：" in output
     assert "Vwap：" in output
@@ -50,6 +50,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■当日位置・レンジ" in output
     assert "■移動平均・出来高" in output
     assert "20日平均出来高比" in output
+    assert "出来高：1,069株" in output
     assert "■前日評価" in output
     assert "5日高値 " in output
     assert "20日高値まで：" in output

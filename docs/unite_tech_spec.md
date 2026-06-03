@@ -431,14 +431,14 @@ flatからstructuredへの変換は `stock_types.to_structured_snapshot()`。
 
 ```text
 【銘柄】{name} ({code4})
-株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（当日{day_close_position_zone}{day_close_position}）
+株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（終端位置{day_close_position}）
 トレンド：{trend_label}　　　25日線傾き：{ma25_slope_symbol}
 
 Vwap：{vwap_diff_price}円（{vwap_diff_pct}、{vwap_diff_atr}ATR）
 位置：25日線 {dev25}（{ma25_distance_atr}ATR）
 前日高値：{prev_high}　前日安値：{prev_low}　　　　{previous_high_evaluation}
 5日高値 {recent5_high_distance_pct}　20日高値まで：{recent20_high_remaining_pct} 　　60日レンジ位置 {recent60_range_position}（{recent60_range_zone}）
-RSI：{rsi}
+RSI：{rsi}　20日平均出来高比：{volume_vs_avg20}
 ```
 
 項目仕様:
@@ -449,13 +449,14 @@ RSI：{rsi}
 | 時点 | `latest_price_timestamp` | 内部値として保持する。先頭サマリには表示しない。スクリプト実行時刻は使わない |
 | 株価 | `latest` | `株価：{latest}円`。価格は `fmt_price_current()` + `円` |
 | 前日比 | `day_change_price`, `day_change_pct` | `（前日比{day_change_price}円：{day_change_pct}）`。価格差は符号付き円、率は符号付き・小数1桁の `%` |
-| 終端位置 | `day_close_position`, `day_close_position_label` | `（当日{zone}{position}%）`。zoneは既存ラベルから `高値圏` / `中間` / `安値圏` に短縮する |
+| 終端位置 | `day_close_position` | `（終端位置{position}%）`。ゾーンラベルは冒頭サマリでは表示しない |
 | トレンド | `trend` | `上昇` / `もみあい` / `下落` の短縮ラベルで表示 |
 | 25日線傾き | `ma25`, `ma25_prev5` | `ma25 > ma25_prev5` なら `↑`、同値なら `→`、下なら `↓`、欠損なら `N/A` |
 | Vwap | `latest - vwap`, `vwap_diff_pct`, `vwap_diff_atr` | 価格差、乖離率、ATR比を表示する |
 | 位置 | `dev25`, `ma25_distance_atr` | 25日線乖離率とATR比を表示する |
 | 前日評価 | `prev_high`, `prev_low`, `latest` | 前日高値・安値と、前日高値突破 / 前日レンジ / 前日安値割れ評価を表示する |
 | RSI | `rsi` | 小数1桁 |
+| 20日平均出来高比 | `volume`, `volume_avg20` | RSI行の横に `20日平均出来高比：{volume / volume_avg20}` として表示する |
 | 60日線レンジ位置 | `recent60_range_position`, `recent60_range_zone` | `recent60_range_position * 100` を小数1桁の `%`。ゾーンラベルを括弧で併記 |
 
 トレンド短縮ラベル:
@@ -485,14 +486,14 @@ RSI：{rsi}
 
 ```text
 【銘柄】　コムシス
-株価：5,452円（前日比+60.00円：+1.1%）（当日高値圏84.4%）
+株価：5,452円（前日比+60.00円：+1.1%）（終端位置84.4%）
 トレンド：もみあい　　　25日線傾き：↑
 
 Vwap：+42.00円（+0.8%、0.50ATR）
 位置：25日線 -1.7%（-0.50ATR）
 前日高値：5,338.00　前日安値：5,210.00　　　　前日高値突破：+2.1%
 5日高値 -0.2%　20日高値まで：12.1% 　　60日レンジ位置 43.8%（中段）
-RSI：49.3
+RSI：49.3　20日平均出来高比：120%
 ```
 
 Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つまり現在値がVWAPより下ならマイナス。
@@ -556,7 +557,7 @@ Vwapの価格差は、既存の `latest - vwap` と同じ符号にする。つ�
 
 ```text
 25日線：{ma25}（乖離 {dev25} / ATR比 {ma25_distance_atr}倍）
-出来高：20日平均出来高比 {volume_vs_avg20_pct}　（{volume}株）
+出来高：{volume}株
 ```
 
 ### 10.6 ファンダメンタルブロック

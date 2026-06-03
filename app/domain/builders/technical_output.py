@@ -22,7 +22,7 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         f"5日線：{_fmt_price(snapshot.moving_average.ma5)}（乖離 {_fmt_pct(snapshot.moving_average.dev5_pct)}）",
         f"25日線：{_fmt_price(snapshot.moving_average.ma25)}（乖離 {_fmt_pct(snapshot.moving_average.dev25_pct)} / ATR比 {_fmt_multiple(snapshot.moving_average.ma25_distance_atr)}）",
         f"14日ATR：{_fmt_price(snapshot.range.atr14)}",
-        f"出来高：20日平均出来高比 {_fmt_volume_ratio(snapshot.price.volume, snapshot.price.volume_avg20)}　（{_fmt_volume(snapshot.price.volume)}）",
+        f"出来高：{_fmt_volume(snapshot.price.volume)}",
         "",
         "■前日評価",
         f"前日騰落率：{_fmt_pct(snapshot.previous_session.prev_change_pct)}",
@@ -50,14 +50,14 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
     return "\n".join(
         [
-            f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（当日{_short_close_position_label(snapshot.range.day_close_position_label)}{_fmt_position_pct(snapshot.range.day_close_position)}）",
+            f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）",
             f"トレンド：{_short_trend_label(snapshot.trend)}　　　25日線傾き：{_ma25_slope_symbol(result)}",
             "",
             f"Vwap：{_fmt_price_signed(vwap_diff)}円（{_fmt_pct(vwap_diff_pct)}、{_fmt_atr_unsigned(vwap_diff_atr)}）{vwap_source_suffix}",
             f"位置：25日線 {_fmt_pct(snapshot.moving_average.dev25_pct)}（{_fmt_atr(snapshot.moving_average.ma25_distance_atr)}）",
             f"前日高値：{_fmt_price(snapshot.previous_session.prev_high)}　前日安値：{_fmt_price(snapshot.previous_session.prev_low)}　　　　{_format_previous_high_evaluation(result)}",
             f"5日高値 {_fmt_pct(snapshot.breakline.recent5_high_distance_pct)}　20日高値まで：{_fmt_high_remaining_pct(snapshot.breakline.recent20_high_distance_pct)} 　　60日レンジ位置 {_fmt_position_pct(snapshot.breakline.recent60_range_position)}（{snapshot.breakline.recent60_range_position_label}）",
-            f"RSI：{_fmt_number(snapshot.rsi14)}",
+            f"RSI：{_fmt_number(snapshot.rsi14)}　20日平均出来高比：{_fmt_volume_ratio(snapshot.price.volume, snapshot.price.volume_avg20)}",
         ]
     )
 
