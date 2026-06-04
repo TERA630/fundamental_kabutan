@@ -2,7 +2,7 @@
 
 最終更新: 2026-05-28
 
-本書を rankCF 採点仕様の正本とする。実装設計と未完了タスクは `docs/cf_scoring_design.md` に集約する。
+本書を rankCF 採点仕様の正本とする。実装上の責務境界は `docs/cf_scoring_design.md` に集約する。
 
 ## 1. スコア構成
 

@@ -288,15 +288,9 @@ ROICが `None`、または数値として不正な場合は分類不能とし、
 
 ---
 
-## 7. 廃止済み方針
+## 7. 現行対象外の方針
 
 - J-Quants由来の財務指標計算モデルは使用しない。
 - `summary_rows` は使用しない。
 - FY/四半期データを前提にした表示補完は行わない。
 - `FundamentalDisplaySnapshot` / `PeriodFundamentalRow` へ寄せる段階移管案は廃止する。
-
----
-
-## 8. 未完了タスク
-
-なし。

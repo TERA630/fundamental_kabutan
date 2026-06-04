@@ -2,7 +2,7 @@
 
 最終更新: 2026-05-28
 
-rankCF 採点仕様の正本は `docs/rankCF_spec.md`。本書は実装構成、責務分離、運用上の確定事項、未完了タスクを管理する。
+rankCF 採点仕様の正本は `docs/rankCF_spec.md`。本書は実装構成と責務分離を定義する。
 
 ## 1. 目的
 
@@ -110,11 +110,6 @@ rankCF 採点仕様の正本は `docs/rankCF_spec.md`。本書は実装構成、
 - UseCase での入力構築
 - Presenter 表示と欠損ログ
 
-## 7. 未完了タスク
-
-なし。
-
-## 8. 検証状況
+## 7. 検証
 
 - 直近確認: `python -m pytest`
-- 結果: `194 passed, 1 warning`
