@@ -129,46 +129,91 @@ ATR14 = TrueRange.ewm(alpha=1/14, adjust=False, min_periods=14).mean()
 ### 5.5 前日評価
 
 - 前日足は日足履歴の末尾から2本目を使う。
-- ローソクは `陽線` / `陰線` / `十字線`。
+- 前日5分足は yFinance の5分足を `period="5d"` で取得し、その中から日足履歴の前日取引日に一致するバーを使う。
+- 前日5分足が取得できない、または前場・後場の判定に必要なバーが不足する場合、前場/後場VWAP・前日VWAP差分・後場評価は `N/A` とする。日足参考値へのフォールバックは行わない。
+- ローソク足型は `大陽線` / `大陰線` / `陽線` / `陰線` / `小陽線` / `小陰線` / `十字`。
 - 押し判定は `押し` / `崩れ` / `中立` / `判定不可`。
-- 前日VWAP維持は、前日終値が表示に使うVWAP以上なら `〇`、下なら `×`、欠損なら `N/A` とする。
+- 前日出来高比は `前日出来高 / 前日基準の20日平均出来高 * 100` とする。
 
-#### 5.5.1 前日評価リニューアル作業案
+#### 5.5.1 前日評価リニューアル仕様
 
 テクニカル画面の `■前日評価` は、前日の終値位置・レンジ・出来高・移動平均に加え、前場/後場のVWAP維持と後場評価を同じブロックで読める構成へ寄せる。実装時は、UI層に判定ロジックを置かず、日足・日中足から作る純粋な指標は Domain、データ取得との合成は UseCase、文字列化は Builder に分離する。
 
-表示案:
+表示仕様:
 
 ```text
 ■前日評価
-終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}ATR）
+終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}ATR）騰落率{prev_change_pct}
+
+前日Vwap(前・後場)　{prev_am_vwap_maintained}/{prev_pm_vwap_maintained}  高値更新 {prev_high_higher} / 安値維持 {prev_low_higher}
+前日出来高比　　{prev_volume_vs_avg20_pct}
+
+後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
 
 前日レンジ {prev_low}-{prev_high}（{prev_range_atr}ATR）　終位置 {prev_close_position}
-ローソク足 {prev_candle}
-前日前場 VWAP{〇/×/N/A}
-後場評価 {previous_pm_evaluation} / VWAP{上/下/N/A}
-高値切り上げ {〇/×/N/A} / 安値切り上げ {〇/×/N/A}
-前日高値更新 {〇/×/N/A}
-出来高比 {prev_volume_vs_avg20_pct}（20日平均 {volume_avg20}株）
-
-3日騰落率 {change_3d_pct}
-5日線 {ma5}（乖離 {dev5_pct}）{ma5_slope}
+前日ローソク足型：　{prev_candle_body_label}＋{prev_wick_label}
 ```
 
-追加予定フィールド:
+フィールド:
 
 | field | 算出元 | 用途 |
 |---|---|---|
 | `prev_close` / `prev_high` / `prev_low` | 前日の日足 | 終値、前日レンジ |
-| `prev_vwap` | 前日の日中足。取得不可時の扱いは確認事項 | 終値のVWAP差分 |
-| `prev_am_vwap_maintained` | 前日前場の終値または前場終端価格と前日前場VWAP | `前日前場 VWAP〇/×` |
+| `prev_vwap` | 前日5分足の前日全体VWAP | 終値のVWAP差分 |
+| `prev_vwap_diff_price` | `prev_close - prev_vwap` | VWAPからの価格差 |
+| `prev_vwap_diff_pct` | `prev_close / prev_vwap - 1` の百分率 | VWAPからの乖離率 |
+| `prev_vwap_diff_atr` | `prev_vwap_diff_price / atr14` | VWAP差分のATR換算 |
+| `prev_am_vwap_maintained` | 前日前場の終端価格と前日前場VWAP | `前日Vwap(前・後場)` の前場側。終端価格がVWAP以上なら `〇`、下なら `×`、欠損なら `N/A` |
+| `prev_pm_vwap_maintained` | 前日終値と前日後場VWAP | `前日Vwap(前・後場)` の後場側。終値が後場VWAP以上なら `〇`、下なら `×`、欠損なら `N/A` |
+| `previous_pm_vwap_position` | 前日終値と前日後場VWAP | `上` / `下` / `N/A` |
 | `previous_pm_evaluation` | 前日後場の `pm_open`, `pm_high`, `pm_low`, `close`, `vwap` | 後場評価ラベル |
-| `prev_high_higher` / `prev_low_higher` | 前日足と前々日足の高値・安値比較 | 高値/安値切り上げ |
-| `prev_high_breakout` | 前日高値と前々日以前の比較対象高値 | 前日高値更新 |
-| `change_3d_pct` | 前日終値と3営業日前終値 | 3日騰落率 |
-| `ma5_slope` | 前日時点5日線とその前営業日の5日線 | 5日線の上昇/横ばい/下降 |
+| `prev_high_higher` | 前日高値と前々日高値 | 前日高値 > 前々日高値なら `〇`、それ以外は `×`、欠損なら `N/A` |
+| `prev_low_higher` | 前日安値と前々日安値 | 前日安値 >= 前々日安値なら `〇`、それ以外は `×`、欠損なら `N/A`。表示ラベルは `安値維持` |
+| `prev_volume_vs_avg20_pct` | 前日出来高と前日基準20日平均出来高 | `前日出来高比` |
+| `prev_candle_body_label` | 前日の日足OHLC | ローソク足の実体分類 |
+| `prev_wick_label` | 前日の日足OHLC | `上髭` / `下髭` / `追加記載なし` |
 
-#### 5.5.2 後場評価の判定仕様案
+#### 5.5.2 ローソク足型・ヒゲ判定
+
+入力値は前日の日足 `open`, `high`, `low`, `close` とする。
+
+派生値:
+
+```text
+range = high - low
+body = abs(close - open)
+body_ratio = body / range
+upper_wick = high - max(open, close)
+lower_wick = min(open, close) - low
+upper_wick_ratio = upper_wick / range
+lower_wick_ratio = lower_wick / range
+```
+
+`range <= 0` または必要値欠損時は、ローソク足型・ヒゲとも `N/A` とする。
+
+ローソク足型:
+
+| 条件 | 陽線系 | 陰線系 |
+|---|---|---|
+| `body_ratio < 0.10` | `十字` | `十字` |
+| `0.10 <= body_ratio < 0.30` | `小陽線` | `小陰線` |
+| `0.30 <= body_ratio < 0.65` | `陽線` | `陰線` |
+| `0.65 <= body_ratio` | `大陽線` | `大陰線` |
+
+- 陽線系は `close > open`、陰線系は `close < open` とする。
+- `close == open` は `十字` とする。
+
+ヒゲ:
+
+| 優先 | ラベル | 条件 |
+|---:|---|---|
+| 1 | `上髭` | `upper_wick_ratio >= 0.30` かつ `upper_wick >= body * 1.5` かつ `upper_wick > lower_wick` |
+| 2 | `下髭` | `lower_wick_ratio >= 0.30` かつ `lower_wick >= body * 1.5` かつ `lower_wick > upper_wick` |
+| 3 | `追加記載なし` | 上記以外 |
+
+- 上髭と下髭の条件が同時に成立し、長さが同値の場合は `追加記載なし` とする。
+
+#### 5.5.3 後場評価の判定仕様
 
 入力値は前日の後場開始価格 `pm_open`、後場高値 `pm_high`、後場安値 `pm_low`、終値 `close`、前日VWAP `vwap` とする。
 
@@ -179,18 +224,18 @@ pm_return_pct = (close / pm_open - 1) * 100
 pm_close_position = (close - pm_low) / (pm_high - pm_low)
 ```
 
-判定区分は `後場上昇` / `高値維持` / `横ばいVWAP維持` / `失速もVWAP維持` / `後場VWAP割` とする。境界条件と重複を解消するため、実装では上から順に評価する優先順位方式を採用する案とする。
+判定区分は `後場上昇` / `高値維持` / `横ばいVWAP維持` / `失速もVWAP維持` / `後場VWAP割` とする。境界条件と重複を解消するため、実装では上から順に評価する優先順位方式を採用する。
 
 | 優先 | ラベル | 条件案 | 備考 |
 |---:|---|---|---|
 | 1 | `N/A` | `pm_open`, `pm_high`, `pm_low`, `close`, `vwap` のいずれかが欠損、または `pm_high <= pm_low` | 0値幅では終値位置を定義できない |
-| 2 | `後場VWAP割` | `close <= vwap` | `close == vwap` は確認事項。漏れ防止の暫定案では保守的にVWAP割側へ寄せる |
+| 2 | `後場VWAP割` | `close <= vwap` | `close == vwap` は保守的にVWAP割側へ寄せる |
 | 3 | `失速もVWAP維持` | `close > vwap` かつ (`pm_return_pct < -1` または `pm_close_position < 0.30`) | `pm_close_position < 0.30` は横ばい条件と重複し得るため、失速を優先する案 |
 | 4 | `後場上昇` | `close > pm_open` かつ `close > vwap` かつ `pm_close_position >= 0.70` | `高値維持` と重複し得るため、上昇を優先する案 |
 | 5 | `高値維持` | `close > vwap` かつ `pm_close_position >= 0.50` かつ `-1 <= pm_return_pct <= 1` | 横ばい圏で高値側を維持 |
 | 6 | `横ばいVWAP維持` | `close > vwap` かつ `0.30 <= pm_close_position < 0.50` かつ `-1 <= pm_return_pct <= 1` | `pm_close_position < 0.30` は失速へ寄せる |
-| 7 | `後場上昇`（暫定フォールバック） | `close > vwap` かつ `pm_return_pct > 1` | 後場騰落率が+1%超だが終値位置70%未満の漏れを防ぐ暫定案。採用可否は確認事項 |
-| 8 | `横ばいVWAP維持`（暫定フォールバック） | `close > vwap` | 上記に該当しないVWAP上ケースの漏れを防ぐ暫定案。採用可否は確認事項 |
+| 7 | `後場上昇` | `close > vwap` かつ `pm_return_pct > 1` | 後場騰落率が+1%超だが終値位置70%未満の漏れを防ぐフォールバック |
+| 8 | `横ばいVWAP維持` | `close > vwap` | 上記に該当しないVWAP上ケースの漏れを防ぐフォールバック |
 
 検証結果:
 
@@ -198,16 +243,16 @@ pm_close_position = (close - pm_low) / (pm_high - pm_low)
 - `横ばいVWAP維持` と `失速もVWAP維持` は、`close > vwap`、`pm_close_position < 0.30`、かつ `-1 <= pm_return_pct <= 1` のケースで重複する。
 - `close > vwap`、`pm_return_pct > 1`、かつ `pm_close_position < 0.70` のケースは、指定条件だけではどのラベルにも入らない。
 - `close == vwap`、`pm_high == pm_low`、欠損値をどう扱うかは指定条件だけでは未定義である。
-- 以上により、実装前に「優先順位」「等号境界」「フォールバックラベル」を確定する必要がある。
+- 優先順位方式により、上記の重複と漏れを解消する。
 
-確認事項:
+#### 5.5.4 yFinance API回数の見込み
 
-1. `close == vwap` は `後場VWAP割` として扱ってよいか。それとも `VWAP同値` 相当の別表示、または `N/A` にするか。
-2. `pm_close_position < 0.30` かつ後場騰落率が `-1% ～ +1%` の重複ケースは、`失速もVWAP維持` を優先してよいか。
-3. `後場上昇` と `高値維持` の重複ケースは、より強い評価として `後場上昇` を優先してよいか。
-4. `close > vwap`、後場騰落率 `> +1%`、終値位置 `< 70%` の漏れケースは、暫定フォールバックどおり `後場上昇` に寄せてよいか。
-5. 前日VWAP・前日前場VWAP・後場VWAPは、前日5分足から厳密算出できない場合に日足参考値へフォールバックするか、前日評価の該当項目を `N/A` にするか。
-6. `前日高値更新` の比較対象は、前々日高値、直近5日高値、直近20日高値のどれを正とするか。
+- Technical取得1銘柄あたり、通常は日足履歴1回、5分足履歴1回の合計2リクエストを想定する。
+- Fundamental同時取得や機関投資サマリ作成で同じ `MarketDataBundle` を使う経路では、既存どおり日足・5分足を再利用する。
+- 5分足取得を `period="1d"` から `period="5d"` に広げても、リクエスト回数は増えない。増えるのはレスポンス内のバー本数である。
+- 既存キャッシュTTLは、日足12時間、5分足5分である。短時間に同一銘柄を再取得した場合、5分足は5分間キャッシュされる。
+- yFinanceは公式の固定レート上限を公開していないため、厳密な上限保証はできない。通常の手動GUI操作や少数銘柄の連続確認では問題になりにくいが、数十〜数百銘柄を短時間に一括取得する用途ではレート制限・一時失敗の可能性がある。
+- レート制限対策が必要になった場合は、5分足TTL延長、銘柄間スリープ、失敗時バックオフ、監視銘柄一括処理時の取得数制限を追加する。
 
 ### 5.6 節目
 
@@ -236,3 +281,15 @@ Technical出力と機関投資サマリ固定パネルの表示順・文言・�
 | `build_technical_output()` | Technical分析結果をテキストへ変換するBuilder |
 | `InstitutionalSummary` | 機関投資サマリ表示用DTO |
 | `institutional_summary.py` | 機関投資スコア、Technical条件、固定パネル用の純計算 |
+
+## 8. 前日評価リニューアル 作業分割と進捗
+
+本節は、前日評価リニューアル作業中の分割コミット計画と進捗を管理する。実装完了後、必要に応じて進捗ログは整理する。
+
+| Commit | 作業 | 対象 | 進捗 |
+|---:|---|---|---|
+| 1 | 仕様確定 | `docs/display_spec.md`, `docs/unite_tech_spec.md` | 完了 |
+| 2 | 日足ベースの前日評価DTO拡張 | `app/domain/models/technical_snapshot.py`, `app/domain/policies/technical_indicators.py`, `tests/test_technical_indicators.py` | 未着手 |
+| 3 | 前日5分足から前場/後場VWAP・後場評価を算出 | `app/data/market_data_provider.py`, `app/domain/usecases/technical_analysis.py`, 関連テスト | 未着手 |
+| 4 | `■前日評価` の表示を新フォーマットへ変更 | `app/domain/builders/technical_output.py`, `tests/test_technical_output.py` | 未着手 |
+| 5 | 結合確認と仕様進捗更新 | 関連テスト、仕様書の進捗欄 | 未着手 |

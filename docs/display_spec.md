@@ -450,21 +450,18 @@ RSI：{rsi}　20日平均出来高比：{volume_vs_avg20}
 
 ```text
 ■前日評価
-終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}ATR）
+終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}ATR）騰落率{prev_change_pct}
+
+前日Vwap(前・後場)　{prev_am_vwap_maintained}/{prev_pm_vwap_maintained}  高値更新 {prev_high_higher} / 安値維持 {prev_low_higher}
+前日出来高比　　{prev_volume_vs_avg20_pct}
+
+後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
 
 前日レンジ {prev_low}-{prev_high}（{prev_range_atr}ATR）　終位置 {prev_close_position}
-ローソク足 {prev_candle}
-前日前場 VWAP{prev_am_vwap_maintained}
-後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
-高値切り上げ {prev_high_higher} / 安値切り上げ {prev_low_higher}
-前日高値更新 {prev_high_breakout}
-出来高比 {prev_volume_vs_avg20_pct}（20日平均 {volume_avg20}株）
-
-3日騰落率 {change_3d_pct}
-5日線 {ma5}（乖離 {dev5_pct}）{ma5_slope}
+前日ローソク足型：　{prev_candle_body_label}＋{prev_wick_label}
 ```
 
-後場評価のラベル、判定優先順位、未定義ケースの確認事項は `docs/unite_tech_spec.md` の「5.5.2 後場評価の判定仕様案」を参照する。
+後場評価のラベル、判定優先順位、ローソク足型、ヒゲ判定、前場/後場VWAP、API回数見込みは `docs/unite_tech_spec.md` の「5.5 前日評価」を参照する。
 
 ### 6.6 支持線
 
