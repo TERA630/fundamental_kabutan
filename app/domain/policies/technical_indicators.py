@@ -260,6 +260,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     prev_prev_close = _none_if_nan(prev_prev_row["Close"]) if prev_prev_row is not None else None
     prev_prev_high = _none_if_nan(prev_prev_row["High"]) if prev_prev_row is not None else None
     prev_prev_low = _none_if_nan(prev_prev_row["Low"]) if prev_prev_row is not None else None
+    prev_prev_volume = _none_if_nan(prev_prev_row["Volume"]) if prev_prev_row is not None else None
     prev_range = (prev_high - prev_low) if prev_high is not None and prev_low is not None else None
     prev_close_position = _safe_div(prev_close - prev_low, prev_range) if prev_close is not None and prev_low is not None else None
     prev_vol_delta_pct = _pct_change(prev_volume, prev_volume_avg20)
@@ -312,6 +313,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         prev_range_atr=_safe_div(prev_range, atr14),
         prev_close_position=prev_close_position,
         prev_volume_vs_avg20_pct=prev_vol_ratio_pct,
+        prev_volume_change_pct=_pct_change(prev_volume, prev_prev_volume),
         prev_high_higher=label_high_higher(prev_high, prev_prev_high),
         prev_low_higher=label_low_higher(prev_low, prev_prev_low),
         candle_body_label=label_candle_body(prev_open, prev_high, prev_low, prev_close),

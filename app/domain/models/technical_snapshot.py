@@ -60,6 +60,7 @@ class PreviousSessionSnapshot:
     prev_range_atr: float | None
     prev_close_position: float | None
     prev_volume_vs_avg20_pct: float | None
+    prev_volume_change_pct: float | None
     prev_high_higher: bool | None
     prev_low_higher: bool | None
     candle_body_label: CandleBodyLabel

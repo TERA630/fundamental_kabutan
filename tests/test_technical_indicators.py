@@ -79,6 +79,7 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.previous_session.prev_high_higher is True
     assert snapshot.previous_session.prev_low_higher is True
     assert snapshot.previous_session.prev_volume_vs_avg20_pct == pytest.approx(1068 / 1058.5 * 100)
+    assert snapshot.previous_session.prev_volume_change_pct == pytest.approx((1068 / 1067 - 1) * 100)
     assert snapshot.previous_session.pullback in {"押し", "中立", "崩れ", "判定不可"}
     assert snapshot.breakline.recent5_high == pytest.approx(170.0)
     assert snapshot.breakline.recent20_high == pytest.approx(170.0)

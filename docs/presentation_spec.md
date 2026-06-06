@@ -131,11 +131,11 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 2. 先頭サマリ
 3. `■モメンタム`
 4. `■当日位置・レンジ`
-5. `■移動平均・出来高`
+5. `■移動平均`
 6. `■前日評価`
 7. `■支持線`
 
-先頭サマリは、現在値、前日比、終端位置、取得時刻、25日線解離、25日線傾き、VWAP差分を表示する。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
+先頭サマリは、現在値、前日比、終端位置、取得時刻、25日線解離、25日線傾き、VWAP差分、当日出来高の20日平均比を表示する。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
 
 `■モメンタム` は、3営業日前、2営業日前、前営業日の順に、高値更新、安値切り上げ、3日騰落率、20日平均出来高比を表示する。
 
@@ -149,6 +149,7 @@ Technicalタブの表示例は次の通り。
 取得時刻：{intraday_price_timestamp}
 25日線解離：{dev25_pct}({ma25_distance_atr})　傾き：{ma25_slope_symbol}
 Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
+当日出来高：20日平均比　{volume_vs_avg20_pct}
 
 ■モメンタム
 3日高値更新：{high_breakout_3bd_ago}{high_breakout_2bd_ago}{high_breakout_1bd_ago}
@@ -163,17 +164,16 @@ Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
 終値：{close}
 当日値幅：{day_range}（ATR比 {day_range_atr} / {day_range_label}）
 
-■移動平均・出来高
+■移動平均
 5日線：{ma5}（乖離 {dev5_pct}）
 25日線：{ma25}（乖離 {dev25_pct} / ATR比 {ma25_distance_atr}）
 14日ATR：{atr14}
-出来高：{volume}
 
 ■前日評価
 終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
 
 前日Vwap(前・後場)　{am_mark}/{pm_mark}  高値更新 {high_mark} / 安値維持 {low_mark}
-前日出来高比　　{prev_volume_vs_avg20_pct}
+前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
 
 後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
 
@@ -192,6 +192,10 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 
 25日線のATR比は25日線からの距離の大きさとして表示する。VWAPのATR比は `latest - vwap` を `atr14` で割った符号付き値として表示する。
 
+当日出来高の20日平均比は、当日出来高を当日時点の20日平均出来高で割った比率として表示する。`■移動平均` ブロックでは当日出来高の実数は表示しない。
+
+前日出来高の20日平均比は、前営業日の出来高を前営業日時点の20日平均出来高で割った比率として表示する。前々日比は、前営業日の出来高を前々営業日の出来高で割った騰落率として表示する。
+
 `■モメンタム` の各値は次の通り。
 
 - `3日高値更新`: 各対象営業日の高値が、その対象営業日の直前3営業日の高値最大値を上回る場合に `〇`、上回らない場合に `×` とする。
@@ -208,7 +212,7 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
 
 前日Vwap(前・後場)　{am_mark}/{pm_mark}  高値更新 {high_mark} / 安値維持 {low_mark}
-前日出来高比　　{prev_volume_vs_avg20_pct}
+前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
 
 後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
 

@@ -68,18 +68,20 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "25日線解離：" in output
     assert "　傾き：↑" in output
     assert "Vwap：" in output
+    assert "当日出来高：20日平均比　101%" in output
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
     assert "3日安値切り上げ：〇〇〇" in output
     assert "3日騰落率　+1.2%" in output
     assert "3日出来高　101%→101%→101%" in output
     assert "■当日位置・レンジ" in output
-    assert "■移動平均・出来高" in output
-    assert "出来高：1,069株" in output
+    assert "■移動平均" in output
+    assert "■移動平均・出来高" not in output
+    assert "出来高：1,069株" not in output
     assert "■前日評価" in output
     assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
     assert "前日Vwap(前・後場)　〇/〇  高値更新 〇 / 安値維持 〇" in output
-    assert "前日出来高比　　100.9%" in output
+    assert "前日出来高：　20日平均比　100.9%(前々日比　+0.1%)" in output
     assert "後場評価 高値維持 / VWAP上" in output
     assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
     assert "前日ローソク足型：　小陽線" in output
