@@ -166,14 +166,24 @@ def test_build_previous_session_intraday_snapshot():
             "High": [102.0, 103.0, 103.0, 105.0],
             "Low": [99.0, 100.0, 101.0, 101.0],
             "Close": [101.0, 102.0, 102.0, 104.0],
-            "Volume": [1000.0, 1000.0, 1000.0, 1000.0],
+            "Volume": [1000.0, 2000.0, 1000.0, 3000.0],
         },
         index=pd.to_datetime(["2026-05-28 09:00", "2026-05-28 11:25", "2026-05-28 12:30", "2026-05-28 14:55"]),
     )
 
     snapshot = provider.build_previous_session_intraday_snapshot(daily, intraday)
+    typical_1 = (102.0 + 99.0 + 101.0) / 3
+    typical_2 = (103.0 + 100.0 + 102.0) / 3
+    typical_3 = (103.0 + 101.0 + 102.0) / 3
+    typical_4 = (105.0 + 101.0 + 104.0) / 3
+    expected_prev_vwap = ((typical_1 * 1000.0) + (typical_2 * 2000.0) + (typical_3 * 1000.0) + (typical_4 * 3000.0)) / 7000.0
+    expected_am_vwap = ((typical_1 * 1000.0) + (typical_2 * 2000.0)) / 3000.0
+    expected_pm_vwap = ((typical_3 * 1000.0) + (typical_4 * 3000.0)) / 4000.0
 
     assert snapshot["prev_vwap_source"] == "前日5分足"
+    assert snapshot["prev_vwap"] == pytest.approx(expected_prev_vwap)
+    assert snapshot["prev_am_vwap"] == pytest.approx(expected_am_vwap)
+    assert snapshot["prev_pm_vwap"] == pytest.approx(expected_pm_vwap)
     assert snapshot["prev_am_vwap_maintained"] is True
     assert snapshot["prev_pm_vwap_maintained"] is True
     assert snapshot["previous_pm_vwap_position"] == "上"

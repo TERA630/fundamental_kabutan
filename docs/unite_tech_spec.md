@@ -292,4 +292,10 @@ Technical出力と機関投資サマリ固定パネルの表示順・文言・�
 | 2 | 日足ベースの前日評価DTO拡張 | `app/domain/models/technical_snapshot.py`, `app/domain/policies/technical_indicators.py`, `tests/test_technical_indicators.py` | 完了 |
 | 3 | 前日5分足から前場/後場VWAP・後場評価を算出 | `app/data/market_data_provider.py`, `app/domain/usecases/technical_analysis.py`, 関連テスト | 完了 |
 | 4 | `■前日評価` の表示を新フォーマットへ変更 | `app/domain/builders/technical_output.py`, `tests/test_technical_output.py` | 完了 |
-| 5 | 結合確認と仕様進捗更新 | 関連テスト、仕様書の進捗欄 | 未着手 |
+| 5 | 結合確認と仕様進捗更新 | 関連テスト、仕様書の進捗欄 | 完了 |
+
+検証メモ:
+
+- 前日出来高比は `tests/test_technical_indicators.py` で、前日出来高 `1068`、前日基準20日平均出来高 `1058.5` から `1068 / 1058.5 * 100` になることを確認する。
+- 前日VWAP、前日前場VWAP、前日後場VWAPは `tests/test_market_data_provider_technical.py` で、5分足の `typical_price = (High + Low + Close) / 3` を出来高加重して算出することを確認する。
+- 表示上の前日VWAP差分、前日出来高比、後場評価、VWAP位置は `tests/test_technical_output.py` で確認する。
