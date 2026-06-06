@@ -92,6 +92,7 @@ def test_build_analysis_result_fetches_and_caches_histories():
     second = service.build_analysis_result(name="Sample", code4="1234")
 
     assert first.snapshot.price.latest == 169.0
+    assert first.intraday_price_timestamp == "2026-04-07 14:55"
     assert first.vwap_snapshot["vwap_source"] == "本日5分足"
     assert first.previous_intraday_snapshot["prev_vwap_source"] == "前日5分足"
     assert first.previous_intraday_snapshot["prev_am_vwap_maintained"] is True
@@ -112,6 +113,7 @@ def test_build_analysis_result_falls_back_to_daily_reference_vwap():
 
     assert result.vwap_snapshot["vwap_source"] == "日足参考値"
     assert result.vwap_snapshot["latest_bar_time"] == "終値"
+    assert result.intraday_price_timestamp == "2026-04-08 終値"
     assert result.previous_intraday_snapshot["previous_pm_evaluation"] == "N/A"
 
 
@@ -128,5 +130,6 @@ def test_build_analysis_result_from_market_data_bundle():
     assert result.name == "Sample"
     assert result.code4 == "1234"
     assert result.snapshot.price.latest == 169.0
+    assert result.intraday_price_timestamp == "2026-04-07 14:55"
     assert result.vwap_snapshot["vwap_source"] == "本日5分足"
     assert result.previous_intraday_snapshot["prev_pm_vwap_maintained"] is True

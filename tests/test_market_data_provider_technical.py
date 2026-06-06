@@ -163,7 +163,9 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["vwap"] == expected_vwap
     assert snapshot["latest_bar_time"] == "09:10"
     assert snapshot["latest_price_source"] == "intraday_5m"
+    assert snapshot["latest_price_timestamp"] == "2026-05-29 09:10"
     assert snapshot["vwap_source"] == "本日5分足"
+    assert snapshot["vwap_timestamp"] == "2026-05-29 09:10"
 
 
 def test_build_previous_session_intraday_snapshot():
@@ -249,6 +251,7 @@ def test_build_daily_reference_vwap_snapshot():
     assert snapshot["vwap"] == (110 + 90 + 105) / 3
     assert snapshot["latest_bar_time"] == "終値"
     assert snapshot["latest_price_source"] == "daily_close"
+    assert snapshot["latest_price_timestamp"] == "2026-05-29 終値"
     assert snapshot["vwap_source"] == "日足参考値"
     assert snapshot["vwap_timestamp"] == "2026-05-29 終値"
 

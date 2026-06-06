@@ -37,6 +37,7 @@ class TechnicalAnalysisResult:
     name: str
     code4: str
     snapshot: TechnicalSnapshot
+    intraday_price_timestamp: str | None
     vwap_snapshot: dict[str, float | str | None]
     previous_intraday_snapshot: dict[str, float | str | bool | None]
 
@@ -115,6 +116,7 @@ class TechnicalAnalysisService:
             name=name,
             code4=code4,
             snapshot=snapshot,
+            intraday_price_timestamp=_as_optional_str(vwap_snapshot.get("latest_price_timestamp")),
             vwap_snapshot=vwap_snapshot,
             previous_intraday_snapshot=previous_intraday_snapshot,
         )
@@ -136,6 +138,10 @@ class TechnicalAnalysisService:
         frame = self.fetch_intraday_history(code4)
         self.file_cache.set(key, dataframe_to_cache_payload(frame))
         return frame
+
+
+def _as_optional_str(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
 
 
 __all__ = [
