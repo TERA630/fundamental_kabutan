@@ -450,12 +450,21 @@ RSI：{rsi}　20日平均出来高比：{volume_vs_avg20}
 
 ```text
 ■前日評価
-前日騰落率：{prev_change_pct}
+終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}ATR）
 
-前日Vwap維持：{〇/×/N/A}
-ローソク：{candle} / {wick_shape}
-押し判定：{pullback}
+前日レンジ {prev_low}-{prev_high}（{prev_range_atr}ATR）　終位置 {prev_close_position}
+ローソク足 {prev_candle}
+前日前場 VWAP{prev_am_vwap_maintained}
+後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
+高値切り上げ {prev_high_higher} / 安値切り上げ {prev_low_higher}
+前日高値更新 {prev_high_breakout}
+出来高比 {prev_volume_vs_avg20_pct}（20日平均 {volume_avg20}株）
+
+3日騰落率 {change_3d_pct}
+5日線 {ma5}（乖離 {dev5_pct}）{ma5_slope}
 ```
+
+後場評価のラベル、判定優先順位、未定義ケースの確認事項は `docs/unite_tech_spec.md` の「5.5.2 後場評価の判定仕様案」を参照する。
 
 ### 6.6 支持線
 
