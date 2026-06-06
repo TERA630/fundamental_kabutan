@@ -291,5 +291,5 @@ Technical出力と機関投資サマリ固定パネルの表示順・文言・�
 | 1 | 仕様確定 | `docs/display_spec.md`, `docs/unite_tech_spec.md` | 完了 |
 | 2 | 日足ベースの前日評価DTO拡張 | `app/domain/models/technical_snapshot.py`, `app/domain/policies/technical_indicators.py`, `tests/test_technical_indicators.py` | 完了 |
 | 3 | 前日5分足から前場/後場VWAP・後場評価を算出 | `app/data/market_data_provider.py`, `app/domain/usecases/technical_analysis.py`, 関連テスト | 完了 |
-| 4 | `■前日評価` の表示を新フォーマットへ変更 | `app/domain/builders/technical_output.py`, `tests/test_technical_output.py` | 未着手 |
+| 4 | `■前日評価` の表示を新フォーマットへ変更 | `app/domain/builders/technical_output.py`, `tests/test_technical_output.py` | 完了 |
 | 5 | 結合確認と仕様進捗更新 | 関連テスト、仕様書の進捗欄 | 未着手 |

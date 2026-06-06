@@ -24,12 +24,7 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         f"14日ATR：{_fmt_price(snapshot.range.atr14)}",
         f"出来高：{_fmt_volume(snapshot.price.volume)}",
         "",
-        "■前日評価",
-        f"前日騰落率：{_fmt_pct(snapshot.previous_session.prev_change_pct)}",
-        "",
-        f"前日Vwap維持：{_fmt_bool_mark(_is_previous_vwap_maintained(result))}",
-        f"ローソク：{snapshot.previous_session.candle} / {snapshot.previous_session.wick_shape}",
-        f"押し判定：{snapshot.previous_session.pullback}",
+        _format_previous_session(result),
         "",
         "■支持線",
         f"前日安値：{_fmt_price(snapshot.previous_session.prev_low)}",
@@ -62,9 +57,42 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     )
 
 
+def _format_previous_session(result: TechnicalAnalysisResult) -> str:
+    snapshot = result.snapshot
+    previous = snapshot.previous_session
+    intraday = result.previous_intraday_snapshot
+    prev_close = snapshot.price.prev_close
+    prev_vwap = _as_float(intraday.get("prev_vwap"))
+    prev_vwap_diff = prev_close - prev_vwap if prev_close is not None and prev_vwap is not None else None
+    prev_vwap_diff_pct = ((prev_close / prev_vwap) - 1) * 100 if prev_close is not None and prev_vwap not in (None, 0) else None
+    prev_vwap_diff_atr = _safe_div(prev_vwap_diff, snapshot.range.atr14)
+    pm_evaluation = intraday.get("previous_pm_evaluation")
+    pm_vwap_position = intraday.get("previous_pm_vwap_position")
+    return "\n".join(
+        [
+            "■前日評価",
+            f"終値 {_fmt_price_compact(prev_close)}（VWAP {_fmt_price_signed_compact(prev_vwap_diff)}円 / {_fmt_pct(prev_vwap_diff_pct)} / {_fmt_atr_unsigned(prev_vwap_diff_atr)}）騰落率{_fmt_pct(previous.prev_change_pct)}",
+            "",
+            f"前日Vwap(前・後場)　{_fmt_bool_mark(_as_bool(intraday.get('prev_am_vwap_maintained')))}/{_fmt_bool_mark(_as_bool(intraday.get('prev_pm_vwap_maintained')))}  高値更新 {_fmt_bool_mark(previous.prev_high_higher)} / 安値維持 {_fmt_bool_mark(previous.prev_low_higher)}",
+            f"前日出来高比　　{_fmt_pct_unsigned(previous.prev_volume_vs_avg20_pct)}",
+            "",
+            f"後場評価 {_fmt_text(pm_evaluation)} / VWAP{_fmt_text(pm_vwap_position)}",
+            "",
+            f"前日レンジ {_fmt_price_compact(previous.prev_low)}-{_fmt_price_compact(previous.prev_high)}（{_fmt_atr_unsigned(previous.prev_range_atr)}）　終位置 {_fmt_position_pct(previous.prev_close_position)}",
+            f"前日ローソク足型：　{previous.candle_body_label}＋{previous.wick_label}",
+        ]
+    )
+
+
 def _as_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
+    return None
+
+
+def _as_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
     return None
 
 
@@ -87,6 +115,14 @@ def _fmt_price(value: float | None) -> str:
     return "N/A" if value is None else f"{value:,.2f}"
 
 
+def _fmt_price_compact(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    if float(value).is_integer():
+        return f"{value:,.0f}"
+    return f"{value:,.2f}"
+
+
 def _fmt_price_current(value: float | None) -> str:
     if value is None:
         return "N/A"
@@ -99,8 +135,20 @@ def _fmt_price_signed(value: float | None) -> str:
     return "N/A" if value is None else f"{value:+,.2f}"
 
 
+def _fmt_price_signed_compact(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    if float(value).is_integer():
+        return f"{value:+,.0f}"
+    return f"{value:+,.2f}"
+
+
 def _fmt_pct(value: float | None) -> str:
     return "N/A" if value is None else f"{value:+.1f}%"
+
+
+def _fmt_pct_unsigned(value: float | None) -> str:
+    return "N/A" if value is None else f"{value:.1f}%"
 
 
 def _fmt_position_pct(value: float | None) -> str:
@@ -134,12 +182,8 @@ def _fmt_bool_mark(value: bool | None) -> str:
     return "〇" if value else "×"
 
 
-def _is_previous_vwap_maintained(result: TechnicalAnalysisResult) -> bool | None:
-    prev_close = result.snapshot.price.prev_close
-    vwap = _as_float(result.vwap_snapshot.get("vwap"))
-    if prev_close is None or vwap is None:
-        return None
-    return prev_close >= vwap
+def _fmt_text(value: object) -> str:
+    return value if isinstance(value, str) and value else "N/A"
 
 
 def _format_previous_high_evaluation(result: TechnicalAnalysisResult) -> str:
