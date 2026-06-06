@@ -12,6 +12,7 @@ from app.data.market_data_provider import (
     TECH_INTRADAY_HISTORY_TTL_SEC,
     build_daily_reference_vwap_snapshot,
     build_intraday_vwap_snapshot,
+    build_previous_session_intraday_snapshot,
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
     fetch_yfinance_daily_history,
@@ -37,6 +38,7 @@ class TechnicalAnalysisResult:
     code4: str
     snapshot: TechnicalSnapshot
     vwap_snapshot: dict[str, float | str | None]
+    previous_intraday_snapshot: dict[str, float | str | bool | None]
 
 
 def dataframe_to_cache_payload(frame: pd.DataFrame) -> dict[str, Any]:
@@ -108,11 +110,13 @@ class TechnicalAnalysisService:
             if not intraday_history.empty
             else build_daily_reference_vwap_snapshot(daily_history)
         )
+        previous_intraday_snapshot = build_previous_session_intraday_snapshot(daily_history, intraday_history)
         return TechnicalAnalysisResult(
             name=name,
             code4=code4,
             snapshot=snapshot,
             vwap_snapshot=vwap_snapshot,
+            previous_intraday_snapshot=previous_intraday_snapshot,
         )
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:

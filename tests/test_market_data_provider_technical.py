@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from app.data import market_data_provider as provider
 
@@ -56,7 +57,7 @@ def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypa
         @staticmethod
         def download(symbol, *, period, interval, auto_adjust, progress):
             assert symbol == "7203.T"
-            assert period == "1d"
+            assert period == "5d"
             assert interval == "5m"
             assert auto_adjust is False
             assert progress is False
@@ -146,6 +147,61 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["latest_bar_time"] == "09:10"
     assert snapshot["latest_price_source"] == "intraday_5m"
     assert snapshot["vwap_source"] == "本日5分足"
+
+
+def test_build_previous_session_intraday_snapshot():
+    daily = pd.DataFrame(
+        {
+            "Open": [100.0, 105.0],
+            "High": [105.0, 106.0],
+            "Low": [99.0, 103.0],
+            "Close": [104.0, 105.0],
+            "Volume": [1000.0, 1200.0],
+        },
+        index=pd.to_datetime(["2026-05-28", "2026-05-29"]),
+    )
+    intraday = pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0, 102.0],
+            "High": [102.0, 103.0, 103.0, 105.0],
+            "Low": [99.0, 100.0, 101.0, 101.0],
+            "Close": [101.0, 102.0, 102.0, 104.0],
+            "Volume": [1000.0, 1000.0, 1000.0, 1000.0],
+        },
+        index=pd.to_datetime(["2026-05-28 09:00", "2026-05-28 11:25", "2026-05-28 12:30", "2026-05-28 14:55"]),
+    )
+
+    snapshot = provider.build_previous_session_intraday_snapshot(daily, intraday)
+
+    assert snapshot["prev_vwap_source"] == "前日5分足"
+    assert snapshot["prev_am_vwap_maintained"] is True
+    assert snapshot["prev_pm_vwap_maintained"] is True
+    assert snapshot["previous_pm_vwap_position"] == "上"
+    assert snapshot["previous_pm_evaluation"] == "後場上昇"
+    assert snapshot["pm_open"] == 102.0
+    assert snapshot["pm_high"] == 105.0
+    assert snapshot["pm_low"] == 101.0
+    assert snapshot["pm_return_pct"] == pytest.approx((104.0 / 102.0 - 1) * 100)
+    assert snapshot["pm_close_position"] == pytest.approx(0.75)
+
+
+def test_build_previous_session_intraday_snapshot_returns_na_when_previous_bars_missing():
+    daily = pd.DataFrame(
+        {
+            "Open": [100.0, 105.0],
+            "High": [105.0, 106.0],
+            "Low": [99.0, 103.0],
+            "Close": [104.0, 105.0],
+            "Volume": [1000.0, 1200.0],
+        },
+        index=pd.to_datetime(["2026-05-28", "2026-05-29"]),
+    )
+
+    snapshot = provider.build_previous_session_intraday_snapshot(daily, pd.DataFrame())
+
+    assert snapshot["prev_vwap"] is None
+    assert snapshot["previous_pm_vwap_position"] == "N/A"
+    assert snapshot["previous_pm_evaluation"] == "N/A"
 
 
 def test_build_daily_reference_vwap_snapshot():

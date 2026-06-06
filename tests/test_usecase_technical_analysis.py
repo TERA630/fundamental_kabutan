@@ -39,14 +39,22 @@ def _daily_history(rows: int = 70) -> pd.DataFrame:
 
 
 def _intraday_history() -> pd.DataFrame:
-    index = pd.date_range("2026-05-29 09:00", periods=2, freq="5min")
+    prev_date = _daily_history().index[-2].date().isoformat()
+    index = pd.to_datetime(
+        [
+            f"{prev_date} 09:00",
+            f"{prev_date} 11:25",
+            f"{prev_date} 12:30",
+            f"{prev_date} 14:55",
+        ]
+    )
     return pd.DataFrame(
         {
-            "Open": [168.0, 169.0],
-            "High": [170.0, 171.0],
-            "Low": [167.0, 168.0],
-            "Close": [169.0, 170.0],
-            "Volume": [1000.0, 2000.0],
+            "Open": [166.0, 167.0, 167.0, 168.0],
+            "High": [168.0, 169.0, 168.0, 169.0],
+            "Low": [165.0, 166.0, 166.0, 167.0],
+            "Close": [167.0, 168.0, 168.0, 168.0],
+            "Volume": [1000.0, 1000.0, 1000.0, 2000.0],
         },
         index=index,
     )
@@ -85,6 +93,9 @@ def test_build_analysis_result_fetches_and_caches_histories():
 
     assert first.snapshot.price.latest == 169.0
     assert first.vwap_snapshot["vwap_source"] == "本日5分足"
+    assert first.previous_intraday_snapshot["prev_vwap_source"] == "前日5分足"
+    assert first.previous_intraday_snapshot["prev_am_vwap_maintained"] is True
+    assert first.previous_intraday_snapshot["previous_pm_evaluation"] == "高値維持"
     assert second.snapshot.price.latest == 169.0
     assert calls == {"daily": 1, "intraday": 1}
     assert len(cache.set_calls) == 2
@@ -101,6 +112,7 @@ def test_build_analysis_result_falls_back_to_daily_reference_vwap():
 
     assert result.vwap_snapshot["vwap_source"] == "日足参考値"
     assert result.vwap_snapshot["latest_bar_time"] == "終値"
+    assert result.previous_intraday_snapshot["previous_pm_evaluation"] == "N/A"
 
 
 def test_build_analysis_result_from_market_data_bundle():
@@ -117,3 +129,4 @@ def test_build_analysis_result_from_market_data_bundle():
     assert result.code4 == "1234"
     assert result.snapshot.price.latest == 169.0
     assert result.vwap_snapshot["vwap_source"] == "本日5分足"
+    assert result.previous_intraday_snapshot["prev_pm_vwap_maintained"] is True
