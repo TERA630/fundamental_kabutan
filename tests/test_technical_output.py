@@ -64,13 +64,17 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "【銘柄】Sample (1234)" in output
     assert "株価：" in output
     assert "終端位置" in output
-    assert "トレンド：" in output
-    assert "25日線傾き：" in output
+    assert "取得時刻：2026-04-07 14:55" in output
+    assert "25日線解離：" in output
+    assert "　傾き：↑" in output
     assert "Vwap：" in output
-    assert "前日高値：" in output
+    assert "■モメンタム" in output
+    assert "3日高値更新：〇〇〇" in output
+    assert "3日安値切り上げ：〇〇〇" in output
+    assert "3日騰落率　+1.2%" in output
+    assert "3日出来高　101%→101%→101%" in output
     assert "■当日位置・レンジ" in output
     assert "■移動平均・出来高" in output
-    assert "20日平均出来高比" in output
     assert "出来高：1,069株" in output
     assert "■前日評価" in output
     assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
@@ -80,13 +84,12 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
     assert "前日ローソク足型：　小陽線" in output
     assert "前日ローソク足型：　小陽線＋" not in output
-    assert "5日高値 " in output
-    assert "20日高値まで：" in output
     assert "■支持線" in output
     assert "20日安値：" in output
     assert "60日安値：" in output
     assert "■節目・ブレイクライン" not in output
     assert "■流れ" not in output
+    assert "トレンド：" not in output
 
 
 def test_build_technical_output_marks_daily_reference_vwap():
@@ -100,6 +103,7 @@ def test_build_technical_output_marks_daily_reference_vwap():
     output = build_technical_output(result)
 
     assert "Vwap：" in output
+    assert "取得時刻：2026-04-08 終値" in output
     assert "(日足参考値)" in output
 
 

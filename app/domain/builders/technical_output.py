@@ -37,22 +37,26 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
 def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
     vwap_snapshot = result.vwap_snapshot
+    momentum = result.three_session_momentum
     latest = snapshot.price.latest
     vwap = _as_float(vwap_snapshot.get("vwap"))
     vwap_diff = latest - vwap if latest is not None and vwap is not None else None
     vwap_diff_pct = ((latest / vwap) - 1) * 100 if latest is not None and vwap not in (None, 0) else None
     vwap_diff_atr = _safe_div(vwap_diff, snapshot.range.atr14)
     vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
+    sessions = momentum.sessions
     return "\n".join(
         [
             f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）",
-            f"トレンド：{_short_trend_label(snapshot.trend)}　　　25日線傾き：{_ma25_slope_symbol(result)}",
+            f"取得時刻：{_fmt_text(result.intraday_price_timestamp)}",
+            f"25日線解離：{_fmt_pct(snapshot.moving_average.dev25_pct)}({_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)})　傾き：{_ma25_slope_symbol(result)}",
+            f"Vwap：{_fmt_price_signed(vwap_diff)}円({_fmt_pct(vwap_diff_pct)}/{_fmt_atr(vwap_diff_atr)}){vwap_source_suffix}",
             "",
-            f"Vwap：{_fmt_price_signed(vwap_diff)}円（{_fmt_pct(vwap_diff_pct)}、{_fmt_atr_unsigned(vwap_diff_atr)}）{vwap_source_suffix}",
-            f"位置：25日線 {_fmt_pct(snapshot.moving_average.dev25_pct)}（{_fmt_atr(snapshot.moving_average.ma25_distance_atr)}）",
-            f"前日高値：{_fmt_price(snapshot.previous_session.prev_high)}　前日安値：{_fmt_price(snapshot.previous_session.prev_low)}　　　　{_format_previous_high_evaluation(result)}",
-            f"5日高値 {_fmt_pct(snapshot.breakline.recent5_high_distance_pct)}　20日高値まで：{_fmt_high_remaining_pct(snapshot.breakline.recent20_high_distance_pct)} 　　60日レンジ位置 {_fmt_position_pct(snapshot.breakline.recent60_range_position)}（{snapshot.breakline.recent60_range_position_label}）",
-            f"RSI：{_fmt_number(snapshot.rsi14)}　20日平均出来高比：{_fmt_volume_ratio(snapshot.price.volume, snapshot.price.volume_avg20)}",
+            "■モメンタム",
+            f"3日高値更新：{_fmt_momentum_marks(session.high_breakout for session in sessions)}",
+            f"3日安値切り上げ：{_fmt_momentum_marks(session.low_higher for session in sessions)}",
+            f"3日騰落率　{_fmt_pct(momentum.change_pct)}",
+            f"3日出来高　{_fmt_momentum_volumes(session.volume_vs_avg20_pct for session in sessions)}",
         ]
     )
 
@@ -167,6 +171,10 @@ def _fmt_atr(value: float | None) -> str:
     return "N/A" if value is None else f"{value:+.2f}ATR"
 
 
+def _fmt_atr_distance(value: float | None) -> str:
+    return "N/A" if value is None else f"{abs(value):.2f}ATR"
+
+
 def _fmt_atr_unsigned(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.2f}ATR"
 
@@ -184,6 +192,19 @@ def _fmt_bool_mark(value: bool | None) -> str:
     if value is None:
         return "N/A"
     return "〇" if value else "×"
+
+
+def _fmt_momentum_marks(values: object) -> str:
+    return "".join(_fmt_bool_mark(_as_bool(value)) for value in values)
+
+
+def _fmt_momentum_volumes(values: object) -> str:
+    return "→".join(_fmt_volume_pct(value) for value in values)
+
+
+def _fmt_volume_pct(value: object) -> str:
+    number = _as_float(value)
+    return "N/A" if number is None else f"{number:.0f}%"
 
 
 def _fmt_text(value: object) -> str:
