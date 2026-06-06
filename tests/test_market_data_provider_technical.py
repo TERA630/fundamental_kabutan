@@ -22,7 +22,7 @@ def test_technical_cache_keys_and_ttls():
     assert provider.TECH_DAILY_HISTORY_TTL_SEC == 12 * 60 * 60
     assert provider.TECH_INTRADAY_HISTORY_TTL_SEC == 5 * 60
     assert provider.build_technical_daily_history_cache_key("7203") == "tech_daily_7203_4mo_1d"
-    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_5m"
+    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_5m_jst"
 
 
 def test_fetch_yfinance_daily_history_uses_ticker_history(monkeypatch):
@@ -69,6 +69,23 @@ def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypa
 
     assert list(out.columns) == list(provider.TECH_DAILY_COLUMNS)
     assert len(out) == 3
+
+
+def test_fetch_yfinance_intraday_history_converts_utc_index_to_jst(monkeypatch):
+    base = _history()
+    base.index = pd.date_range("2026-05-29 00:00", periods=3, freq="5min", tz="UTC")
+
+    class FakeYf:
+        @staticmethod
+        def download(symbol, *, period, interval, auto_adjust, progress):
+            return base
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    out = provider.fetch_yfinance_intraday_history("7203")
+
+    assert out.index[0] == pd.Timestamp("2026-05-29 09:00")
+    assert out.index.tz is None
 
 
 def test_build_market_snapshot_from_daily_history_uses_latest_close():

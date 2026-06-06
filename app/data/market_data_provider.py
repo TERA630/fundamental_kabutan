@@ -117,7 +117,7 @@ def build_technical_daily_history_cache_key(code4: str, *, period: str = "4mo", 
 
 
 def build_technical_intraday_history_cache_key(code4: str, *, interval: str = "5m") -> str:
-    return f"tech_intraday_{code4}_{interval}"
+    return f"tech_intraday_{code4}_{interval}_jst"
 
 
 def _empty_history() -> pd.DataFrame:
@@ -150,7 +150,7 @@ def _normalize_history_frame(history: Any) -> pd.DataFrame:
         out[column] = pd.to_numeric(out[column], errors="coerce")
     out = out.dropna(subset=["Open", "High", "Low", "Close"])
     if hasattr(out.index, "tz") and out.index.tz is not None:
-        out.index = out.index.tz_localize(None)
+        out.index = out.index.tz_convert("Asia/Tokyo").tz_localize(None)
     return out
 
 

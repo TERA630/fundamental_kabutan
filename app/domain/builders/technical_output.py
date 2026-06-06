@@ -79,9 +79,13 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
             f"後場評価 {_fmt_text(pm_evaluation)} / VWAP{_fmt_text(pm_vwap_position)}",
             "",
             f"前日レンジ {_fmt_price_compact(previous.prev_low)}-{_fmt_price_compact(previous.prev_high)}（{_fmt_atr_unsigned(previous.prev_range_atr)}）　終位置 {_fmt_position_pct(previous.prev_close_position)}",
-            f"前日ローソク足型：　{previous.candle_body_label}＋{previous.wick_label}",
+            f"前日ローソク足型：　{_format_previous_candle(previous.candle_body_label, previous.wick_label)}",
         ]
     )
+
+
+def _format_previous_candle(candle_body_label: str, wick_label: str) -> str:
+    return candle_body_label if not wick_label else f"{candle_body_label}＋{wick_label}"
 
 
 def _as_float(value: object) -> float | None:

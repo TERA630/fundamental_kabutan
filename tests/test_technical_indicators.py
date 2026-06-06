@@ -75,7 +75,7 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.range.day_close_position_label == "高値圏で終了"
     assert snapshot.previous_session.candle == "陽線"
     assert snapshot.previous_session.candle_body_label == "小陽線"
-    assert snapshot.previous_session.wick_label == "追加記載なし"
+    assert snapshot.previous_session.wick_label == ""
     assert snapshot.previous_session.prev_high_higher is True
     assert snapshot.previous_session.prev_low_higher is True
     assert snapshot.previous_session.prev_volume_vs_avg20_pct == pytest.approx(1068 / 1058.5 * 100)
@@ -134,7 +134,7 @@ def test_candle_wick_trend_and_pullback_labels():
 
     assert label_previous_wick(100, 110, 99, 102) == "上髭"
     assert label_previous_wick(105, 106, 95, 103) == "下髭"
-    assert label_previous_wick(100, 105, 95, 100) == "追加記載なし"
+    assert label_previous_wick(100, 105, 95, 100) == ""
     assert label_previous_wick(100, 100, 100, 100) == "N/A"
 
     assert label_high_higher(110, 109) is True

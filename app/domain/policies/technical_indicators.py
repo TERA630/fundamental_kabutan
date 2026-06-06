@@ -194,7 +194,7 @@ def label_previous_wick(open_value: float | None, high: float | None, low: float
         return "上髭"
     if lower_matches and lower_wick > upper_wick:
         return "下髭"
-    return "追加記載なし"
+    return ""
 
 
 def label_high_higher(prev_high: float | None, prev_prev_high: float | None) -> bool | None:

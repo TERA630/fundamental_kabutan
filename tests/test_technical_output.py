@@ -78,7 +78,8 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "前日出来高比　　100.9%" in output
     assert "後場評価 高値維持 / VWAP上" in output
     assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
-    assert "前日ローソク足型：　小陽線＋追加記載なし" in output
+    assert "前日ローソク足型：　小陽線" in output
+    assert "前日ローソク足型：　小陽線＋" not in output
     assert "5日高値 " in output
     assert "20日高値まで：" in output
     assert "■支持線" in output

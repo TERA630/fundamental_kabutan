@@ -12,7 +12,7 @@ RangeAtrLabel = Literal["浅い値幅", "通常値幅", "大きめ", "急拡大"
 CandleLabel = Literal["陽線", "陰線", "十字線"]
 WickShapeLabel = Literal["小動き", "実体大きめ", "下ヒゲ長め", "上ヒゲ長め", "小動き・十字線気味", "通常足"]
 CandleBodyLabel = Literal["大陽線", "大陰線", "陽線", "陰線", "小陽線", "小陰線", "十字", "N/A"]
-PreviousWickLabel = Literal["上髭", "下髭", "追加記載なし", "N/A"]
+PreviousWickLabel = Literal["上髭", "下髭", "", "N/A"]
 PullbackLabel = Literal["崩れ", "押し", "中立", "判定不可"]
 
 
