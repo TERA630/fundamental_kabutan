@@ -100,3 +100,18 @@ def test_build_technical_output_marks_daily_reference_vwap():
 
     assert "Vwap：" in output
     assert "(日足参考値)" in output
+
+
+def test_build_technical_output_marks_previous_session_intraday_na_when_missing():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: pd.DataFrame(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+
+    output = build_technical_output(result)
+
+    assert "終値 168（VWAP N/A円 / N/A / N/A）騰落率+0.6%" in output
+    assert "前日Vwap(前・後場)　N/A/N/A  高値更新 〇 / 安値維持 〇" in output
+    assert "後場評価 N/A / VWAPN/A" in output
