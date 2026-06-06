@@ -6,7 +6,11 @@ from app.domain.policies.technical_indicators import (
     calc_atr14,
     calc_rsi14,
     label_candle,
+    label_candle_body,
     label_close_position,
+    label_high_higher,
+    label_low_higher,
+    label_previous_wick,
     label_pullback,
     label_range_atr,
     label_range_position,
@@ -70,6 +74,11 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.range.day_close_position == pytest.approx(0.6)
     assert snapshot.range.day_close_position_label == "高値圏で終了"
     assert snapshot.previous_session.candle == "陽線"
+    assert snapshot.previous_session.candle_body_label == "小陽線"
+    assert snapshot.previous_session.wick_label == "追加記載なし"
+    assert snapshot.previous_session.prev_high_higher is True
+    assert snapshot.previous_session.prev_low_higher is True
+    assert snapshot.previous_session.prev_volume_vs_avg20_pct == pytest.approx(1068 / 1058.5 * 100)
     assert snapshot.previous_session.pullback in {"押し", "中立", "崩れ", "判定不可"}
     assert snapshot.breakline.recent5_high == pytest.approx(170.0)
     assert snapshot.breakline.recent20_high == pytest.approx(170.0)
@@ -113,6 +122,27 @@ def test_candle_wick_trend_and_pullback_labels():
     assert label_wick_shape(105, 106, 95, 104) == "下ヒゲ長め"
     assert label_wick_shape(105, 115, 104, 106) == "上ヒゲ長め"
     assert label_wick_shape(100, 105, 98, 103) == "通常足"
+
+    assert label_candle_body(100, 111, 99, 101) == "十字"
+    assert label_candle_body(100, 106, 99, 102) == "小陽線"
+    assert label_candle_body(103, 104, 97, 101) == "小陰線"
+    assert label_candle_body(100, 106, 99, 104) == "陽線"
+    assert label_candle_body(104, 105, 98, 100) == "陰線"
+    assert label_candle_body(100, 106, 99, 105) == "大陽線"
+    assert label_candle_body(105, 106, 99, 100) == "大陰線"
+    assert label_candle_body(100, 100, 100, 100) == "N/A"
+
+    assert label_previous_wick(100, 110, 99, 102) == "上髭"
+    assert label_previous_wick(105, 106, 95, 103) == "下髭"
+    assert label_previous_wick(100, 105, 95, 100) == "追加記載なし"
+    assert label_previous_wick(100, 100, 100, 100) == "N/A"
+
+    assert label_high_higher(110, 109) is True
+    assert label_high_higher(110, 110) is False
+    assert label_high_higher(None, 110) is None
+    assert label_low_higher(100, 100) is True
+    assert label_low_higher(99, 100) is False
+    assert label_low_higher(100, None) is None
 
     assert label_trend(110, 105, 100, 99) == "上昇トレンド"
     assert label_trend(90, 95, 100, 101) == "下落トレンド"

@@ -8,9 +8,11 @@ import pandas as pd
 
 from app.domain.models.technical_snapshot import (
     BreaklineSnapshot,
+    CandleBodyLabel,
     CandleLabel,
     ClosePositionLabel,
     PreviousSessionSnapshot,
+    PreviousWickLabel,
     PullbackLabel,
     RangeAtrLabel,
     RangePositionLabel,
@@ -159,6 +161,54 @@ def label_wick_shape(open_value: float | None, high: float | None, low: float | 
     return "通常足"
 
 
+def label_candle_body(open_value: float | None, high: float | None, low: float | None, close: float | None) -> CandleBodyLabel:
+    if None in (open_value, high, low, close):
+        return "N/A"
+    day_range = high - low
+    if day_range <= 0:
+        return "N/A"
+    body_ratio = abs(close - open_value) / day_range
+    if body_ratio < 0.10 or close == open_value:
+        return "十字"
+
+    bullish = close > open_value
+    if body_ratio < 0.30:
+        return "小陽線" if bullish else "小陰線"
+    if body_ratio < 0.65:
+        return "陽線" if bullish else "陰線"
+    return "大陽線" if bullish else "大陰線"
+
+
+def label_previous_wick(open_value: float | None, high: float | None, low: float | None, close: float | None) -> PreviousWickLabel:
+    if None in (open_value, high, low, close):
+        return "N/A"
+    day_range = high - low
+    if day_range <= 0:
+        return "N/A"
+    body = abs(close - open_value)
+    upper_wick = high - max(open_value, close)
+    lower_wick = min(open_value, close) - low
+    upper_matches = (upper_wick / day_range) >= 0.30 and upper_wick >= body * 1.5
+    lower_matches = (lower_wick / day_range) >= 0.30 and lower_wick >= body * 1.5
+    if upper_matches and upper_wick > lower_wick:
+        return "上髭"
+    if lower_matches and lower_wick > upper_wick:
+        return "下髭"
+    return "追加記載なし"
+
+
+def label_high_higher(prev_high: float | None, prev_prev_high: float | None) -> bool | None:
+    if prev_high is None or prev_prev_high is None:
+        return None
+    return prev_high > prev_prev_high
+
+
+def label_low_higher(prev_low: float | None, prev_prev_low: float | None) -> bool | None:
+    if prev_low is None or prev_prev_low is None:
+        return None
+    return prev_low >= prev_prev_low
+
+
 def label_pullback(prev_range_atr: float | None, prev_close_position: float | None, prev_vol_ratio: float | None) -> PullbackLabel:
     if prev_range_atr is None or prev_close_position is None:
         return "判定不可"
@@ -208,9 +258,12 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     prev_volume = _none_if_nan(prev_row["Volume"])
     prev_volume_avg20 = _none_if_nan(enriched["Volume"].shift(1).rolling(20).mean().iloc[-1])
     prev_prev_close = _none_if_nan(prev_prev_row["Close"]) if prev_prev_row is not None else None
+    prev_prev_high = _none_if_nan(prev_prev_row["High"]) if prev_prev_row is not None else None
+    prev_prev_low = _none_if_nan(prev_prev_row["Low"]) if prev_prev_row is not None else None
     prev_range = (prev_high - prev_low) if prev_high is not None and prev_low is not None else None
     prev_close_position = _safe_div(prev_close - prev_low, prev_range) if prev_close is not None and prev_low is not None else None
-    prev_vol_ratio = _pct_change(prev_volume, prev_volume_avg20)
+    prev_vol_delta_pct = _pct_change(prev_volume, prev_volume_avg20)
+    prev_vol_ratio_pct = None if prev_volume is None or prev_volume_avg20 in (None, 0) else (prev_volume / prev_volume_avg20) * 100
 
     shifted = enriched.shift(1)
     recent5_high = _none_if_nan(shifted["High"].rolling(5).max().iloc[-1])
@@ -258,10 +311,14 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         prev_range=prev_range,
         prev_range_atr=_safe_div(prev_range, atr14),
         prev_close_position=prev_close_position,
-        prev_volume_vs_avg20_pct=prev_vol_ratio,
+        prev_volume_vs_avg20_pct=prev_vol_ratio_pct,
+        prev_high_higher=label_high_higher(prev_high, prev_prev_high),
+        prev_low_higher=label_low_higher(prev_low, prev_prev_low),
+        candle_body_label=label_candle_body(prev_open, prev_high, prev_low, prev_close),
+        wick_label=label_previous_wick(prev_open, prev_high, prev_low, prev_close),
         candle=label_candle(prev_open, prev_close),
         wick_shape=label_wick_shape(prev_open, prev_high, prev_low, prev_close),
-        pullback=label_pullback(_safe_div(prev_range, atr14), prev_close_position, prev_vol_ratio),
+        pullback=label_pullback(_safe_div(prev_range, atr14), prev_close_position, prev_vol_delta_pct),
     )
     breakline = BreaklineSnapshot(
         recent5_high=recent5_high,
@@ -303,7 +360,11 @@ __all__ = [
     "calc_moving_averages",
     "calc_rsi14",
     "label_candle",
+    "label_candle_body",
     "label_close_position",
+    "label_high_higher",
+    "label_low_higher",
+    "label_previous_wick",
     "label_pullback",
     "label_range_atr",
     "label_range_position",

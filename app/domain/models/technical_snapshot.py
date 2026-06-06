@@ -11,6 +11,8 @@ RangePositionLabel = Literal["高値圏", "中段", "安値圏", "N/A"]
 RangeAtrLabel = Literal["浅い値幅", "通常値幅", "大きめ", "急拡大", "N/A"]
 CandleLabel = Literal["陽線", "陰線", "十字線"]
 WickShapeLabel = Literal["小動き", "実体大きめ", "下ヒゲ長め", "上ヒゲ長め", "小動き・十字線気味", "通常足"]
+CandleBodyLabel = Literal["大陽線", "大陰線", "陽線", "陰線", "小陽線", "小陰線", "十字", "N/A"]
+PreviousWickLabel = Literal["上髭", "下髭", "追加記載なし", "N/A"]
 PullbackLabel = Literal["崩れ", "押し", "中立", "判定不可"]
 
 
@@ -58,6 +60,10 @@ class PreviousSessionSnapshot:
     prev_range_atr: float | None
     prev_close_position: float | None
     prev_volume_vs_avg20_pct: float | None
+    prev_high_higher: bool | None
+    prev_low_higher: bool | None
+    candle_body_label: CandleBodyLabel
+    wick_label: PreviousWickLabel
     candle: CandleLabel
     wick_shape: WickShapeLabel
     pullback: PullbackLabel
@@ -100,9 +106,11 @@ class TechnicalSnapshot:
 
 __all__ = [
     "BreaklineSnapshot",
+    "CandleBodyLabel",
     "CandleLabel",
     "ClosePositionLabel",
     "PreviousSessionSnapshot",
+    "PreviousWickLabel",
     "PullbackLabel",
     "RangeAtrLabel",
     "RangePositionLabel",
