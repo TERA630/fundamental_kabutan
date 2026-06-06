@@ -1,29 +1,30 @@
 # 仕様書インデックス
 
-このディレクトリでは、責務ごとに正本仕様を分ける。
-完了済みの実装工程・PR分割・作業ログは仕様書へ残さない。
+## 正本
 
-## 正本仕様
+現行実装の正本仕様は `current_implementation_spec.md` とする。
+画面表示の詳細仕様は `screen_spec.md` とする。
+プレゼンテーション層の詳細仕様は `presentation_spec.md` とする。
 
-| 責務 | 正本 | 内容 |
-|------|------|------|
-| 全体アーキテクチャ / Domain責務 | `domain_spec_proposal.md` | Data / Domain / UseCase / Presentation / GUI の境界、主要モデル、計算ルール |
-| 表示仕様 | `display_spec.md` | GUI共通文言、Fundamental / Technical出力、機関投資サマリ固定パネル |
-| Technicalデータ / 指標 | `unite_tech_spec.md` | Technicalタブ、Technicalデータ取得、Technical指標作成 |
-| 監視銘柄サマリ | `summery_spec.md` | `fundamental_summery-yyyy-mm-dd.md` の出力仕様 |
-| rankCF採点ルール | `rankCF_spec.md` | スコア配点、ランク、免責・補正、総合判定 |
-| rankCF実装責務 | `cf_scoring_design.md` | rankCF のモデル、UseCase接続、Presentation接続 |
-| アナリスト予想 | `analyst_estimates_spec.md` | yFinanceアナリスト目標株価・EPS修正人数の取得と表示 |
-| Web UI案 | `web_ui_design.md` | Flask Web UI の未実装設計案 |
+この仕様書は、分割されていた表示仕様、Technical仕様、Domain責務、rankCF、監視銘柄サマリ、アナリスト予想の内容を統合し、次の責務ごとに整理している。
 
-## アーカイブ
+- 画面表示案
+- プレゼンテーション層
+- ドメイン層
+- データー層
 
-`archive/` は過去の提案・表示ラフを残す場所とする。
-正本仕様ではないため、実装判断では上記の正本仕様を優先する。
+## 分離仕様
+
+- `screen_spec.md`: GUI画面表示、操作、ステータス、固定パネル、GUI出力キャッシュ表示
+- `presentation_spec.md`: 出力テキスト、Markdown、表示用セクション、数値表現、N/A表現
+
+## 案
+
+- `web_ui_design.md` は未実装のWeb UI案であり、現行実装仕様ではない。
 
 ## 運用ルール
 
-- 実装済みの作業工程、完了日、PRログは残さない。
-- 仕様と実装が異なる可能性がある場合は、仕様書へ確定内容として書かず、確認事項として扱う。
-- 新しい仕様は、責務が最も近い正本へ追記する。
+- 完了済みの作業工程、PR分割、進捗ログは正本仕様に残さない。
+- 仕様と実装が異なる可能性がある場合は、確定内容として書かず確認事項として扱う。
+- 新しい仕様は `current_implementation_spec.md` へ追記する。
 - 提案段階の案は、正本へ混ぜずに明示的に「案」として分離する。
