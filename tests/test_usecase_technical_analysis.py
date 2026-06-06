@@ -1,7 +1,9 @@
 import pandas as pd
+import pytest
 
 from app.domain.usecases.technical_analysis import (
     TechnicalAnalysisService,
+    build_three_session_momentum,
     dataframe_from_cache_payload,
     dataframe_to_cache_payload,
 )
@@ -93,6 +95,7 @@ def test_build_analysis_result_fetches_and_caches_histories():
 
     assert first.snapshot.price.latest == 169.0
     assert first.intraday_price_timestamp == "2026-04-07 14:55"
+    assert first.three_session_momentum.change_pct == pytest.approx((168.0 / 166.0 - 1) * 100)
     assert first.vwap_snapshot["vwap_source"] == "本日5分足"
     assert first.previous_intraday_snapshot["prev_vwap_source"] == "前日5分足"
     assert first.previous_intraday_snapshot["prev_am_vwap_maintained"] is True
@@ -131,5 +134,32 @@ def test_build_analysis_result_from_market_data_bundle():
     assert result.code4 == "1234"
     assert result.snapshot.price.latest == 169.0
     assert result.intraday_price_timestamp == "2026-04-07 14:55"
+    assert result.three_session_momentum.sessions[-1].session_date == "2026-04-07"
     assert result.vwap_snapshot["vwap_source"] == "本日5分足"
     assert result.previous_intraday_snapshot["prev_pm_vwap_maintained"] is True
+
+
+def test_build_three_session_momentum_from_daily_history():
+    momentum = build_three_session_momentum(_daily_history())
+
+    assert [session.session_date for session in momentum.sessions] == ["2026-04-03", "2026-04-06", "2026-04-07"]
+    assert [session.high_breakout for session in momentum.sessions] == [True, True, True]
+    assert [session.low_higher for session in momentum.sessions] == [True, True, True]
+    assert momentum.change_pct == pytest.approx((168.0 / 166.0 - 1) * 100)
+    assert [session.volume_vs_avg20_pct for session in momentum.sessions] == pytest.approx(
+        [
+            1066.0 / 1056.5 * 100,
+            1067.0 / 1057.5 * 100,
+            1068.0 / 1058.5 * 100,
+        ]
+    )
+
+
+def test_build_three_session_momentum_returns_none_for_missing_comparison_data():
+    momentum = build_three_session_momentum(_daily_history(5))
+
+    assert [session.session_date for session in momentum.sessions] == ["2026-01-02", "2026-01-05", "2026-01-06"]
+    assert [session.high_breakout for session in momentum.sessions] == [None, None, True]
+    assert [session.low_higher for session in momentum.sessions] == [True, True, True]
+    assert [session.volume_vs_avg20_pct for session in momentum.sessions] == [None, None, None]
+    assert momentum.change_pct == pytest.approx((103.0 / 101.0 - 1) * 100)

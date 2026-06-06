@@ -20,7 +20,7 @@ from app.data.market_data_provider import (
 )
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.models.technical_snapshot import TechnicalSnapshot
-from app.domain.policies.technical_indicators import build_technical_snapshot
+from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
 
 
 class TechnicalHistoryCachePort(Protocol):
@@ -33,11 +33,26 @@ TechnicalHistoryProvider = Callable[[str], pd.DataFrame]
 
 
 @dataclass(frozen=True)
+class TechnicalMomentumSession:
+    session_date: str | None
+    high_breakout: bool | None
+    low_higher: bool | None
+    volume_vs_avg20_pct: float | None
+
+
+@dataclass(frozen=True)
+class TechnicalThreeSessionMomentum:
+    sessions: tuple[TechnicalMomentumSession, TechnicalMomentumSession, TechnicalMomentumSession]
+    change_pct: float | None
+
+
+@dataclass(frozen=True)
 class TechnicalAnalysisResult:
     name: str
     code4: str
     snapshot: TechnicalSnapshot
     intraday_price_timestamp: str | None
+    three_session_momentum: TechnicalThreeSessionMomentum
     vwap_snapshot: dict[str, float | str | None]
     previous_intraday_snapshot: dict[str, float | str | bool | None]
 
@@ -117,6 +132,7 @@ class TechnicalAnalysisService:
             code4=code4,
             snapshot=snapshot,
             intraday_price_timestamp=_as_optional_str(vwap_snapshot.get("latest_price_timestamp")),
+            three_session_momentum=build_three_session_momentum(daily_history),
             vwap_snapshot=vwap_snapshot,
             previous_intraday_snapshot=previous_intraday_snapshot,
         )
@@ -144,9 +160,77 @@ def _as_optional_str(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def build_three_session_momentum(history: pd.DataFrame) -> TechnicalThreeSessionMomentum:
+    daily = normalize_daily_history(history)
+    volume_avg20 = daily["Volume"].rolling(20).mean()
+    target_positions = (-4, -3, -2)
+    sessions = tuple(_build_momentum_session(daily, volume_avg20, position) for position in target_positions)
+    return TechnicalThreeSessionMomentum(
+        sessions=sessions,
+        change_pct=_three_session_change_pct(daily),
+    )
+
+
+def _build_momentum_session(daily: pd.DataFrame, volume_avg20: pd.Series, position: int) -> TechnicalMomentumSession:
+    absolute_position = len(daily) + position
+    if absolute_position < 0 or absolute_position >= len(daily):
+        return TechnicalMomentumSession(
+            session_date=None,
+            high_breakout=None,
+            low_higher=None,
+            volume_vs_avg20_pct=None,
+        )
+
+    row = daily.iloc[absolute_position]
+    previous_row = daily.iloc[absolute_position - 1] if absolute_position >= 1 else None
+    previous_three = daily.iloc[absolute_position - 3 : absolute_position] if absolute_position >= 3 else pd.DataFrame()
+    average_volume = _as_float(volume_avg20.iloc[absolute_position])
+    volume = _as_float(row["Volume"])
+    timestamp = pd.Timestamp(daily.index[absolute_position])
+    return TechnicalMomentumSession(
+        session_date=timestamp.date().isoformat(),
+        high_breakout=_high_breakout(_as_float(row["High"]), previous_three),
+        low_higher=_low_higher(_as_float(row["Low"]), previous_row),
+        volume_vs_avg20_pct=None if volume is None or average_volume in (None, 0) else (volume / average_volume) * 100,
+    )
+
+
+def _three_session_change_pct(daily: pd.DataFrame) -> float | None:
+    if len(daily) < 4:
+        return None
+    start_close = _as_float(daily.iloc[-4]["Close"])
+    end_close = _as_float(daily.iloc[-2]["Close"])
+    if start_close in (None, 0) or end_close is None:
+        return None
+    return ((end_close / start_close) - 1) * 100
+
+
+def _high_breakout(high: float | None, previous_three: pd.DataFrame) -> bool | None:
+    if high is None or len(previous_three) < 3:
+        return None
+    previous_high = _as_float(previous_three["High"].max())
+    return None if previous_high is None else high > previous_high
+
+
+def _low_higher(low: float | None, previous_row: pd.Series | None) -> bool | None:
+    if low is None or previous_row is None:
+        return None
+    previous_low = _as_float(previous_row["Low"])
+    return None if previous_low is None else low > previous_low
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
+
+
 __all__ = [
     "TechnicalAnalysisResult",
     "TechnicalAnalysisService",
+    "TechnicalMomentumSession",
+    "TechnicalThreeSessionMomentum",
+    "build_three_session_momentum",
     "dataframe_from_cache_payload",
     "dataframe_to_cache_payload",
 ]
