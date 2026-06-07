@@ -1,0 +1,295 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --line: #d8dde6;
+  --text: #17202a;
+  --muted: #5d6978;
+  --accent: #1b6b5f;
+  --accent-strong: #15544b;
+  --warn: #8a5a00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.app-shell {
+  width: min(1280px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.app-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.app-header p {
+  margin: 0;
+  color: var(--muted);
+  text-align: right;
+}
+
+.control-band,
+.summary-panel,
+.output-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.control-band {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.control-grid,
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.control-grid .wide {
+  grid-column: span 2;
+}
+
+.toolbar {
+  grid-template-columns: minmax(260px, 1fr) auto auto auto auto auto;
+  margin-bottom: 12px;
+}
+
+label span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input[type="text"],
+input[type="file"],
+select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+button,
+.button-link {
+  min-height: 38px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover,
+.button-link:hover {
+  background: var(--accent-strong);
+}
+
+.segmented {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  min-height: 38px;
+}
+
+.segmented label span {
+  display: grid;
+  place-items: center;
+  min-width: 112px;
+  height: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--text);
+  background: #fff;
+  font-size: 14px;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+}
+
+.segmented input:checked + span {
+  background: #dfeeea;
+  color: #0f4d43;
+}
+
+.summary-panel {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.summary-panel pre,
+.output-panel textarea,
+.text-block {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+}
+
+.output-panel textarea {
+  display: block;
+  min-height: 54vh;
+  resize: vertical;
+  padding: 14px;
+  background: #fff;
+  color: var(--text);
+}
+
+.rich-output {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+}
+
+.output-block {
+  display: grid;
+  gap: 8px;
+}
+
+.output-block h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.table-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.fundamental-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fundamental-table th,
+.fundamental-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fundamental-table thead th {
+  background: #eef3f1;
+  color: #20342f;
+  font-weight: 700;
+}
+
+.fundamental-table th:first-child,
+.fundamental-table td:first-child {
+  text-align: left;
+}
+
+.fundamental-table tbody th {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.fundamental-table tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.fundamental-table tbody tr:last-child th,
+.fundamental-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.text-block {
+  padding: 0;
+  color: var(--text);
+}
+
+.copy-source {
+  position: fixed;
+  left: -100vw;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100% - 20px, 1280px);
+    padding: 14px 0;
+  }
+
+  .app-header,
+  .control-grid,
+  .toolbar {
+    grid-template-columns: 1fr;
+    display: grid;
+    align-items: stretch;
+  }
+
+  .app-header p {
+    text-align: left;
+  }
+
+  .control-grid .wide {
+    grid-column: auto;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+}
