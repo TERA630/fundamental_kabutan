@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,58 +15,12 @@ except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Fl
     request = None  # type: ignore[assignment]
     send_file = None  # type: ignore[assignment]
 
-from app.data.watchlist_repository import fetch_watchlist_entries, parse_watchlist_text
-from app.gui_controller import FundamentalGuiController
-from app.gui_state import build_output_cache_key, build_stock_choices, get_selected_stock
-from app.gui_view_model import GuiViewModel
+from app.gui_state_utils import build_output_cache_key
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
+from app.services.watchlist_service import WatchlistService
+from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
-DEFAULT_INSTITUTIONAL_SUMMARY = "機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A"
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
-
-
-@dataclass
-class WebUiState:
-    """In-memory state for the single-process Flask UI."""
-
-    controller: FundamentalGuiController = field(default_factory=FundamentalGuiController)
-    view_model: GuiViewModel = field(default_factory=GuiViewModel)
-    watchlist_path: Path | None = None
-    kabutan_html_dir: Path | None = None
-    watchlist: list[tuple[str, str]] = field(default_factory=list)
-    output_cache: dict[str, str] = field(default_factory=dict)
-    selected_label: str = ""
-    mode: str = "fundamental"
-    output: str = ""
-    institutional_summary: str = DEFAULT_INSTITUTIONAL_SUMMARY
-    status: str = field(default_factory=GuiViewModel.build_initial_status)
-
-    @property
-    def stock_choices(self) -> list[str]:
-        choices, _mapping = build_stock_choices(self.watchlist)
-        return choices
-
-
-def decode_watchlist_upload(data: bytes) -> str:
-    """Decode an uploaded watchlist using the same encodings accepted by file loading."""
-
-    last_error: UnicodeDecodeError | None = None
-    for encoding in ("utf-8", "utf-8-sig", "cp932"):
-        try:
-            return data.decode(encoding)
-        except UnicodeDecodeError as exc:
-            last_error = exc
-    raise ValueError(f"監視銘柄ファイルを読み込めませんでした: {last_error}")
-
-
-def parse_uploaded_watchlist(data: bytes) -> list[tuple[str, str]]:
-    text = decode_watchlist_upload(data)
-    entries = parse_watchlist_text(text)
-    if not entries:
-        raise ValueError(
-            "監視銘柄ファイルから銘柄を抽出できませんでした。対応形式例: '銘柄名 (1234)', '1234  銘柄名', '銘柄名,1234'"
-        )
-    return entries
 
 
 def build_copy_text(institutional_summary: str, output: str) -> str:
@@ -78,6 +31,10 @@ def build_copy_text(institutional_summary: str, output: str) -> str:
     if summary and body:
         return f"{summary}\n\n{body}"
     return summary or body
+
+
+def parse_uploaded_watchlist(data: bytes) -> list[tuple[str, str]]:
+    return WatchlistService().parse_uploaded(data)
 
 
 def resolve_existing_dir(raw_path: str) -> Path:
@@ -95,7 +52,9 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     app = Flask(__name__)
     ui_state = state or WebUiState()
-    _restore_cached_state(ui_state)
+    state_manager = WebUiStateManager(ui_state)
+    watchlist_service = WatchlistService()
+    state_manager.restore_cached_state()
 
     @app.get("/")
     def index() -> str:
@@ -107,7 +66,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             uploaded = request.files.get("watchlist_file")
             if uploaded is not None and uploaded.filename:
                 data = uploaded.read()
-                ui_state.watchlist = parse_uploaded_watchlist(data)
+                ui_state.watchlist = watchlist_service.parse_uploaded(data)
                 ui_state.watchlist_path = _save_uploaded_watchlist(ui_state, data)
                 ui_state.controller.save_watchlist_path_cache(ui_state.watchlist_path)
                 ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
@@ -116,11 +75,11 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 if not raw_path:
                     raise ValueError("監視銘柄ファイルをアップロードするか、パスを入力してください。")
                 path = Path(raw_path).expanduser().resolve()
-                ui_state.watchlist = fetch_watchlist_entries(path)
+                ui_state.watchlist = watchlist_service.load_from_file(path)
                 ui_state.watchlist_path = path
                 ui_state.controller.save_watchlist_path_cache(path)
                 ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
-            _select_first_if_needed(ui_state)
+            state_manager.select_first_if_needed()
         except Exception as exc:
             ui_state.status = str(exc)
         return _render(ui_state)
@@ -139,8 +98,8 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     @app.post("/fetch")
     def fetch_output() -> str:
-        _sync_form_selection(ui_state)
-        selected = _selected_stock(ui_state)
+        state_manager.sync_form_selection(request.form.get("selected_stock", ui_state.selected_label), request.form.get("mode", ui_state.mode))
+        selected = state_manager.selected_stock()
         if selected is None:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
             return _render(ui_state)
@@ -174,7 +133,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     @app.post("/summary")
     def build_summary() -> str:
-        _sync_form_selection(ui_state)
+        state_manager.sync_form_selection(request.form.get("selected_stock", ui_state.selected_label), request.form.get("mode", ui_state.mode))
         if not ui_state.watchlist:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
             return _render(ui_state)
@@ -195,7 +154,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     @app.get("/download")
     def download_output() -> Response:
-        selected = _selected_stock(ui_state)
+        selected = state_manager.selected_stock()
         filename = f"stock_fundamental_prompt_{selected[1]}.txt" if selected else "stock_fundamental_prompt.txt"
         content = build_copy_text(ui_state.institutional_summary, ui_state.output)
         response = app.response_class(content, mimetype="text/plain; charset=utf-8")
@@ -205,44 +164,10 @@ def create_app(state: WebUiState | None = None) -> Flask:
     return app
 
 
-def _restore_cached_state(state: WebUiState) -> None:
-    state.output_cache = state.controller.fetch_output_cache_for_today()
-    resolved_watchlist = state.controller.fetch_resolved_watchlist_path()
-    if resolved_watchlist.status == "ok" and resolved_watchlist.file_path is not None:
-        try:
-            state.watchlist_path = resolved_watchlist.file_path
-            state.watchlist = state.controller.fetch_watchlist_entries(resolved_watchlist.file_path)
-            state.status = state.view_model.build_watchlist_restored_status(len(state.watchlist))
-            _select_first_if_needed(state)
-        except Exception:
-            state.watchlist_path = None
-            state.watchlist = []
-
-    resolved_kabutan = state.controller.fetch_resolved_kabutan_html_dir()
-    if resolved_kabutan.status == "ok":
-        state.kabutan_html_dir = resolved_kabutan.dir_path
-
-
 def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
     path = state.controller.file_cache.base_dir / UPLOAD_WATCHLIST_CACHE_NAME
     path.write_bytes(data)
     return path
-
-
-def _select_first_if_needed(state: WebUiState) -> None:
-    choices = state.stock_choices
-    if choices and state.selected_label not in choices:
-        state.selected_label = choices[0]
-
-
-def _sync_form_selection(state: WebUiState) -> None:
-    state.selected_label = request.form.get("selected_stock", state.selected_label)
-    state.mode = request.form.get("mode", state.mode)
-
-
-def _selected_stock(state: WebUiState) -> tuple[str, str] | None:
-    _choices, mapping = build_stock_choices(state.watchlist)
-    return get_selected_stock(mapping, state.selected_label)
 
 
 def _render(state: WebUiState) -> str:
