@@ -17,13 +17,11 @@ from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
 from app.domain.usecases.market_data import MarketDataService
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
-from app.domain.builders.institutional_summary import build_institutional_summary_text
 from app.domain.builders.technical_output import build_technical_output
-from app.domain.policies.cf_scoring import calculate_cf_score
-from app.domain.policies.institutional_summary import build_institutional_summary
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
 from app.presenters import build_fundamental_output
 from app.services.cache_service import CacheService
+from app.services.institutional_summary_service import InstitutionalSummaryService
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
 from app.services.output_cache_service import OutputCacheService
 from app.services.watchlist_service import WatchlistService
@@ -190,55 +188,16 @@ class FundamentalGuiController:
         code4: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        if self._uses_default_technical_service and self._uses_default_fundamental_service:
-            bundle = self.fetch_market_data_bundle(code4)
-            technical_result = TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
-            fundamental_service = self._build_default_fundamental_service_with_market_bundle(bundle)
-            price_snapshot = bundle.snapshot.to_dict()
-        else:
-            technical_service = self.build_technical_service(self.file_cache)
-            technical_result = technical_service.build_analysis_result(name=name, code4=code4)
-
-            fundamental_service = self.build_fundamental_service(self.file_cache)
-            price_snapshot = fundamental_service.fetch_price_snapshot(code4)
-        cf_scoring_input = None
-        if kabutan_html_dir is not None:
-            kabutan_fetch_result = fundamental_service.fetch_kabutan_forecast_pair(code4, html_dir=kabutan_html_dir)
-            financial_metric_rows = fundamental_service.build_financial_metric_rows(
-                price=price_snapshot.get("price"),
-                forecast_pair=kabutan_fetch_result.pair,
-                balance_sheet_rows=kabutan_fetch_result.balance_sheet_rows,
-            )
-            cf_scoring_input = fundamental_service.build_cf_scoring_input(
-                code4=code4,
-                as_of=fundamental_service.resolve_cf_scoring_as_of(
-                    price_snapshot=price_snapshot,
-                    forecast_pair=kabutan_fetch_result.pair,
-                ),
-                price=price_snapshot.get("price"),
-                market_per=price_snapshot.get("per"),
-                market_cap=price_snapshot.get("market_cap"),
-                forecast_pair=kabutan_fetch_result.pair,
-                cashflow_rows=kabutan_fetch_result.cashflow_rows,
-                financial_metric_rows=financial_metric_rows,
-            )
-        scoring_result = calculate_cf_score(cf_scoring_input) if cf_scoring_input is not None else None
-        summary = build_institutional_summary(
-            market_cap_yen=price_snapshot.get("market_cap") if isinstance(price_snapshot.get("market_cap"), (int, float)) else None,
-            close=technical_result.snapshot.price.close,
-            volume=technical_result.snapshot.price.volume,
-            volume_avg20=technical_result.snapshot.price.volume_avg20,
-            roic_pct=cf_scoring_input.roic if cf_scoring_input is not None else None,
-            eps_cagr_pct=cf_scoring_input.eps_cagr_3y if cf_scoring_input is not None else None,
-            fundamental_score=scoring_result.total.total_points if scoring_result is not None else None,
-            fundamental_rank=scoring_result.total.judgement if scoring_result is not None else None,
-            latest=technical_result.snapshot.price.latest,
-            vwap=technical_result.vwap_snapshot.get("vwap") if isinstance(technical_result.vwap_snapshot.get("vwap"), (int, float)) else None,
-            ma5=technical_result.snapshot.moving_average.ma5,
-            ma25=technical_result.snapshot.moving_average.ma25,
-            vwap_is_daily_reference=technical_result.vwap_snapshot.get("vwap_source") == "日足参考値",
+        service = InstitutionalSummaryService(
+            file_cache=self.file_cache,
+            build_fundamental_service=self.build_fundamental_service,
+            build_technical_service=self.build_technical_service,
+            uses_default_fundamental_service=self._uses_default_fundamental_service,
+            uses_default_technical_service=self._uses_default_technical_service,
+            fetch_market_data_bundle=self.fetch_market_data_bundle,
+            build_fundamental_service_with_market_bundle=self._build_default_fundamental_service_with_market_bundle,
         )
-        return build_institutional_summary_text(summary)
+        return service.build_text(name=name, code4=code4, kabutan_html_dir=kabutan_html_dir)
 
 
 __all__ = [
