@@ -25,7 +25,7 @@ from app.domain.policies.institutional_summary import build_institutional_summar
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
 from app.presenters import build_fundamental_output
 
-FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summery"
+FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
 
 
 def build_fundamental_summary_filename(*, today: date | None = None) -> str:

@@ -104,7 +104,7 @@ def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
 
 
 def test_build_fundamental_summary_filename_uses_date():
-    assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summery-2026-05-30.md"
+    assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summary-2026-05-30.md"
 
 
 def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path, monkeypatch):
@@ -134,7 +134,7 @@ def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path
         today=date(2026, 5, 30),
     )
 
-    assert output_path == output_dir / "fundamental_summery-2026-05-30.md"
+    assert output_path == output_dir / "fundamental_summary-2026-05-30.md"
     assert output_path.read_text(encoding="utf-8") == "MD:TABLE\n"
 
 
