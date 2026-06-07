@@ -20,7 +20,7 @@ from app.data.watchlist_repository import fetch_watchlist_entries, parse_watchli
 from app.gui_controller import FundamentalGuiController
 from app.gui_state import build_output_cache_key, build_stock_choices, get_selected_stock
 from app.gui_view_model import GuiViewModel
-from app.presentation.web_fundamental_output import build_fundamental_web_blocks
+from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 
 DEFAULT_INSTITUTIONAL_SUMMARY = "機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A"
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
@@ -246,13 +246,16 @@ def _selected_stock(state: WebUiState) -> tuple[str, str] | None:
 
 
 def _render(state: WebUiState) -> str:
-    show_rich_output = state.mode != "technical" and bool(state.output.strip())
+    output_blocks = (
+        [WebTextBlock(kind="text", text=state.output)]
+        if state.mode == "technical"
+        else build_fundamental_web_blocks(state.output)
+    )
     return render_template(
         "index.html",
         state=state,
         copy_text=build_copy_text(state.institutional_summary, state.output),
-        output_blocks=build_fundamental_web_blocks(state.output) if show_rich_output else [],
-        show_rich_output=show_rich_output,
+        output_blocks=output_blocks,
     )
 
 

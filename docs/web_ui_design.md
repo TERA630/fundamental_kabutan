@@ -157,3 +157,6 @@ Web UI の Fundamental 画面では、既存のプレーンテキスト出力を
 - 2026-06-07: `app/presentation/web_fundamental_output.py` を追加し、株価評価・資本効率、株探通期業績推移、キャッシュフロー、四半期トレンドのテーブル化を実装。
 - 2026-06-07: `app/web.py`、`app/templates/index.html`、`app/static/web.css` を更新し、Fundamental モードのみリッチ表示に切り替えるよう実装。
 - 2026-06-07: `tests/test_web_fundamental_output.py` を追加し、対象4ブロックとコピー用プレーンテキスト維持のテストを追加。
+- 2026-06-07: WebUIでテーブル表示にならない事象を確認。テンプレート単体ではテーブルHTML生成済みであることを確認し、古い可能性のある `8080` プロセスを停止して修正版コードで再起動。
+- 2026-06-07: 表示用の既定を `textarea` にする必要がないため、出力パネルを常に HTML 表示領域へ変更。Fundamental はテーブル混在表示、Technical は `<pre>` 表示とし、コピー用の隠し `textarea` のみ維持。
+- 2026-06-07: `8080` に古い `python -m app.web` プロセスが複数残っていたため、全WebUIプロセスを停止。起動元を明示する `run_web.py` を追加し、`8080` は `run_web.py` 起動の1プロセスに整理。

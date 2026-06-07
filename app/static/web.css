@@ -159,7 +159,6 @@ button:hover,
 }
 
 .summary-panel pre,
-.output-panel textarea,
 .text-block {
   width: 100%;
   margin: 0;
@@ -171,19 +170,12 @@ button:hover,
   white-space: pre-wrap;
 }
 
-.output-panel textarea {
-  display: block;
-  min-height: 54vh;
-  resize: vertical;
-  padding: 14px;
-  background: #fff;
-  color: var(--text);
-}
-
 .rich-output {
   display: grid;
   gap: 16px;
+  min-height: 54vh;
   padding: 14px;
+  background: #fff;
 }
 
 .output-block {

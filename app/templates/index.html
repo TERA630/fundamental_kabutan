@@ -69,48 +69,44 @@
     </section>
 
     <section class="output-panel" aria-label="出力">
-      {% if show_rich_output %}
-        <div class="rich-output">
-          {% for block in output_blocks %}
-            {% if block.kind == "table" %}
-              <section class="output-block">
-                <h2>{{ block.title }}</h2>
-                {% if block.note %}
-                  <p class="table-note">{{ block.note }}</p>
-                {% endif %}
-                <div class="table-scroll">
-                  <table class="fundamental-table">
-                    <thead>
+      <div class="rich-output">
+        {% for block in output_blocks %}
+          {% if block.kind == "table" %}
+            <section class="output-block">
+              <h2>{{ block.title }}</h2>
+              {% if block.note %}
+                <p class="table-note">{{ block.note }}</p>
+              {% endif %}
+              <div class="table-scroll">
+                <table class="fundamental-table">
+                  <thead>
+                    <tr>
+                      {% for header in block.headers %}
+                        <th scope="col">{{ header }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in block.rows %}
                       <tr>
-                        {% for header in block.headers %}
-                          <th scope="col">{{ header }}</th>
+                        {% for cell in row %}
+                          {% if loop.first %}
+                            <th scope="row">{{ cell }}</th>
+                          {% else %}
+                            <td>{{ cell }}</td>
+                          {% endif %}
                         {% endfor %}
                       </tr>
-                    </thead>
-                    <tbody>
-                      {% for row in block.rows %}
-                        <tr>
-                          {% for cell in row %}
-                            {% if loop.first %}
-                              <th scope="row">{{ cell }}</th>
-                            {% else %}
-                              <td>{{ cell }}</td>
-                            {% endif %}
-                          {% endfor %}
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            {% else %}
-              <pre class="text-block">{{ block.text }}</pre>
-            {% endif %}
-          {% endfor %}
-        </div>
-      {% else %}
-        <textarea readonly spellcheck="false">{{ state.output }}</textarea>
-      {% endif %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          {% else %}
+            <pre class="text-block">{{ block.text }}</pre>
+          {% endif %}
+        {% endfor %}
+      </div>
     </section>
   </main>
 
