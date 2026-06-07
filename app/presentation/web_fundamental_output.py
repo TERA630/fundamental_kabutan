@@ -39,7 +39,10 @@ def build_fundamental_web_blocks(output: str) -> list[WebOutputBlock]:
             continue
         heading = section[0]
         if heading == "■株価評価・資本効率":
-            blocks.append(_parse_pipe_table(section, title=heading))
+            table_section, remaining_section = _split_valuation_table_section(section)
+            blocks.append(_parse_pipe_table(table_section, title=heading))
+            if remaining_section:
+                blocks.append(WebTextBlock(kind="text", text="\n".join(remaining_section).strip()))
         elif heading == "■株探 通期業績推移":
             blocks.append(_parse_forecast_table(section))
         elif heading == "■キャッシュフロー":
@@ -100,6 +103,22 @@ def _parse_pipe_table(section: list[str], *, title: str, fallback_headers: tuple
     if not rows:
         rows = (("N/A",),)
     return WebTableBlock(kind="table", title=title, headers=tuple(headers), rows=_normalize_rows(tuple(headers), rows))
+
+
+def _split_valuation_table_section(section: list[str]) -> tuple[list[str], list[str]]:
+    table_lines = [section[0]]
+    remainder: list[str] = []
+    in_table = True
+
+    for line in section[1:]:
+        stripped = line.strip()
+        if in_table and stripped and "|" in stripped:
+            table_lines.append(line)
+            continue
+        in_table = False
+        remainder.append(line)
+
+    return _trim_blank_lines(table_lines), _trim_blank_lines(remainder)
 
 
 def _parse_forecast_table(section: list[str]) -> WebTableBlock:

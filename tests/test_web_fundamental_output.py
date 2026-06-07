@@ -1,4 +1,4 @@
-from app.presentation.web_fundamental_output import WebTableBlock, build_fundamental_web_blocks
+from app.presentation.web_fundamental_output import WebTableBlock, WebTextBlock, build_fundamental_web_blocks
 from app.web import build_copy_text
 
 
@@ -28,6 +28,32 @@ FCF Yield|2.00%|N/A
     assert table.headers == ("年度", "2025年(実績)", "2026年(予)")
     assert ("PER", "20.0倍", "18.0倍") in table.rows
     assert ("FCF Yield", "2.00%", "N/A") in table.rows
+
+
+def test_build_fundamental_web_blocks_keeps_scoring_text_out_of_valuation_table():
+    output = """■株価評価・資本効率
+年度|2025年(実績)
+PER|20.0倍
+PBR|2.00倍
+ROE|20.00%
+配当利回り|1.00%
+FCF Yield|2.00%
+
+Quality 45点 Growth 20点 Valuation 8点
+
+[Quality]
+ROIC         18.20%(B)
+ルール注記:
+- なし
+"""
+
+    blocks = build_fundamental_web_blocks(output)
+    table = next(block for block in blocks if isinstance(block, WebTableBlock))
+    text = next(block for block in blocks if isinstance(block, WebTextBlock))
+
+    assert ("Quality 45点 Growth 20点 Valuation 8点",) not in table.rows
+    assert "Quality 45点 Growth 20点 Valuation 8点" in text.text
+    assert "ルール注記:" in text.text
 
 
 def test_build_fundamental_web_blocks_tables_forecast_rows():

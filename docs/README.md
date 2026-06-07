@@ -18,6 +18,13 @@
 - `screen_spec.md`: GUI画面表示、操作、ステータス、固定パネル、GUI出力キャッシュ表示
 - `presentation_spec.md`: 出力テキスト、Markdown、表示用セクション、数値表現、N/A表現
 
+## 起動方法
+
+- Tkinter GUI: `python -m app.main`
+- Web UI: `python run_web.py`
+- Web UI は `PORT` 環境変数を優先し、未設定時は `8080` で起動する。
+- GitHub Codespaces では `8080` を自動転送対象とする。
+
 ## 案
 
 - `web_ui_design.md` は未実装のWeb UI案であり、現行実装仕様ではない。

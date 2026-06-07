@@ -38,7 +38,7 @@ Fundamental 出力は `app/presenters.py` と `app/domain/builders/fundamental_o
 2. 冒頭サマリー
 3. バリュエーション
 4. rankCF サマリー
-5. Quality / Growth / Valuation スコア詳細
+5. Quality / Growth スコア詳細
 6. アナリスト
 7. CF 経時
 8. 成長性経時
@@ -82,10 +82,6 @@ EPS CAGR           {eps_cagr_value}({rank})
 売上CAGR           {sales_cagr_value}({rank})
 営業利益CAGR(3y)   {operating_profit_cagr_value}({rank})
 
-[Valuation]
-FCF Yield          {fcf_yield_value}({rank})
-PER                {per_value}({rank})
-
 ■アナリスト
 目標株価 {target_mean_price}円(現価格との乖離{target_gap_pct}：アナリスト{analyst_count}人)
 今期EPS修正 ↑{current_up} ↓{current_down}
@@ -112,6 +108,8 @@ ROE(%)|ROIC(%)|PBR|
 　　　売上|営業利益率|昨年同期比|修正一株益
 {quarter_label}　{quarter_sales}|{quarter_operating_margin}|{quarter_yoy}|{quarter_eps}
 ```
+
+`■株価評価・資本効率` は、年度行から `FCF Yield` 行までを表として扱う。後続の `Quality {quality_score}点 ...`、`[Quality]`、`[Growth]`、`ルール注記:` は表に含めず通常テキストとして表示する。`[Valuation]` 詳細ブロックは `■株価評価・資本効率` と内容が重複するため表示しない。
 
 取得できないブロックまたは値は `N/A` とする。株探通期業績が取得できない場合は、株探ソース行に取得不可理由を表示し、本文に `データーが取得できません` を表示する。
 

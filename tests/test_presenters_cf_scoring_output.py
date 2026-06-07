@@ -68,10 +68,10 @@ def test_build_cf_scoring_summary_text_renders_total_breakdown_and_notes():
     assert "Quality 45点 Growth 20点 Valuation 8点" in text
     assert "[Quality]" in text
     assert "[Growth]" in text
-    assert "[Valuation]" in text
+    assert "[Valuation]" not in text
     assert "[Quality] 45/60" not in text
-    assert "FCF Yield    2.50%(B)" in text
-    assert "PER          40.0倍(C)" in text
+    assert "FCF Yield    2.50%(B)" not in text
+    assert "PER          40.0倍(C)" not in text
     assert "ROIC               18.20%(B)" in text
     assert "9/15" not in text
     assert "ルール注記:" in text
@@ -100,12 +100,10 @@ def test_build_cf_scoring_sections_builds_score_display_dtos():
     assert isinstance(sections[1], ScoreBreakdownSection)
     assert isinstance(sections[2], ScoreCategorySection)
     assert isinstance(sections[3], ScoreCategorySection)
-    assert isinstance(sections[4], ScoreCategorySection)
-    assert isinstance(sections[5], RuleNotesSection)
+    assert isinstance(sections[4], RuleNotesSection)
     assert sections[1].quality_points == 45
     assert sections[2].title == "Quality"
     assert sections[3].title == "Growth"
-    assert sections[4].title == "Valuation"
 
 
 def test_format_opening_summary_section():
@@ -190,6 +188,7 @@ def test_build_fundamental_output_uses_opening_summary_when_scoring_present():
     assert "総合評価：" not in out
     assert "Quality 45点 Growth 20点 Valuation 8点" in out
     assert "[Quality]" in out
+    assert "[Valuation]" not in out
     assert "[Quality] 45/60" not in out
     assert out.find("【Test (1234)】") < out.find("総合評価 A（73/100）") < out.find("■株価評価・資本効率")
     assert out.find("■株価評価・資本効率") < out.find("Quality 45点 Growth 20点 Valuation 8点") < out.find("■株探 通期業績推移")
@@ -370,14 +369,14 @@ def test_build_cf_scoring_summary_text_omits_na_metrics_and_logs(caplog):
     assert "Quality 0点 Growth 0点 Valuation 0点" in text
     assert "[Quality]" in text
     assert "[Growth]" in text
-    assert "[Valuation]" in text
+    assert "[Valuation]" not in text
     assert "[Quality] 0/60" not in text
     assert "投資分類" not in text
     assert "投資戦略" not in text
     assert "ROIC:" not in text
     assert "FCF Ratio" not in text
     assert "取得不可: ROIC (値欠損)" in caplog.text
-    assert "取得不可: FCF Yield (値欠損)" in caplog.text
+    assert "取得不可: FCF Yield (値欠損)" not in caplog.text
 
 
 def test_build_cf_scoring_summary_text_rule_note_fallback_for_unknown_key():

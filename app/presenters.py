@@ -78,7 +78,6 @@ def build_cf_scoring_sections(scoring: CfScoringResult, *, include_summary: bool
             ),
             ScoreCategorySection("Quality", scoring.quality.subtotal, scoring.quality.max_points, list(scoring.quality.metrics)),
             ScoreCategorySection("Growth", scoring.growth.subtotal, scoring.growth.max_points, _build_growth_display_metrics(scoring, operating_profit_cagr_3y)),
-            ScoreCategorySection("Valuation", scoring.valuation.subtotal, scoring.valuation.max_points, list(scoring.valuation.metrics)),
             RuleNotesSection(
                 [
                     note
