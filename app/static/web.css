@@ -240,6 +240,44 @@ button:hover,
   background: #fafbfc;
 }
 
+.summary-html-panel {
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.summary-html-panel .summary-output h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.summary-html-panel .summary-output .table-scroll {
+  border-color: var(--line);
+}
+
+.summary-html-panel .fundamental-table.summary-table {
+  min-width: 900px;
+}
+
+.summary-html-panel .summary-skipped {
+  margin: 14px 0 6px;
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.summary-html-panel .summary-skipped-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+button:disabled,
+.button-link[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
 .fundamental-table tbody tr:last-child th,
 .fundamental-table tbody tr:last-child td {
   border-bottom: 0;

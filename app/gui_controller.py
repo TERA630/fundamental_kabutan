@@ -152,6 +152,15 @@ class FundamentalGuiController:
         output_cache[output_cache_key] = output
         return output
 
+    def build_fundamental_summary_table(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+        kabutan_html_dir: Path | None = None,
+    ) -> FundamentalSummaryTable:
+        service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
+        return service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
+
     def build_and_save_fundamental_summary(
         self,
         *,
@@ -160,8 +169,10 @@ class FundamentalGuiController:
         kabutan_html_dir: Path | None = None,
         today: date | None = None,
     ) -> Path:
-        service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
-        table = service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
+        table = self.build_fundamental_summary_table(
+            watchlist_entries=watchlist_entries,
+            kabutan_html_dir=kabutan_html_dir,
+        )
         markdown = build_fundamental_summary_markdown(table)
         output_path = output_dir / build_fundamental_summary_filename(today=today)
         output_path.write_text(markdown, encoding="utf-8")
