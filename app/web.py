@@ -24,6 +24,7 @@ from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateM
 
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
 UPLOAD_KABUTAN_HTML_DIR_NAME = "web_uploaded_kabutan_html"
+WEB_KABUTAN_PACKAGE_DIR_NAME = "web_kabutan_html_package"
 KABUTAN_HTML_SUFFIXES = {".html", ".htm"}
 
 
@@ -142,6 +143,38 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.status = str(exc)
         return _render(ui_state)
 
+    @app.post("/kabutan-package")
+    def build_kabutan_package() -> str:
+        try:
+            if ui_state.kabutan_html_dir is None:
+                ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
+                return _render(ui_state)
+
+            result = ui_state.controller.build_kabutan_html_package(
+                source_dir=ui_state.kabutan_html_dir,
+                output_dir=ui_state.controller.file_cache.base_dir / WEB_KABUTAN_PACKAGE_DIR_NAME,
+            )
+            ui_state.kabutan_html_dir = result.html_dir
+            ui_state.output_cache.clear()
+            ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
+            ui_state.fundamental_summary_html = ""
+            ui_state.status = (
+                "株探HTMLを正規化してZipを作成しました。"
+                f" 正規化: {result.normalized_count}件 / スキップ: {result.skipped_count}件"
+                f" / manifest: {result.manifest_path}"
+                f" / zip: {result.zip_path}"
+            )
+        except Exception as exc:
+            ui_state.status = f"株探HTMLパッケージ作成失敗: {exc}"
+        return _render(ui_state)
+
+    @app.get("/kabutan-package/download")
+    def download_kabutan_package() -> Response:
+        zip_path = ui_state.controller.file_cache.base_dir / WEB_KABUTAN_PACKAGE_DIR_NAME / "kabutan_html_package.zip"
+        if not zip_path.exists():
+            return app.response_class("株探HTMLパッケージが見つかりません。", status=404)
+        return send_file(zip_path, as_attachment=True, download_name="kabutan_html_package.zip")
+
     @app.post("/fetch")
     def fetch_output() -> str:
         state_manager.sync_form_selection(
@@ -230,6 +263,14 @@ def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
     return path
 
 
+def _kabutan_package_zip_exists(state: WebUiState) -> bool:
+    file_cache = getattr(state.controller, "file_cache", None)
+    base_dir = getattr(file_cache, "base_dir", None)
+    if base_dir is None:
+        return False
+    return (base_dir / WEB_KABUTAN_PACKAGE_DIR_NAME / "kabutan_html_package.zip").exists()
+
+
 def _render(state: WebUiState) -> str:
     output_blocks = (
         [WebTextBlock(kind="text", text=state.output)]
@@ -241,6 +282,7 @@ def _render(state: WebUiState) -> str:
         state=state,
         copy_text=build_copy_text(state.institutional_summary, state.output),
         output_blocks=output_blocks,
+        kabutan_package_zip_exists=_kabutan_package_zip_exists(state),
         summary_html=state.fundamental_summary_html,
     )
 

@@ -25,7 +25,19 @@ class FundamentalView:
         self.kabutan_dir_var = kabutan_dir_var
         self.institutional_summary_var = institutional_summary_var
 
-    def build_ui(self, *, on_open, on_select, on_fetch, on_copy, on_save, on_open_kabutan_dir, on_summary, on_tab_changed) -> None:
+    def build_ui(
+        self,
+        *,
+        on_open,
+        on_select,
+        on_fetch,
+        on_copy,
+        on_save,
+        on_open_kabutan_dir,
+        on_build_kabutan_package,
+        on_summary,
+        on_tab_changed,
+    ) -> None:
         root = ttk.Frame(self.master, padding=10)
         root.pack(fill="both", expand=True)
 
@@ -39,6 +51,8 @@ class FundamentalView:
         kabutan_top.pack(fill="x", pady=(0, 8))
         self.open_kabutan_dir_button = ttk.Button(kabutan_top, text="株探HTMLフォルダを選択", command=on_open_kabutan_dir)
         self.open_kabutan_dir_button.pack(side="left")
+        self.kabutan_package_button = ttk.Button(kabutan_top, text="HTML正規化+Zip作成", command=on_build_kabutan_package)
+        self.kabutan_package_button.pack(side="left", padx=(6, 0))
         ttk.Label(kabutan_top, textvariable=self.kabutan_dir_var).pack(side="left", padx=10, fill="x", expand=True)
 
         control = ttk.Frame(root)
@@ -93,6 +107,7 @@ class FundamentalView:
         readonly_state = "disabled" if busy else "readonly"
         self.open_button.configure(state=state)
         self.open_kabutan_dir_button.configure(state=state)
+        self.kabutan_package_button.configure(state=state)
         self.fetch_button.configure(state=state)
         self.summary_button.configure(state=state)
         self.copy_button.configure(state=state)

@@ -23,6 +23,7 @@ from app.presenters import build_fundamental_output
 from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
+from app.services.kabutan_html_package_service import KabutanHtmlPackageResult, KabutanHtmlPackageService
 from app.services.output_cache_service import OutputCacheService
 from app.services.watchlist_service import WatchlistService
 
@@ -68,6 +69,7 @@ class FundamentalGuiController:
         self.cache_service = CacheService(self.file_cache)
         self.watchlist_service = WatchlistService(self.cache_service)
         self.kabutan_html_dir_service = KabutanHtmlDirService(self.cache_service)
+        self.kabutan_html_package_service = KabutanHtmlPackageService()
         self.output_cache_service = OutputCacheService(self.cache_service)
         self.resolve_kabutan_html_dir_usecase = ResolveKabutanHtmlDirUseCase()
         self.resolve_watchlist_path_usecase = ResolveWatchlistPathUseCase()
@@ -108,6 +110,17 @@ class FundamentalGuiController:
 
     def save_kabutan_html_dir_cache(self, path: Path) -> None:
         self.kabutan_html_dir_service.save_dir(path)
+
+    def build_kabutan_html_package(
+        self,
+        *,
+        source_dir: Path,
+        output_dir: Path | None = None,
+    ) -> KabutanHtmlPackageResult:
+        return self.kabutan_html_package_service.build_package(
+            source_dir=source_dir,
+            output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_package"),
+        )
 
     def fetch_resolved_watchlist_path(self) -> ResolvedWatchlistPath:
         cached_path = self.watchlist_service.restore_watchlist_path()

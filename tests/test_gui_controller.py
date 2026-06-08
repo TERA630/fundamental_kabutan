@@ -91,6 +91,22 @@ def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
     assert resolved.dir_path == target.resolve()
 
 
+def test_build_kabutan_html_package_uses_package_service(tmp_path: Path):
+    source_dir = tmp_path / "source"
+    output_dir = tmp_path / "package"
+    source_dir.mkdir()
+    (source_dir / "7203.html").write_text("<html><body>7203</body></html>", encoding="utf-8")
+    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+
+    result = controller.build_kabutan_html_package(source_dir=source_dir, output_dir=output_dir)
+
+    assert result.normalized_count == 1
+    assert result.html_dir == output_dir.resolve() / "html"
+    assert (output_dir / "html" / "7203.html").exists()
+    assert (output_dir / "manifest.json").exists()
+    assert (output_dir / "kabutan_html_package.zip").exists()
+
+
 def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
     controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
     target = tmp_path / "watchlist.md"

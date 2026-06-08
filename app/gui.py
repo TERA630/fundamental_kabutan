@@ -54,6 +54,7 @@ class FundamentalApp:
             on_copy=self.copy_text,
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
+            on_build_kabutan_package=self.build_kabutan_html_package,
             on_summary=self.generate_summary,
             on_tab_changed=self.on_tab_changed,
         )
@@ -208,6 +209,30 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_summary_error(msg))
 
+    def _kabutan_package_worker(self, source_dir: Path, output_dir: Path):
+        try:
+            result = self.controller.build_kabutan_html_package(source_dir=source_dir, output_dir=output_dir)
+            self.state.kabutan_html_dir = result.html_dir
+            self.controller.save_kabutan_html_dir_cache(result.html_dir)
+            self.state.output_cache.clear()
+            self.state.output_cache_date = current_date_iso()
+            self.controller.save_output_cache_for_today(self.state.output_cache)
+
+            def done():
+                self.kabutan_dir_var.set(str(result.html_dir))
+                self.set_busy(
+                    False,
+                    (
+                        "株探HTMLを正規化してZipを作成しました。"
+                        f" 正規化: {result.normalized_count}件 / スキップ: {result.skipped_count}件"
+                        f" / zip: {result.zip_path}"
+                    ),
+                )
+
+            self.master.after(0, done)
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_summary_error(msg))
+
     def _require_kabutan_html_dir(self) -> bool:
         if self.state.kabutan_html_dir is None:
             self.status_var.set(self.view_model.build_kabutan_dir_restore_required_status())
@@ -280,6 +305,22 @@ class FundamentalApp:
         output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
         self.set_busy(True, self.view_model.build_summary_running_status())
         thread = threading.Thread(target=self._summary_worker, args=(output_dir,), daemon=True)
+        thread.start()
+
+    def build_kabutan_html_package(self):
+        if self.state.is_fetching:
+            return
+        if self.view.current_mode() == "technical":
+            return
+        if not self._require_kabutan_html_dir():
+            return
+
+        source_dir = self.state.kabutan_html_dir
+        if source_dir is None:
+            return
+        output_dir = source_dir.parent / "kabutan_html_package"
+        self.set_busy(True, "株探HTMLを正規化してZipを作成中...")
+        thread = threading.Thread(target=self._kabutan_package_worker, args=(source_dir, output_dir), daemon=True)
         thread.start()
 
     def copy_text(self):
