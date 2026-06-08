@@ -26,8 +26,12 @@
         <button type="submit">WatchList読込</button>
       </form>
 
-      <form action="/kabutan-dir" method="post" class="control-grid">
-        <label class="wide">
+      <form action="/kabutan-dir" method="post" enctype="multipart/form-data" class="control-grid">
+        <label>
+          <span>Kabutan HTML folder</span>
+          <input type="file" name="kabutan_html_files" accept=".html,.htm,text/html" webkitdirectory directory multiple>
+        </label>
+        <label>
           <span>Kabutan_html_dir</span>
           <input type="text" name="kabutan_html_dir" value="{{ state.kabutan_html_dir or '' }}" placeholder="/workspaces/project/kabutan_html">
         </label>

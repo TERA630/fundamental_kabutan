@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,8 @@ from app.services.watchlist_service import WatchlistService
 from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
+UPLOAD_KABUTAN_HTML_DIR_NAME = "web_uploaded_kabutan_html"
+KABUTAN_HTML_SUFFIXES = {".html", ".htm"}
 
 
 def parse_uploaded_watchlist(data: bytes) -> list[tuple[str, str]]:
@@ -45,6 +48,41 @@ def resolve_existing_dir(raw_path: str) -> Path:
     if not path.exists() or not path.is_dir():
         raise ValueError("株探HTMLフォルダが見つかりません。コンテナ内の既存ディレクトリを指定してください。")
     return path.resolve()
+
+
+def save_uploaded_kabutan_html_dir(state: WebUiState, uploaded_files: list[Any]) -> Path:
+    files = [
+        uploaded
+        for uploaded in uploaded_files
+        if uploaded is not None
+        and uploaded.filename
+        and Path(uploaded.filename).suffix.lower() in KABUTAN_HTML_SUFFIXES
+    ]
+    if not files:
+        raise ValueError("株探HTMLフォルダにHTMLファイルが見つかりませんでした。")
+
+    upload_dir = state.controller.file_cache.base_dir / UPLOAD_KABUTAN_HTML_DIR_NAME
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    used_names: set[str] = set()
+    for uploaded in files:
+        source_name = Path(uploaded.filename).name
+        target_name = _dedupe_filename(source_name, used_names)
+        uploaded.save(upload_dir / target_name)
+    return upload_dir.resolve()
+
+
+def _dedupe_filename(filename: str, used_names: set[str]) -> str:
+    path = Path(filename)
+    candidate = path.name
+    index = 2
+    while candidate.lower() in used_names:
+        candidate = f"{path.stem}_{index}{path.suffix}"
+        index += 1
+    used_names.add(candidate.lower())
+    return candidate
 
 
 def create_app(state: WebUiState | None = None) -> Flask:
@@ -90,7 +128,11 @@ def create_app(state: WebUiState | None = None) -> Flask:
     @app.post("/kabutan-dir")
     def set_kabutan_dir() -> str:
         try:
-            path = resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
+            uploaded_files = request.files.getlist("kabutan_html_files")
+            if any(uploaded.filename for uploaded in uploaded_files):
+                path = save_uploaded_kabutan_html_dir(ui_state, uploaded_files)
+            else:
+                path = resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
             ui_state.kabutan_html_dir = path
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(path)
