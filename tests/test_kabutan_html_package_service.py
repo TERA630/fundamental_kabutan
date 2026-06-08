@@ -50,3 +50,34 @@ def test_write_zip_includes_only_normalized_html(tmp_path: Path):
     assert result.zip_path == output_dir / "custom.zip"
     with zipfile.ZipFile(result.zip_path) as archive:
         assert archive.namelist() == ["manifest.json", "html/7203.html"]
+
+
+def test_import_package_extracts_html_dir_and_manifest(tmp_path: Path):
+    zip_path = tmp_path / "package.zip"
+    output_dir = tmp_path / "imported"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html><body>7203</body></html>")
+
+    result = KabutanHtmlPackageService().import_package(zip_path=zip_path, output_dir=output_dir)
+
+    assert result.output_dir == output_dir.resolve()
+    assert result.html_dir == output_dir.resolve() / "html"
+    assert result.manifest_path == output_dir.resolve() / "manifest.json"
+    assert result.html_count == 1
+    assert (output_dir / "html" / "7203.html").read_text(encoding="utf-8") == "<html><body>7203</body></html>"
+
+
+def test_import_package_rejects_zip_slip_path(tmp_path: Path):
+    zip_path = tmp_path / "package.zip"
+    output_dir = tmp_path / "imported"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("../evil.html", "bad")
+        archive.writestr("html/7203.html", "<html></html>")
+
+    try:
+        KabutanHtmlPackageService().import_package(zip_path=zip_path, output_dir=output_dir)
+    except ValueError as exc:
+        assert "不正なパス" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")

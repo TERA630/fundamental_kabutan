@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import date
 from types import SimpleNamespace
+import zipfile
 
 import pandas as pd
 
@@ -105,6 +106,21 @@ def test_build_kabutan_html_package_uses_package_service(tmp_path: Path):
     assert (output_dir / "html" / "7203.html").exists()
     assert (output_dir / "manifest.json").exists()
     assert (output_dir / "kabutan_html_package.zip").exists()
+
+
+def test_import_kabutan_html_package_uses_package_service(tmp_path: Path):
+    zip_path = tmp_path / "package.zip"
+    output_dir = tmp_path / "imported"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html></html>")
+    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+
+    result = controller.import_kabutan_html_package(zip_path=zip_path, output_dir=output_dir)
+
+    assert result.html_dir == output_dir.resolve() / "html"
+    assert result.manifest_path == output_dir.resolve() / "manifest.json"
+    assert result.html_count == 1
 
 
 def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):

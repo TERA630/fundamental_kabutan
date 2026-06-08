@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+import zipfile
 
 import pytest
 
@@ -85,6 +86,8 @@ def test_index_has_kabutan_html_folder_picker():
     assert 'enctype="multipart/form-data"' in html
     assert 'form action="/kabutan-package"' in html
     assert "HTMLを正規化してZip作成" in html
+    assert 'form action="/kabutan-package/import"' in html
+    assert 'name="kabutan_package_zip"' in html
 
 
 def test_set_kabutan_dir_accepts_uploaded_html_folder(tmp_path: Path):
@@ -180,6 +183,61 @@ def test_build_kabutan_package_sets_normalized_html_dir_and_shows_download(tmp_p
     assert state.output_cache == {}
     assert "正規化: 1件 / スキップ: 0件" in html
     assert 'href="/kabutan-package/download"' in html
+
+
+def test_import_kabutan_package_zip_sets_html_dir(tmp_path: Path):
+    class FakeController:
+        def __init__(self):
+            self.file_cache = SimpleNamespace(base_dir=tmp_path)
+            self.saved_dir = None
+            self.imported_zip = None
+
+        def fetch_output_cache_for_today(self):
+            return {"7203|-": "cached"}
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def save_kabutan_html_dir_cache(self, path):
+            self.saved_dir = path
+
+        def import_kabutan_html_package(self, *, zip_path, output_dir):
+            self.imported_zip = zip_path
+            html_dir = output_dir / "html"
+            html_dir.mkdir(parents=True)
+            manifest_path = output_dir / "manifest.json"
+            manifest_path.write_text("{}", encoding="utf-8")
+            return SimpleNamespace(
+                html_dir=html_dir,
+                manifest_path=manifest_path,
+                html_count=2,
+            )
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html></html>")
+    zip_buffer.seek(0)
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.output_cache = {"7203|-": "cached"}
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/kabutan-package/import",
+        data={"kabutan_package_zip": (zip_buffer, "kabutan_html_package.zip")},
+        content_type="multipart/form-data",
+    ).data.decode("utf-8")
+
+    assert controller.imported_zip == tmp_path / "web_uploaded_kabutan_html_package.zip"
+    assert state.kabutan_html_dir == tmp_path / "web_imported_kabutan_html_package" / "html"
+    assert controller.saved_dir == state.kabutan_html_dir
+    assert state.output_cache == {}
+    assert "HTML: 2件" in html
 
 
 def test_fetch_fundamental_clears_summary_html(tmp_path: Path):

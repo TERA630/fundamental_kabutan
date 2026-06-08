@@ -24,7 +24,9 @@ from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateM
 
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
 UPLOAD_KABUTAN_HTML_DIR_NAME = "web_uploaded_kabutan_html"
+UPLOAD_KABUTAN_PACKAGE_NAME = "web_uploaded_kabutan_html_package.zip"
 WEB_KABUTAN_PACKAGE_DIR_NAME = "web_kabutan_html_package"
+WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME = "web_imported_kabutan_html_package"
 KABUTAN_HTML_SUFFIXES = {".html", ".htm"}
 
 
@@ -73,6 +75,16 @@ def save_uploaded_kabutan_html_dir(state: WebUiState, uploaded_files: list[Any])
         target_name = _dedupe_filename(source_name, used_names)
         uploaded.save(upload_dir / target_name)
     return upload_dir.resolve()
+
+
+def save_uploaded_kabutan_html_package(state: WebUiState, uploaded_file: Any) -> Path:
+    if uploaded_file is None or not uploaded_file.filename:
+        raise ValueError("株探HTMLパッケージZipを選択してください。")
+    if Path(uploaded_file.filename).suffix.lower() != ".zip":
+        raise ValueError("株探HTMLパッケージはZipファイルを選択してください。")
+    zip_path = state.controller.file_cache.base_dir / UPLOAD_KABUTAN_PACKAGE_NAME
+    uploaded_file.save(zip_path)
+    return zip_path
 
 
 def _dedupe_filename(filename: str, used_names: set[str]) -> str:
@@ -166,6 +178,30 @@ def create_app(state: WebUiState | None = None) -> Flask:
             )
         except Exception as exc:
             ui_state.status = f"株探HTMLパッケージ作成失敗: {exc}"
+        return _render(ui_state)
+
+    @app.post("/kabutan-package/import")
+    def import_kabutan_package() -> str:
+        try:
+            uploaded = request.files.get("kabutan_package_zip")
+            zip_path = save_uploaded_kabutan_html_package(ui_state, uploaded)
+            result = ui_state.controller.import_kabutan_html_package(
+                zip_path=zip_path,
+                output_dir=ui_state.controller.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME,
+            )
+            ui_state.kabutan_html_dir = result.html_dir
+            ui_state.output_cache.clear()
+            ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
+            ui_state.fundamental_summary_html = ""
+            manifest_text = f" / manifest: {result.manifest_path}" if result.manifest_path is not None else ""
+            ui_state.status = (
+                "株探HTMLパッケージZipを展開しました。"
+                f" HTML: {result.html_count}件"
+                f" / html_dir: {result.html_dir}"
+                f"{manifest_text}"
+            )
+        except Exception as exc:
+            ui_state.status = f"株探HTMLパッケージ展開失敗: {exc}"
         return _render(ui_state)
 
     @app.get("/kabutan-package/download")

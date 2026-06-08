@@ -48,6 +48,14 @@
           <a class="button-link" href="/kabutan-package/download">Zip保存</a>
         {% endif %}
       </form>
+
+      <form action="/kabutan-package/import" method="post" enctype="multipart/form-data" class="control-grid">
+        <label>
+          <span>Kabutan HTML package zip</span>
+          <input type="file" name="kabutan_package_zip" accept=".zip,application/zip">
+        </label>
+        <button id="kabutan-package-import-button" type="submit">Zipを展開して設定</button>
+      </form>
     </section>
 
     <form method="post" class="work-area">
@@ -137,6 +145,7 @@
     const copySource = document.getElementById("copy-source");
     const summaryButton = document.getElementById("summary-button");
     const kabutanPackageButton = document.getElementById("kabutan-package-button");
+    const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
     const modeInputs = document.querySelectorAll('input[name="mode"]');
 
     function updateSummaryButton() {
@@ -149,6 +158,9 @@
       summaryButton.disabled = technicalSelected;
       if (kabutanPackageButton) {
         kabutanPackageButton.disabled = technicalSelected;
+      }
+      if (kabutanPackageImportButton) {
+        kabutanPackageImportButton.disabled = technicalSelected;
       }
     }
 
