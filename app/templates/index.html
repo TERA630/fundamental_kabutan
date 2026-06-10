@@ -26,36 +26,27 @@
         <button type="submit">WatchList読込</button>
       </form>
 
-      <form action="/kabutan-dir" method="post" enctype="multipart/form-data" class="control-grid">
-        <label>
-          <span>Kabutan HTML folder</span>
-          <input type="file" name="kabutan_html_files" accept=".html,.htm,text/html" webkitdirectory directory multiple>
-        </label>
-        <label>
-          <span>Kabutan_html_dir</span>
-          <input type="text" name="kabutan_html_dir" value="{{ state.kabutan_html_dir or '' }}" placeholder="/workspaces/project/kabutan_html">
-        </label>
-        <button type="submit">フォルダ設定</button>
-      </form>
-
-      <form action="/kabutan-package" method="post" class="control-grid">
-        <label>
-          <span>Normalized Kabutan HTML</span>
-          <input type="text" value="{{ state.kabutan_html_dir or '' }}" readonly>
-        </label>
-        <button id="kabutan-package-button" type="submit">HTMLを正規化してZip作成</button>
-        {% if kabutan_package_zip_exists %}
-          <a class="button-link" href="/kabutan-package/download">Zip保存</a>
-        {% endif %}
-      </form>
-
       <form action="/kabutan-package/import" method="post" enctype="multipart/form-data" class="control-grid">
-        <label>
+        <label class="wide">
           <span>Kabutan HTML package zip</span>
           <input type="file" name="kabutan_package_zip" accept=".zip,application/zip">
         </label>
-        <button id="kabutan-package-import-button" type="submit">Zipを展開して設定</button>
+        <button id="kabutan-package-import-button" type="submit">Zipを読み込む</button>
       </form>
+
+      <div class="package-guidance">
+        ローカルで作成した <code>kabutan_html_package.zip</code> を読み込むと、展開後の <code>html/</code> を Fundamental 用の株探HTMLとして利用します。
+      </div>
+
+      {% if state.kabutan_html_dir %}
+        <div class="package-guidance">現在のKabutan HTML: <code>{{ state.kabutan_html_dir }}</code></div>
+      {% endif %}
+
+      {% if state.kabutan_package_summary %}
+        <section class="package-summary" aria-label="株探HTMLパッケージ情報">
+          <pre>{{ state.kabutan_package_summary }}</pre>
+        </section>
+      {% endif %}
     </section>
 
     <form method="post" class="work-area">
@@ -148,7 +139,6 @@
     const copyButton = document.getElementById("copy-button");
     const copySource = document.getElementById("copy-source");
     const summaryButton = document.getElementById("summary-button");
-    const kabutanPackageButton = document.getElementById("kabutan-package-button");
     const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
     const modeInputs = document.querySelectorAll('input[name="mode"]');
 
@@ -156,9 +146,6 @@
       const technicalSelected = Array.from(modeInputs).some(
         (input) => input.checked && input.value === "technical"
       );
-      if (kabutanPackageButton) {
-        kabutanPackageButton.disabled = technicalSelected;
-      }
       if (kabutanPackageImportButton) {
         kabutanPackageImportButton.disabled = technicalSelected;
       }

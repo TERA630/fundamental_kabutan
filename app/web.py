@@ -199,6 +199,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
             _clear_summary(ui_state)
+            ui_state.kabutan_package_summary = _build_kabutan_package_summary(result)
             manifest_text = f" / manifest: {result.manifest_path}" if result.manifest_path is not None else ""
             ui_state.status = (
                 "株探HTMLパッケージZipを展開しました。"
@@ -365,6 +366,18 @@ def _store_summary(
     state.summary_html = html
     state.summary_markdown = markdown
     state.summary_filename = filename
+
+
+def _build_kabutan_package_summary(result: Any) -> str:
+    lines = [
+        "株探HTMLパッケージ",
+        f"HTML: {result.html_count}件",
+        f"html_dir: {result.html_dir}",
+    ]
+    manifest_path = getattr(result, "manifest_path", None)
+    if manifest_path is not None:
+        lines.append(f"manifest: {manifest_path}")
+    return "\n".join(lines)
 
 
 def _summary_html_filename(markdown_filename: str) -> str:

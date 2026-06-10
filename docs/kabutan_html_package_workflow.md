@@ -44,21 +44,21 @@ kabutan_html_package.zip
 
 `manifest.json` には、元ファイル名、出力ファイル名、推定コード、処理結果、スキップ理由を記録する。
 
-## Web UIでの作成手順
+## Web UIでの読み込み手順
 
-1. Web UIを起動する。
-2. `Kabutan HTML folder` でHTMLフォルダをアップロードする、または `Kabutan_html_dir` にコンテナ内パスを入力して `フォルダ設定` を押す。
-3. `HTMLを正規化してZip作成` を押す。
-4. 正常に作成されると、正規化済み `html/` が現在の `kabutan_html_dir` に設定される。
-5. `Zip保存` が表示された場合は、`kabutan_html_package.zip` をダウンロードできる。
+1. ローカルPCで `manifest.json` と `html/*.html` を含む `kabutan_html_package.zip` を作成する。
+2. Web UIを起動する。
+3. `Kabutan HTML package zip` に `kabutan_html_package.zip` を選択する。
+4. `Zipを読み込む` を押す。
+5. 展開後の `html/` が `kabutan_html_dir` に設定される。
 
-作成先は `.fundamental_cache/web_kabutan_html_package/` 配下である。
+Web UIでは、ブラウザ経由のHTMLフォルダ保持やWeb UI上でのZip作成を主導線にしない。Codespaces運用では、ローカルで作成済みのZipを読み込む形に統一する。
 
 ## Codespacesでの受け入れ手順
 
 1. CodespacesでWeb UIを開く。
 2. `Kabutan HTML package zip` に `kabutan_html_package.zip` を選択する。
-3. `Zipを展開して設定` を押す。
+3. `Zipを読み込む` を押す。
 4. 展開後の `html/` が `kabutan_html_dir` に設定される。
 5. Fundamentalの `取得` または `サマリ表示` を実行する。
 
@@ -76,15 +76,12 @@ kabutan_html_package.zip
 
 現時点では、次の手動確認が残っている。
 
-- ローカルWeb UIでHTMLフォルダをアップロードできるか。
-- `HTMLを正規化してZip作成` 後に `Zip保存` が表示されるか。
-- ダウンロードしたZipをCodespaces側Web UIでアップロードできるか。
-- `Zipを展開して設定` 後に、Fundamental解析が正規化済みHTMLを読めるか。
+- ローカルで作成したZipをCodespaces側Web UIでアップロードできるか。
+- `Zipを読み込む` 後に、Fundamental解析が正規化済みHTMLを読めるか。
 - スキップされたHTMLがある場合に、manifestで理由を確認できるか。
 
 ## 既知の弱い点
 
 - manifestの中身は画面上に表表示していない。
 - Status欄にパスと件数を出すだけなので、長いパスでは読みづらい。
-- Tkinter GUIにはZip作成導線はあるが、Zip受け入れ導線はない。
 - 実ブラウザでの確認が不十分なため、UI操作上の詰まりが残っている可能性がある。

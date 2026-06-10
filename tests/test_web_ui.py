@@ -154,19 +154,20 @@ def test_index_copy_button_has_textarea_fallback_for_insecure_contexts():
     assert 'document.execCommand("copy")' in html
 
 
-def test_index_has_kabutan_html_folder_picker():
+def test_index_uses_kabutan_package_zip_import_as_primary_flow():
     state = WebUiState()
     client = create_app(state).test_client()
 
     html = client.get("/").data.decode("utf-8")
 
-    assert 'name="kabutan_html_files"' in html
-    assert "webkitdirectory" in html
-    assert 'enctype="multipart/form-data"' in html
-    assert 'form action="/kabutan-package"' in html
-    assert "HTMLを正規化してZip作成" in html
+    assert 'name="kabutan_html_files"' not in html
+    assert "webkitdirectory" not in html
+    assert 'form action="/kabutan-package"' not in html
+    assert "HTMLを正規化してZip作成" not in html
     assert 'form action="/kabutan-package/import"' in html
     assert 'name="kabutan_package_zip"' in html
+    assert "Zipを読み込む" in html
+    assert "ローカルで作成した" in html
 
 
 def test_set_kabutan_dir_accepts_uploaded_html_folder(tmp_path: Path):
@@ -316,7 +317,14 @@ def test_import_kabutan_package_zip_sets_html_dir(tmp_path: Path):
     assert state.kabutan_html_dir == tmp_path / "web_imported_kabutan_html_package" / "html"
     assert controller.saved_dir == state.kabutan_html_dir
     assert state.output_cache == {}
+    assert state.kabutan_package_summary == (
+        "株探HTMLパッケージ\n"
+        "HTML: 2件\n"
+        f"html_dir: {tmp_path / 'web_imported_kabutan_html_package' / 'html'}\n"
+        f"manifest: {tmp_path / 'web_imported_kabutan_html_package' / 'manifest.json'}"
+    )
     assert "HTML: 2件" in html
+    assert "株探HTMLパッケージ" in html
 
 
 def test_fetch_fundamental_clears_summary_html(tmp_path: Path):

@@ -29,6 +29,7 @@ class WebUiState:
     summary_markdown: str = ""
     summary_html: str = ""
     summary_filename: str = ""
+    kabutan_package_summary: str = ""
     status: str = field(default_factory=GuiViewModel.build_initial_status)
 
     @property
