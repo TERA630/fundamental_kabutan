@@ -95,7 +95,7 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
     assert state.fundamental_summary_html == "<section>TECH_TABLE</section>"
     assert state.summary_kind == "technical"
     assert state.summary_markdown == "MD:TECH_TABLE\n"
-    assert state.summary_filename.startswith("technical_summary-")
+    assert state.summary_filename.startswith("technical_summary_")
     assert state.status == "Technicalサマリを表示しました。"
     assert 'href="/summary/download.md"' in html
     assert 'href="/summary/download.html"' in html
@@ -129,7 +129,7 @@ def test_summary_markdown_download_returns_latest_summary(monkeypatch):
     assert response.status_code == 200
     assert response.data.decode("utf-8") == "MD:TECH_TABLE\n"
     assert response.headers["Content-Type"].startswith("text/markdown")
-    assert "technical_summary-" in response.headers["Content-Disposition"]
+    assert "technical_summary_" in response.headers["Content-Disposition"]
 
 
 def test_summary_download_returns_404_before_summary_generated():

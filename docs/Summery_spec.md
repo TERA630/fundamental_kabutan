@@ -264,7 +264,7 @@ Technical Summary の冒頭には、夜間米国指標セクションを表示�
 
 - `WebUiState` に直近サマリの種別、Markdown本文、HTML本文、推奨ファイル名を保持するフィールドを追加する。
 - `/summary` で Fundamental / Technical の HTML 表示と同時に Markdown も保持する。
-- `/summary/download.md` を追加し、直近サマリを `fundamental_summary-yyyy-mm-dd.md` または `technical_summary-yyyy-mm-dd.md` としてダウンロードできるようにする。
+- `/summary/download.md` を追加し、直近サマリを `fundamental_summary-yyyy-mm-dd.md` または `technical_summary_mm-dd-hh-mm.md` としてダウンロードできるようにする。
 - 必要なら `/summary/download.html` を追加し、Web 表示と同じ HTML を保存できるようにする。
 - `index.html` には、サマリ生成済みのときだけ `Markdown保存`、必要に応じて `HTML保存` を表示する。
 

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 try:
     from flask import Flask, Response, render_template, request, send_file
@@ -271,7 +272,8 @@ def create_app(state: WebUiState | None = None) -> Flask:
             return _render(ui_state)
 
         try:
-            today = date.today()
+            generated_at = datetime.now(ZoneInfo("Asia/Tokyo"))
+            today = generated_at.date()
             if ui_state.mode == "technical":
                 technical_table = ui_state.controller.build_technical_summary_table(
                     watchlist_entries=ui_state.watchlist,
@@ -283,7 +285,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                     kind="technical",
                     html=html,
                     markdown=markdown,
-                    filename=build_technical_summary_filename(today=today),
+                    filename=build_technical_summary_filename(generated_at=generated_at),
                 )
                 ui_state.status = "Technicalサマリを表示しました。"
             else:

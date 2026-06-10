@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 import zipfile
 
@@ -143,8 +143,11 @@ def test_build_fundamental_summary_filename_uses_date():
     assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summary-2026-05-30.md"
 
 
-def test_build_technical_summary_filename_uses_date():
-    assert build_technical_summary_filename(today=date(2026, 5, 30)) == "technical_summary-2026-05-30.md"
+def test_build_technical_summary_filename_uses_month_day_hour_minute():
+    assert (
+        build_technical_summary_filename(generated_at=datetime(2026, 5, 30, 14, 5))
+        == "technical_summary_05-30-14-05.md"
+    )
 
 
 def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path, monkeypatch):
@@ -198,10 +201,10 @@ def test_build_and_save_technical_summary_writes_dated_filename(tmp_path: Path, 
     output_path = controller.build_and_save_technical_summary(
         watchlist_entries=[("トヨタ", "7203")],
         output_dir=output_dir,
-        today=date(2026, 5, 30),
+        generated_at=datetime(2026, 5, 30, 14, 5),
     )
 
-    assert output_path == output_dir / "technical_summary-2026-05-30.md"
+    assert output_path == output_dir / "technical_summary_05-30-14-05.md"
     assert output_path.read_text(encoding="utf-8") == "TECH_MD:TECH_TABLE\n"
 
 

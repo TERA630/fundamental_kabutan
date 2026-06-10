@@ -46,9 +46,9 @@ def build_fundamental_summary_filename(*, today: date | None = None) -> str:
     return f"{FUNDAMENTAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
 
 
-def build_technical_summary_filename(*, today: date | None = None) -> str:
-    target_date = today or date.today()
-    return f"{TECHNICAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
+def build_technical_summary_filename(*, generated_at: datetime | None = None) -> str:
+    target_datetime = generated_at or datetime.now(ZoneInfo("Asia/Tokyo"))
+    return f"{TECHNICAL_SUMMARY_FILENAME_PREFIX}_{target_datetime.strftime('%m-%d-%H-%M')}.md"
 
 
 def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
@@ -244,11 +244,11 @@ class FundamentalGuiController:
         *,
         watchlist_entries: list[tuple[str, str]],
         output_dir: Path,
-        today: date | None = None,
+        generated_at: datetime | None = None,
     ) -> Path:
         table = self.build_technical_summary_table(watchlist_entries=watchlist_entries)
         markdown = build_technical_summary_markdown(table)
-        output_path = output_dir / build_technical_summary_filename(today=today)
+        output_path = output_dir / build_technical_summary_filename(generated_at=generated_at)
         output_path.write_text(markdown, encoding="utf-8")
         return output_path
 
