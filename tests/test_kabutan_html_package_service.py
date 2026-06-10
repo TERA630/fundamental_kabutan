@@ -68,6 +68,21 @@ def test_import_package_extracts_html_dir_and_manifest(tmp_path: Path):
     assert (output_dir / "html" / "7203.html").read_text(encoding="utf-8") == "<html><body>7203</body></html>"
 
 
+def test_inspect_package_validates_without_extracting(tmp_path: Path):
+    zip_path = tmp_path / "package.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html><body>7203</body></html>")
+        archive.writestr("html/7974.html", "<html><body>7974</body></html>")
+
+    result = KabutanHtmlPackageService().inspect_package(zip_path=zip_path)
+
+    assert result.zip_path == zip_path.resolve()
+    assert result.html_count == 2
+    assert result.has_manifest is True
+    assert not (tmp_path / "html").exists()
+
+
 def test_import_package_rejects_zip_slip_path(tmp_path: Path):
     zip_path = tmp_path / "package.zip"
     output_dir = tmp_path / "imported"

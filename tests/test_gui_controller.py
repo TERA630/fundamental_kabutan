@@ -1,12 +1,16 @@
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 import zipfile
 
 import pandas as pd
 
 from app.data.file_cache import FileCache
-from app.gui_controller import FundamentalGuiController, build_fundamental_summary_filename
+from app.gui_controller import (
+    FundamentalGuiController,
+    build_fundamental_summary_filename,
+    build_technical_summary_filename,
+)
 from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 
 
@@ -139,6 +143,13 @@ def test_build_fundamental_summary_filename_uses_date():
     assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summary-2026-05-30.md"
 
 
+def test_build_technical_summary_filename_uses_month_day_hour_minute():
+    assert (
+        build_technical_summary_filename(generated_at=datetime(2026, 5, 30, 14, 5))
+        == "technical_summary_05-30-14-05.md"
+    )
+
+
 def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path, monkeypatch):
     class DummySummaryService:
         def __init__(self, service):
@@ -168,6 +179,33 @@ def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path
 
     assert output_path == output_dir / "fundamental_summary-2026-05-30.md"
     assert output_path.read_text(encoding="utf-8") == "MD:TABLE\n"
+
+
+def test_build_and_save_technical_summary_writes_dated_filename(tmp_path: Path, monkeypatch):
+    class DummySummaryService:
+        def __init__(self, build_result, build_us_market_summary=None):
+            self.build_result = build_result
+            self.build_us_market_summary = build_us_market_summary
+
+        def build_summary_table(self, watchlist_entries):
+            assert watchlist_entries == [("トヨタ", "7203")]
+            return "TECH_TABLE"
+
+    monkeypatch.setattr("app.gui_controller.TechnicalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.gui_controller.build_technical_summary_markdown", lambda table: f"TECH_MD:{table}\n")
+
+    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+
+    output_path = controller.build_and_save_technical_summary(
+        watchlist_entries=[("トヨタ", "7203")],
+        output_dir=output_dir,
+        generated_at=datetime(2026, 5, 30, 14, 5),
+    )
+
+    assert output_path == output_dir / "technical_summary_05-30-14-05.md"
+    assert output_path.read_text(encoding="utf-8") == "TECH_MD:TECH_TABLE\n"
 
 
 def test_fetch_technical_output_uses_injected_technical_service(tmp_path: Path, monkeypatch):

@@ -198,13 +198,19 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
-    def _summary_worker(self, output_dir: Path):
+    def _summary_worker(self, output_dir: Path, mode: str):
         try:
-            output_path = self.controller.build_and_save_fundamental_summary(
-                watchlist_entries=self.state.watchlist,
-                output_dir=output_dir,
-                kabutan_html_dir=self.state.kabutan_html_dir,
-            )
+            if mode == "technical":
+                output_path = self.controller.build_and_save_technical_summary(
+                    watchlist_entries=self.state.watchlist,
+                    output_dir=output_dir,
+                )
+            else:
+                output_path = self.controller.build_and_save_fundamental_summary(
+                    watchlist_entries=self.state.watchlist,
+                    output_dir=output_dir,
+                    kabutan_html_dir=self.state.kabutan_html_dir,
+                )
             self.master.after(0, lambda path=output_path: self.set_busy(False, self.view_model.build_saved_status(str(path))))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_summary_error(msg))
@@ -292,19 +298,18 @@ class FundamentalApp:
     def generate_summary(self):
         if self.state.is_fetching:
             return
-        if self.view.current_mode() == "technical":
-            return
 
         if not self.state.watchlist:
             self.status_var.set(self.view_model.build_missing_stock_status())
             return
 
-        if not self._require_kabutan_html_dir():
+        mode = self.view.current_mode()
+        if mode != "technical" and not self._require_kabutan_html_dir():
             return
 
         output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
         self.set_busy(True, self.view_model.build_summary_running_status())
-        thread = threading.Thread(target=self._summary_worker, args=(output_dir,), daemon=True)
+        thread = threading.Thread(target=self._summary_worker, args=(output_dir, mode), daemon=True)
         thread.start()
 
     def build_kabutan_html_package(self):

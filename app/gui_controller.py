@@ -17,8 +17,10 @@ from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
 from app.domain.usecases.market_data import MarketDataService
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
+from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.builders.technical_output import build_technical_output
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
+from app.domain.usecases.technical_summary import TechnicalSummaryService
 from app.presenters import build_fundamental_output
 from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
@@ -32,11 +34,17 @@ from app.services.output_cache_service import OutputCacheService
 from app.services.watchlist_service import WatchlistService
 
 FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
+TECHNICAL_SUMMARY_FILENAME_PREFIX = "technical_summary"
 
 
 def build_fundamental_summary_filename(*, today: date | None = None) -> str:
     target_date = today or date.today()
     return f"{FUNDAMENTAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
+
+
+def build_technical_summary_filename(*, today: date | None = None) -> str:
+    target_date = today or date.today()
+    return f"{TECHNICAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
 
 
 def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
@@ -206,6 +214,34 @@ class FundamentalGuiController:
         output_path.write_text(markdown, encoding="utf-8")
         return output_path
 
+    def build_technical_summary_table(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+    ):
+        service = TechnicalSummaryService(self._build_technical_summary_result)
+        return service.build_summary_table(watchlist_entries)
+
+    def build_and_save_technical_summary(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+        output_dir: Path,
+        today: date | None = None,
+    ) -> Path:
+        table = self.build_technical_summary_table(watchlist_entries=watchlist_entries)
+        markdown = build_technical_summary_markdown(table)
+        output_path = output_dir / build_technical_summary_filename(today=today)
+        output_path.write_text(markdown, encoding="utf-8")
+        return output_path
+
+    def _build_technical_summary_result(self, name: str, code4: str):
+        if self._uses_default_technical_service:
+            bundle = self.fetch_market_data_bundle(code4)
+            return TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
+        service = self.build_technical_service(self.file_cache)
+        return service.build_analysis_result(name=name, code4=code4)
+
     def fetch_technical_output(
         self,
         *,
@@ -241,8 +277,10 @@ class FundamentalGuiController:
 
 __all__ = [
     "FUNDAMENTAL_SUMMARY_FILENAME_PREFIX",
+    "TECHNICAL_SUMMARY_FILENAME_PREFIX",
     "FundamentalGuiController",
     "build_fundamental_summary_filename",
+    "build_technical_summary_filename",
     "build_default_market_data_service",
     "build_default_technical_service",
 ]

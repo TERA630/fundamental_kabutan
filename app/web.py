@@ -19,6 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Fl
 from app.gui_state_utils import build_output_cache_key
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 from app.presentation.web_fundamental_summary import build_fundamental_summary_html
+from app.presentation.web_technical_summary import build_technical_summary_html
 from app.services.watchlist_service import WatchlistService
 from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
@@ -260,22 +261,25 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
             ui_state.fundamental_summary_html = ""
             return _render(ui_state)
-        if ui_state.kabutan_html_dir is None:
+        if ui_state.mode != "technical" and ui_state.kabutan_html_dir is None:
             ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
-            ui_state.fundamental_summary_html = ""
-            return _render(ui_state)
-        if ui_state.mode == "technical":
-            ui_state.status = "Technicalモードではサマリ表示は無効です。"
             ui_state.fundamental_summary_html = ""
             return _render(ui_state)
 
         try:
-            table = ui_state.controller.build_fundamental_summary_table(
-                watchlist_entries=ui_state.watchlist,
-                kabutan_html_dir=ui_state.kabutan_html_dir,
-            )
-            ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
-            ui_state.status = "Fundamentalサマリを表示しました。"
+            if ui_state.mode == "technical":
+                technical_table = ui_state.controller.build_technical_summary_table(
+                    watchlist_entries=ui_state.watchlist,
+                )
+                ui_state.fundamental_summary_html = build_technical_summary_html(technical_table)
+                ui_state.status = "Technicalサマリを表示しました。"
+            else:
+                table = ui_state.controller.build_fundamental_summary_table(
+                    watchlist_entries=ui_state.watchlist,
+                    kabutan_html_dir=ui_state.kabutan_html_dir,
+                )
+                ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
+                ui_state.status = "Fundamentalサマリを表示しました。"
         except Exception as exc:
             ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
             ui_state.fundamental_summary_html = ""

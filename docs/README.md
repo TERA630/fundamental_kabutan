@@ -17,6 +17,8 @@
 
 - `screen_spec.md`: GUI画面表示、操作、ステータス、固定パネル、GUI出力キャッシュ表示
 - `presentation_spec.md`: 出力テキスト、Markdown、表示用セクション、数値表現、N/A表現
+- `Summery_spec.md`: Tkinter / Web UI のサマリ表示、保存、Technical Summary 表示仕様
+- `kabutan_html_package_workflow.md`: 株探HTMLの正規化、Zip作成、Codespaces受け入れ手順
 
 ## 起動方法
 

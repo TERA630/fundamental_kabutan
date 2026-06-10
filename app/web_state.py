@@ -18,6 +18,7 @@ class WebUiState:
     view_model: GuiViewModel = field(default_factory=GuiViewModel)
     watchlist_path: Path | None = None
     kabutan_html_dir: Path | None = None
+    kabutan_package_zip_path: Path | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
     output_cache: dict[str, str] = field(default_factory=dict)
     selected_label: str = ""
@@ -25,6 +26,10 @@ class WebUiState:
     output: str = ""
     institutional_summary: str = DEFAULT_INSTITUTIONAL_SUMMARY
     fundamental_summary_html: str = ""
+    summary_kind: str = ""
+    summary_markdown: str = ""
+    summary_html: str = ""
+    summary_filename: str = ""
     status: str = field(default_factory=GuiViewModel.build_initial_status)
 
     @property
@@ -51,9 +56,7 @@ class WebUiStateManager:
                 state.watchlist_path = None
                 state.watchlist = []
 
-        resolved_kabutan = state.controller.fetch_resolved_kabutan_html_dir()
-        if resolved_kabutan.status == "ok":
-            state.kabutan_html_dir = resolved_kabutan.dir_path
+        state.kabutan_package_zip_path = state.controller.fetch_kabutan_package_zip_cache()
 
     def select_first_if_needed(self) -> None:
         choices = self.state.stock_choices

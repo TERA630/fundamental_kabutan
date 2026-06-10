@@ -77,7 +77,7 @@ h1 {
 }
 
 .toolbar {
-  grid-template-columns: minmax(260px, 1fr) auto auto auto auto auto;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto auto auto auto auto;
   margin-bottom: 12px;
 }
 
@@ -151,6 +151,48 @@ button:hover,
 .segmented input:checked + span {
   background: #dfeeea;
   color: #0f4d43;
+}
+
+.input-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.maintenance-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.maintenance-panel summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.maintenance-panel .control-grid {
+  margin-top: 10px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid #c9d0da;
+  border-radius: 6px;
+  background: #f3f5f8;
+  color: var(--muted);
+  padding: 4px 9px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.status-chip.is-ready {
+  border-color: #8fbdb4;
+  background: #e7f3f0;
+  color: #14564c;
 }
 
 .summary-panel {
@@ -256,6 +298,55 @@ button:hover,
 
 .summary-html-panel .fundamental-table.summary-table {
   min-width: 900px;
+}
+
+.summary-html-panel .technical-summary-table {
+  min-width: 1320px;
+}
+
+.summary-html-panel .us-market-summary-table {
+  min-width: 720px;
+}
+
+.summary-html-panel .summary-rank-heading {
+  margin: 16px 0 8px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.summary-html-panel .line-marker-group {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.summary-html-panel .line-marker {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.summary-html-panel .line-marker + .line-marker::before {
+  content: "";
+  width: 18px;
+  border-top: 2px solid #aab3c0;
+}
+
+.summary-html-panel .line-marker-index {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 22px;
+  border: 1px solid #b45d4a;
+  border-radius: 4px;
+  background: #fff4ef;
+  color: #843820;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summary-html-panel .summary-output h3:first-of-type {
+  margin-top: 0;
 }
 
 .summary-html-panel .summary-skipped {
