@@ -60,6 +60,7 @@ def calc_moving_averages(history: pd.DataFrame) -> pd.DataFrame:
     close = out["Close"]
     out["ma5"] = close.rolling(5).mean()
     out["ma25"] = close.rolling(25).mean()
+    out["ma75"] = close.rolling(75).mean()
     out["ma25_prev5"] = out["ma25"].shift(5)
     out["dev5_pct"] = ((close / out["ma5"]) - 1) * 100
     out["dev25_pct"] = ((close / out["ma25"]) - 1) * 100
@@ -246,6 +247,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     atr14 = _none_if_nan(latest_row["atr14"])
     ma5 = _none_if_nan(latest_row["ma5"])
     ma25 = _none_if_nan(latest_row["ma25"])
+    ma75 = _none_if_nan(latest_row["ma75"])
     ma25_prev5 = _none_if_nan(latest_row["ma25_prev5"])
 
     day_range = (high - low) if high is not None and low is not None else None
@@ -291,6 +293,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     moving_average = TechnicalMovingAverageSnapshot(
         ma5=ma5,
         ma25=ma25,
+        ma75=ma75,
         ma25_prev5=ma25_prev5,
         dev5_pct=_none_if_nan(latest_row["dev5_pct"]),
         dev25_pct=_none_if_nan(latest_row["dev25_pct"]),

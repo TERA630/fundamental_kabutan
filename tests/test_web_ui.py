@@ -60,6 +60,85 @@ def test_index_renders_technical_output_as_pre_text_not_visible_textarea():
 
     assert '<pre class="text-block">Technical output</pre>' in html
     assert '<textarea readonly' not in html
+    assert '<button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>' in html
+
+
+def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeypatch):
+    class FakeController:
+        def fetch_output_cache_for_today(self):
+            return {}
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def build_technical_summary_table(self, *, watchlist_entries):
+            assert watchlist_entries == [("トヨタ", "7203")]
+            return "TECH_TABLE"
+
+    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_technical_summary_markdown", lambda table: f"MD:{table}\n")
+
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/summary",
+        data={"selected_stock": "トヨタ (7203)", "mode": "technical"},
+    ).data.decode("utf-8")
+
+    assert "<section>TECH_TABLE</section>" in html
+    assert state.fundamental_summary_html == "<section>TECH_TABLE</section>"
+    assert state.summary_kind == "technical"
+    assert state.summary_markdown == "MD:TECH_TABLE\n"
+    assert state.summary_filename.startswith("technical_summary-")
+    assert state.status == "Technicalサマリを表示しました。"
+    assert 'href="/summary/download.md"' in html
+    assert 'href="/summary/download.html"' in html
+
+
+def test_summary_markdown_download_returns_latest_summary(monkeypatch):
+    class FakeController:
+        def fetch_output_cache_for_today(self):
+            return {}
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def build_technical_summary_table(self, *, watchlist_entries):
+            return "TECH_TABLE"
+
+    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_technical_summary_markdown", lambda table: f"MD:{table}\n")
+
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    client = create_app(state).test_client()
+
+    client.post("/summary", data={"selected_stock": "トヨタ (7203)", "mode": "technical"})
+    response = client.get("/summary/download.md")
+
+    assert response.status_code == 200
+    assert response.data.decode("utf-8") == "MD:TECH_TABLE\n"
+    assert response.headers["Content-Type"].startswith("text/markdown")
+    assert "technical_summary-" in response.headers["Content-Disposition"]
+
+
+def test_summary_download_returns_404_before_summary_generated():
+    state = WebUiState()
+    client = create_app(state).test_client()
+
+    response = client.get("/summary/download.md")
+
+    assert response.status_code == 404
 
 
 def test_index_copy_button_has_textarea_fallback_for_insecure_contexts():

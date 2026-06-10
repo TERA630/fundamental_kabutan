@@ -25,6 +25,10 @@ class WebUiState:
     output: str = ""
     institutional_summary: str = DEFAULT_INSTITUTIONAL_SUMMARY
     fundamental_summary_html: str = ""
+    summary_kind: str = ""
+    summary_markdown: str = ""
+    summary_html: str = ""
+    summary_filename: str = ""
     status: str = field(default_factory=GuiViewModel.build_initial_status)
 
     @property

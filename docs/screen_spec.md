@@ -38,8 +38,8 @@
 - `取得` は選択中タブに応じて Fundamental または Technical を出力する。
 - `コピー` は選択中タブのテキストをクリップボードへコピーする。
 - `保存` は選択中タブのテキストをファイルへ保存する。
-- `サマリ出力` は Fundamental タブ選択時のみ `fundamental_summery-yyyy-mm-dd.md` を作成する。
-- Technical タブ選択時のサマリ出力は何もしない。
+- `サマリ出力` は Fundamental タブ選択時に `fundamental_summary-yyyy-mm-dd.md` を作成する。
+- `サマリ出力` は Technical タブ選択時に `technical_summary-yyyy-mm-dd.md` を作成する。
 
 ## 5. ステータス表示
 

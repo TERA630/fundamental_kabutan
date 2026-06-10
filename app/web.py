@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,12 @@ except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Fl
     send_file = None  # type: ignore[assignment]
 
 from app.gui_state_utils import build_output_cache_key
+from app.gui_controller import build_fundamental_summary_filename, build_technical_summary_filename
+from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
+from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 from app.presentation.web_fundamental_summary import build_fundamental_summary_html
+from app.presentation.web_technical_summary import build_technical_summary_html
 from app.services.watchlist_service import WatchlistService
 from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
@@ -121,7 +126,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 ui_state.watchlist = watchlist_service.parse_uploaded(data)
                 ui_state.watchlist_path = _save_uploaded_watchlist(ui_state, data)
                 ui_state.controller.save_watchlist_path_cache(ui_state.watchlist_path)
-                ui_state.fundamental_summary_html = ""
+                _clear_summary(ui_state)
                 ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
             else:
                 raw_path = request.form.get("watchlist_path", "").strip()
@@ -131,7 +136,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 ui_state.watchlist = watchlist_service.load_from_file(path)
                 ui_state.watchlist_path = path
                 ui_state.controller.save_watchlist_path_cache(path)
-                ui_state.fundamental_summary_html = ""
+                _clear_summary(ui_state)
                 ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
             state_manager.select_first_if_needed()
         except Exception as exc:
@@ -149,7 +154,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.kabutan_html_dir = path
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(path)
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
             ui_state.status = ui_state.view_model.build_kabutan_dir_selected_status()
         except Exception as exc:
             ui_state.status = str(exc)
@@ -169,7 +174,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.kabutan_html_dir = result.html_dir
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
             ui_state.status = (
                 "株探HTMLを正規化してZipを作成しました。"
                 f" 正規化: {result.normalized_count}件 / スキップ: {result.skipped_count}件"
@@ -192,7 +197,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.kabutan_html_dir = result.html_dir
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
             manifest_text = f" / manifest: {result.manifest_path}" if result.manifest_path is not None else ""
             ui_state.status = (
                 "株探HTMLパッケージZipを展開しました。"
@@ -217,7 +222,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
             request.form.get("selected_stock", ui_state.selected_label),
             request.form.get("mode", ui_state.mode),
         )
-        ui_state.fundamental_summary_html = ""
+        _clear_summary(ui_state)
         selected = state_manager.selected_stock()
         if selected is None:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
@@ -258,28 +263,66 @@ def create_app(state: WebUiState | None = None) -> Flask:
         )
         if not ui_state.watchlist:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
             return _render(ui_state)
-        if ui_state.kabutan_html_dir is None:
+        if ui_state.mode != "technical" and ui_state.kabutan_html_dir is None:
             ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
-            ui_state.fundamental_summary_html = ""
-            return _render(ui_state)
-        if ui_state.mode == "technical":
-            ui_state.status = "Technicalモードではサマリ表示は無効です。"
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
             return _render(ui_state)
 
         try:
-            table = ui_state.controller.build_fundamental_summary_table(
-                watchlist_entries=ui_state.watchlist,
-                kabutan_html_dir=ui_state.kabutan_html_dir,
-            )
-            ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
-            ui_state.status = "Fundamentalサマリを表示しました。"
+            today = date.today()
+            if ui_state.mode == "technical":
+                technical_table = ui_state.controller.build_technical_summary_table(
+                    watchlist_entries=ui_state.watchlist,
+                )
+                html = build_technical_summary_html(technical_table)
+                markdown = build_technical_summary_markdown(technical_table)
+                _store_summary(
+                    ui_state,
+                    kind="technical",
+                    html=html,
+                    markdown=markdown,
+                    filename=build_technical_summary_filename(today=today),
+                )
+                ui_state.status = "Technicalサマリを表示しました。"
+            else:
+                table = ui_state.controller.build_fundamental_summary_table(
+                    watchlist_entries=ui_state.watchlist,
+                    kabutan_html_dir=ui_state.kabutan_html_dir,
+                )
+                html = build_fundamental_summary_html(table)
+                markdown = build_fundamental_summary_markdown(table)
+                _store_summary(
+                    ui_state,
+                    kind="fundamental",
+                    html=html,
+                    markdown=markdown,
+                    filename=build_fundamental_summary_filename(today=today),
+                )
+                ui_state.status = "Fundamentalサマリを表示しました。"
         except Exception as exc:
             ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
-            ui_state.fundamental_summary_html = ""
+            _clear_summary(ui_state)
         return _render(ui_state)
+
+    @app.get("/summary/download.md")
+    def download_summary_markdown() -> Response:
+        if not ui_state.summary_markdown:
+            return app.response_class("サマリがまだ生成されていません。", status=404)
+        response = app.response_class(ui_state.summary_markdown, mimetype="text/markdown; charset=utf-8")
+        filename = ui_state.summary_filename or "summary.md"
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+
+    @app.get("/summary/download.html")
+    def download_summary_html() -> Response:
+        if not ui_state.summary_html:
+            return app.response_class("サマリがまだ生成されていません。", status=404)
+        filename = _summary_html_filename(ui_state.summary_filename)
+        response = app.response_class(ui_state.summary_html, mimetype="text/html; charset=utf-8")
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
 
     @app.get("/download")
     def download_output() -> Response:
@@ -297,6 +340,35 @@ def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
     path = state.controller.file_cache.base_dir / UPLOAD_WATCHLIST_CACHE_NAME
     path.write_bytes(data)
     return path
+
+
+def _clear_summary(state: WebUiState) -> None:
+    state.fundamental_summary_html = ""
+    state.summary_kind = ""
+    state.summary_markdown = ""
+    state.summary_html = ""
+    state.summary_filename = ""
+
+
+def _store_summary(
+    state: WebUiState,
+    *,
+    kind: str,
+    html: str,
+    markdown: str,
+    filename: str,
+) -> None:
+    state.fundamental_summary_html = html
+    state.summary_kind = kind
+    state.summary_html = html
+    state.summary_markdown = markdown
+    state.summary_filename = filename
+
+
+def _summary_html_filename(markdown_filename: str) -> str:
+    if markdown_filename.endswith(".md"):
+        return f"{markdown_filename[:-3]}.html"
+    return "summary.html"
 
 
 def _kabutan_package_zip_exists(state: WebUiState) -> bool:

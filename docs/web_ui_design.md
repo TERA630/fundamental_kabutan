@@ -46,7 +46,7 @@
 - 銘柄選択
 - Fundamental / Technical モード切替
 - 取得
-- サマリ出力
+- サマリ表示
 - コピー
 - 保存
 - ステータスメッセージ表示
@@ -61,10 +61,11 @@
 - Technical選択時は Technical 取得を実行する。
 - ステータスメッセージと出力本文は、既存 GUI と同等の意味にする。
 
-### 7.2 サマリ出力
+### 7.2 サマリ表示
 
-- Fundamental選択時のみ `fundamental_summery-yyyy-mm-dd.md` を作成する。
-- Technical選択時は、既存 GUI と同じく何もしない。
+- Fundamental選択時は監視銘柄の Fundamental Summary をHTMLテーブルで表示する。
+- Technical選択時は監視銘柄の Technical Summary をランク別HTMLテーブルで表示する。
+- サマリ生成後は Markdown 保存を提供し、必要に応じてHTML保存も提供する。
 
 ### 7.3 コピー
 
@@ -82,7 +83,7 @@
 - ポートは `PORT` 環境変数を優先し、未設定時は `8080` を使う。
 - watchlist はファイルアップロードを優先し、未指定時のみ repo内/コンテナ内パス入力を扱う。
 - 株探HTMLフォルダは、コンテナ内パス指定を基本案とする。
-- 必要に応じて HTML ZIP アップロードを追加候補とする。
+- 株探HTMLは、正規化済みZipの作成とアップロード展開に対応する。運用手順は `kabutan_html_package_workflow.md` を参照する。
 
 ## 9. 確認事項
 

@@ -81,9 +81,13 @@
         </div>
 
         <button formaction="/fetch" type="submit">取得</button>
-        <button id="summary-button" formaction="/summary" type="submit" {% if state.mode == 'technical' %}disabled{% endif %}>サマリ表示</button>
+        <button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>
         <button id="copy-button" type="button">コピー</button>
         <a class="button-link" href="/download">保存</a>
+        {% if state.summary_markdown %}
+          <a class="button-link" href="/summary/download.md">Markdown保存</a>
+          <a class="button-link" href="/summary/download.html">HTML保存</a>
+        {% endif %}
       </section>
     </form>
 
@@ -91,8 +95,8 @@
       <pre>{{ state.institutional_summary }}</pre>
     </section>
 
-    {% if state.mode != 'technical' and summary_html %}
-    <section class="summary-panel summary-html-panel" aria-label="Fundamentalサマリ">
+    {% if summary_html %}
+    <section class="summary-panel summary-html-panel" aria-label="サマリ">
       {{ summary_html | safe }}
     </section>
     {% endif %}
@@ -149,13 +153,9 @@
     const modeInputs = document.querySelectorAll('input[name="mode"]');
 
     function updateSummaryButton() {
-      if (!summaryButton) {
-        return;
-      }
       const technicalSelected = Array.from(modeInputs).some(
         (input) => input.checked && input.value === "technical"
       );
-      summaryButton.disabled = technicalSelected;
       if (kabutanPackageButton) {
         kabutanPackageButton.disabled = technicalSelected;
       }
