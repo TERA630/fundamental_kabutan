@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 from pathlib import Path
@@ -167,16 +168,24 @@ def create_app(state: WebUiState | None = None) -> Flask:
             result = ui_state.controller.inspect_kabutan_html_package(zip_path=zip_path)
             ui_state.kabutan_package_zip_path = zip_path
             ui_state.kabutan_package_zip_signature = _file_signature(zip_path)
-            ui_state.kabutan_html_dir = None
+            uploaded_html_dir = _import_output_dir_for_signature(ui_state, ui_state.kabutan_package_zip_signature) / "html"
+            ui_state.kabutan_html_dir = uploaded_html_dir if _html_dir_ready(uploaded_html_dir) else None
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_package_zip_cache(zip_path)
+            if ui_state.kabutan_html_dir is not None:
+                ui_state.controller.save_kabutan_html_dir_cache(ui_state.kabutan_html_dir)
             ui_state.fundamental_summary_html = ""
             manifest_text = " / manifest: あり" if result.has_manifest else " / manifest: なし"
+            extract_text = (
+                f" / 展開済み: {ui_state.kabutan_html_dir}"
+                if ui_state.kabutan_html_dir is not None
+                else " / Fundamental取得時に展開します。"
+            )
             ui_state.status = (
                 "株探HTMLパッケージZipをアップロードしました。"
                 f" HTML: {result.html_count}件"
                 f"{manifest_text}"
-                " / Fundamental取得時に展開します。"
+                f"{extract_text}"
             )
         except Exception as exc:
             ui_state.status = f"株探HTMLパッケージアップロード失敗: {exc}"
@@ -279,14 +288,21 @@ def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
     return path
 
 
-def _file_signature(path: Path) -> tuple[int, int]:
-    stat = path.stat()
-    return (stat.st_size, stat.st_mtime_ns)
+def _file_signature(path: Path) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return (path.stat().st_size, digest.hexdigest()[:16])
 
 
-def _import_output_dir_for_signature(state: WebUiState, signature: tuple[int, int]) -> Path:
-    size, mtime_ns = signature
-    return state.controller.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME / f"{size}_{mtime_ns}"
+def _import_output_dir_for_signature(state: WebUiState, signature: tuple[int, str]) -> Path:
+    size, digest = signature
+    return state.controller.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME / f"{size}_{digest}"
+
+
+def _html_dir_ready(html_dir: Path) -> bool:
+    return html_dir.exists() and html_dir.is_dir() and any(html_dir.glob("*.html"))
 
 
 def _ensure_kabutan_html_dir_for_fundamental(state: WebUiState) -> None:
@@ -297,13 +313,25 @@ def _ensure_kabutan_html_dir_for_fundamental(state: WebUiState) -> None:
         raise ValueError("アップロード済みの株探HTMLパッケージZipが見つかりません。")
 
     signature = _file_signature(zip_path)
+    if (
+        state.kabutan_package_zip_signature == signature
+        and state.kabutan_html_dir is not None
+        and _html_dir_ready(state.kabutan_html_dir)
+    ):
+        return
+
     output_dir = _import_output_dir_for_signature(state, signature)
     html_dir = output_dir / "html"
+    if _html_dir_ready(html_dir):
+        state.kabutan_html_dir = html_dir
+        state.kabutan_package_zip_signature = signature
+        state.controller.save_kabutan_html_dir_cache(html_dir)
+        return
+
     if (
         state.kabutan_html_dir == html_dir
         and state.kabutan_package_zip_signature == signature
-        and html_dir.exists()
-        and html_dir.is_dir()
+        and _html_dir_ready(html_dir)
     ):
         return
 

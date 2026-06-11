@@ -47,6 +47,10 @@
           <span>Uploaded package</span>
           <input type="text" value="{{ state.kabutan_package_zip_path or '' }}" readonly>
         </label>
+        <label>
+          <span>Package html dir</span>
+          <input type="text" value="{{ state.kabutan_html_dir or '' }}" readonly>
+        </label>
         <button id="kabutan-package-import-button" type="submit">Zipをアップロード</button>
       </form>
     </section>

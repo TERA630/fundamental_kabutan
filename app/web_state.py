@@ -19,7 +19,7 @@ class WebUiState:
     watchlist_path: Path | None = None
     kabutan_html_dir: Path | None = None
     kabutan_package_zip_path: Path | None = None
-    kabutan_package_zip_signature: tuple[int, int] | None = None
+    kabutan_package_zip_signature: tuple[int, str] | tuple[int, int] | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
     output_cache: dict[str, str] = field(default_factory=dict)
     selected_label: str = ""

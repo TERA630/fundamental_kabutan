@@ -1,4 +1,5 @@
 from io import BytesIO
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 import zipfile
@@ -6,6 +7,10 @@ import zipfile
 import pytest
 
 from app.web import WebUiState, build_copy_text, create_app, parse_uploaded_watchlist, resolve_existing_dir
+
+
+def file_signature(path: Path) -> tuple[int, str]:
+    return (path.stat().st_size, hashlib.sha256(path.read_bytes()).hexdigest()[:16])
 
 
 def test_parse_uploaded_watchlist_supports_cp932_bytes():
@@ -122,6 +127,7 @@ def test_index_has_kabutan_html_folder_picker():
     assert 'form action="/kabutan-package/import"' in html
     assert 'name="kabutan_package_zip"' in html
     assert "Uploaded package" in html
+    assert "Package html dir" in html
     assert "Zipをアップロード" in html
 
 
@@ -255,6 +261,7 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
             self.import_count += 1
             html_dir = output_dir / "html"
             html_dir.mkdir(parents=True, exist_ok=True)
+            (html_dir / "7203.html").write_text("<html></html>", encoding="utf-8")
             return SimpleNamespace(html_dir=html_dir, manifest_path=None, html_count=1)
 
         def save_kabutan_html_dir_cache(self, path):
@@ -291,7 +298,7 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
     assert "Fundamental output" in html
     assert state.fundamental_summary_html == ""
     assert controller.import_count == 1
-    signature = (zip_path.stat().st_size, zip_path.stat().st_mtime_ns)
+    signature = file_signature(zip_path)
     assert state.kabutan_html_dir == tmp_path / "web_imported_kabutan_html_package" / f"{signature[0]}_{signature[1]}" / "html"
     assert controller.saved_dir == state.kabutan_html_dir
     assert controller.analysis_dirs == [state.kabutan_html_dir]
@@ -325,6 +332,7 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
             self.import_count += 1
             html_dir = output_dir / "html"
             html_dir.mkdir(parents=True, exist_ok=True)
+            (html_dir / "7203.html").write_text("<html></html>", encoding="utf-8")
             return SimpleNamespace(html_dir=html_dir, manifest_path=None, html_count=1)
 
         def save_kabutan_html_dir_cache(self, _path):
@@ -350,7 +358,7 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
         data={"selected_stock": "トヨタ (7203)", "mode": "fundamental"},
     ).data.decode("utf-8")
 
-    signature = (zip_path.stat().st_size, zip_path.stat().st_mtime_ns)
+    signature = file_signature(zip_path)
     expected_html_dir = tmp_path / "web_imported_kabutan_html_package" / f"{signature[0]}_{signature[1]}" / "html"
     assert "<section>FUND_TABLE</section>" in html
     assert controller.import_count == 1
