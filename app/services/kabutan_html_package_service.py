@@ -46,6 +46,13 @@ class KabutanHtmlPackageImportResult:
     html_count: int
 
 
+@dataclass(frozen=True)
+class KabutanHtmlPackageInspectionResult:
+    zip_path: Path
+    html_count: int
+    has_manifest: bool
+
+
 class KabutanHtmlPackageService:
     """Create normalized HTML files and a zip archive for Codespaces."""
 
@@ -100,6 +107,29 @@ class KabutanHtmlPackageService:
             html_count=html_count,
         )
 
+    def inspect_package(self, *, zip_path: Path) -> KabutanHtmlPackageInspectionResult:
+        zip_path = zip_path.resolve()
+        with zipfile.ZipFile(zip_path) as archive:
+            html_count = 0
+            has_manifest = False
+            for member in archive.infolist():
+                if member.is_dir():
+                    continue
+                normalized_name = member.filename.replace("\\", "/")
+                self._validate_zip_member_name(normalized_name, member.filename)
+                if normalized_name == "manifest.json":
+                    has_manifest = True
+                if normalized_name.startswith("html/") and Path(normalized_name).suffix.lower() == ".html":
+                    html_count += 1
+
+        if html_count == 0:
+            raise ValueError("Zip内の html/ フォルダにHTMLファイルが見つかりません。")
+        return KabutanHtmlPackageInspectionResult(
+            zip_path=zip_path,
+            html_count=html_count,
+            has_manifest=has_manifest,
+        )
+
     @staticmethod
     def write_zip(*, normalization: KabutanHtmlNormalizationResult, zip_path: Path) -> Path:
         zip_path.parent.mkdir(parents=True, exist_ok=True)
@@ -112,16 +142,21 @@ class KabutanHtmlPackageService:
     @staticmethod
     def _resolve_zip_member(output_dir: Path, member_name: str) -> Path:
         normalized_name = member_name.replace("\\", "/")
-        if normalized_name.startswith("/") or normalized_name.startswith("../") or "/../" in normalized_name:
-            raise ValueError(f"Zip内に不正なパスが含まれています: {member_name}")
+        KabutanHtmlPackageService._validate_zip_member_name(normalized_name, member_name)
         target_path = (output_dir / normalized_name).resolve()
         if output_dir != target_path and output_dir not in target_path.parents:
             raise ValueError(f"Zip内に不正なパスが含まれています: {member_name}")
         return target_path
 
+    @staticmethod
+    def _validate_zip_member_name(normalized_name: str, original_name: str) -> None:
+        if normalized_name.startswith("/") or normalized_name.startswith("../") or "/../" in normalized_name:
+            raise ValueError(f"Zip内に不正なパスが含まれています: {original_name}")
+
 
 __all__ = [
     "DEFAULT_PACKAGE_NAME",
+    "KabutanHtmlPackageInspectionResult",
     "KabutanHtmlPackageImportResult",
     "KabutanHtmlPackageResult",
     "KabutanHtmlPackageService",

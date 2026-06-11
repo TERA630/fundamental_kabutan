@@ -117,8 +117,8 @@ def test_index_has_kabutan_html_folder_picker():
     assert 'name="kabutan_html_files"' in html
     assert "webkitdirectory" in html
     assert 'enctype="multipart/form-data"' in html
-    assert 'form action="/kabutan-package"' in html
-    assert "HTMLを正規化してZip作成" in html
+    assert 'form action="/kabutan-package"' not in html
+    assert "HTMLを正規化してZip作成" not in html
     assert 'form action="/kabutan-package/import"' in html
     assert 'name="kabutan_package_zip"' in html
 
@@ -163,59 +163,6 @@ def test_set_kabutan_dir_accepts_uploaded_html_folder(tmp_path: Path):
     assert (state.kabutan_html_dir / "7974.htm").read_bytes() == b"<html>7974</html>"
     assert not (state.kabutan_html_dir / "readme.txt").exists()
     assert "株探HTMLフォルダを設定しました" in html
-
-
-def test_build_kabutan_package_sets_normalized_html_dir_and_shows_download(tmp_path: Path):
-    class FakeController:
-        def __init__(self):
-            self.file_cache = SimpleNamespace(base_dir=tmp_path)
-            self.saved_dir = None
-            self.package_source = None
-
-        def fetch_output_cache_for_today(self):
-            return {"7203|-": "cached"}
-
-        def fetch_resolved_watchlist_path(self):
-            return SimpleNamespace(status="missing", file_path=None)
-
-        def fetch_resolved_kabutan_html_dir(self):
-            return SimpleNamespace(status="missing", dir_path=None)
-
-        def save_kabutan_html_dir_cache(self, path):
-            self.saved_dir = path
-
-        def build_kabutan_html_package(self, *, source_dir, output_dir):
-            self.package_source = source_dir
-            html_dir = output_dir / "html"
-            html_dir.mkdir(parents=True)
-            manifest_path = output_dir / "manifest.json"
-            zip_path = output_dir / "kabutan_html_package.zip"
-            manifest_path.write_text("{}", encoding="utf-8")
-            zip_path.write_bytes(b"zip")
-            return SimpleNamespace(
-                html_dir=html_dir,
-                manifest_path=manifest_path,
-                zip_path=zip_path,
-                normalized_count=1,
-                skipped_count=0,
-            )
-
-    source_dir = tmp_path / "source"
-    source_dir.mkdir()
-    controller = FakeController()
-    state = WebUiState(controller=controller)
-    state.kabutan_html_dir = source_dir
-    state.output_cache = {"7203|-": "cached"}
-    client = create_app(state).test_client()
-
-    html = client.post("/kabutan-package").data.decode("utf-8")
-
-    assert controller.package_source == source_dir
-    assert state.kabutan_html_dir == (tmp_path / "web_kabutan_html_package" / "html")
-    assert controller.saved_dir == state.kabutan_html_dir
-    assert state.output_cache == {}
-    assert "正規化: 1件 / スキップ: 0件" in html
-    assert 'href="/kabutan-package/download"' in html
 
 
 def test_import_kabutan_package_zip_sets_html_dir(tmp_path: Path):

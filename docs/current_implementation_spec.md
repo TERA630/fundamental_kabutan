@@ -283,7 +283,7 @@ GUIで株探HTMLフォルダが指定されている場合は、対象銘柄のH
 - 出力ファイル名を `7203.html` 形式へ統一
 - 正規化結果とスキップ理由を `manifest.json` へ記録
 
-`app/services/kabutan_html_package_service.py` は、正規化済みHTMLと `manifest.json` を `kabutan_html_package.zip` として書庫化する。Web UIでは正規化HTML Package Zipをファイル選択で読み込み、選択時は検査とパス保持だけを行う。Fundamental解析が必要になった時だけ、アプリ内部のキャッシュ領域へ遅延展開し、展開後の `html/` を既存の解析処理へ渡す。
+`app/services/kabutan_html_package_service.py` は、正規化済みHTMLと `manifest.json` を `kabutan_html_package.zip` として書庫化する。Package Zip の作成は Tkinter UI で行う。Web UI では Package Zip をアップロードしてアプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。Web UI はHTML正規化とZip作成を行わない。
 
 Zipの基本構成は次の通り。
 

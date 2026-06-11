@@ -8,25 +8,22 @@ Technical 解析では使わない。
 
 ## 通常運用
 
-Web UI でユーザーが通常触る入力は次の2つだけ。
+Web UI でユーザーが通常触る入力は次のどちらか。
 
-1. `WatchListファイル` で監視銘柄 md を選択する。
-2. `正規化HTML Package Zip` で Package Zip を選択する。
+- `Kabutan HTML folder` でHTMLフォルダをアップロード、または `Kabutan_html_dir` にコンテナ内パスを入力して `フォルダ設定` を押す。
+- Tkinterで作成済みのPackage Zipを `Kabutan HTML package zip` で選択し、`Zipを展開して設定` を押す。
 
-どちらもファイル選択後に自動で読み込む。追加の読込ボタンや手動展開ボタンは置かない。
-
-Package Zip は選択時に検査してパスを保持する。Fundamental の `取得` または `サマリ表示` が必要になった時だけ、アプリ内部でキャッシュ領域へ遅延展開する。
+Package Zip は選択後すぐにアプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。
 
 ## Package作成
 
-生の株探HTMLフォルダは通常運用には出さない。Web UI の `株探HTML正規化` を開いた時だけ使う。
+Package Zip の作成は Tkinter UI で行う。Web UI ではHTML正規化とZip作成は行わない。
 
-1. `株探HTML正規化` を開く。
-2. `生HTMLフォルダ` を選択する、または `生HTMLパス` を入力する。
-3. `HTML正規化Zip作成` を押す。
-4. 作成後、必要なら `Package保存` で `kabutan_html_package.zip` を保存する。
+1. Tkinterで株探HTMLフォルダを設定する。
+2. `HTML正規化+Zip作成` を押す。
+3. 作成された `kabutan_html_package.zip` を必要に応じてWeb UIへアップロードする。
 
-作成先は `.fundamental_cache/web_kabutan_html_package/` 配下。
+作成先は Tkinter のキャッシュ領域配下。
 
 ## Package構成
 
@@ -55,4 +52,4 @@ kabutan_html_package.zip
 - Package Zip 内に `html/` フォルダがない場合は失敗する。
 - Package Zip 内の `html/` に `.html` がない場合は失敗する。
 - Package Zip 内の `../` など、展開先の外へ出るパスは拒否する。
-- 遅延展開に失敗した場合は、途中展開ディレクトリを削除する。
+- 展開に失敗した場合は、途中展開ディレクトリを削除する。

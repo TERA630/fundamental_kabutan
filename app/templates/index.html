@@ -38,17 +38,6 @@
         <button type="submit">フォルダ設定</button>
       </form>
 
-      <form action="/kabutan-package" method="post" class="control-grid">
-        <label>
-          <span>Normalized Kabutan HTML</span>
-          <input type="text" value="{{ state.kabutan_html_dir or '' }}" readonly>
-        </label>
-        <button id="kabutan-package-button" type="submit">HTMLを正規化してZip作成</button>
-        {% if kabutan_package_zip_exists %}
-          <a class="button-link" href="/kabutan-package/download">Zip保存</a>
-        {% endif %}
-      </form>
-
       <form action="/kabutan-package/import" method="post" enctype="multipart/form-data" class="control-grid">
         <label>
           <span>Kabutan HTML package zip</span>
@@ -144,7 +133,6 @@
     const copyButton = document.getElementById("copy-button");
     const copySource = document.getElementById("copy-source");
     const summaryButton = document.getElementById("summary-button");
-    const kabutanPackageButton = document.getElementById("kabutan-package-button");
     const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
     const modeInputs = document.querySelectorAll('input[name="mode"]');
 
@@ -152,9 +140,6 @@
       const technicalSelected = Array.from(modeInputs).some(
         (input) => input.checked && input.value === "technical"
       );
-      if (kabutanPackageButton) {
-        kabutanPackageButton.disabled = technicalSelected;
-      }
       if (kabutanPackageImportButton) {
         kabutanPackageImportButton.disabled = technicalSelected;
       }

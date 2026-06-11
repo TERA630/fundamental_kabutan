@@ -56,7 +56,12 @@ class WebUiStateManager:
                 state.watchlist_path = None
                 state.watchlist = []
 
-        state.kabutan_package_zip_path = state.controller.fetch_kabutan_package_zip_cache()
+        fetch_kabutan_package_zip_cache = getattr(state.controller, "fetch_kabutan_package_zip_cache", None)
+        state.kabutan_package_zip_path = (
+            fetch_kabutan_package_zip_cache()
+            if callable(fetch_kabutan_package_zip_cache)
+            else None
+        )
 
     def select_first_if_needed(self) -> None:
         choices = self.state.stock_choices
