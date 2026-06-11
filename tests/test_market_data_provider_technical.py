@@ -168,6 +168,36 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["vwap_timestamp"] == "2026-05-29 09:10"
 
 
+def test_build_intraday_vwap_snapshot_uses_latest_session_only():
+    intraday = pd.DataFrame(
+        {
+            "Open": [80.0, 90.0, 100.0, 101.0],
+            "High": [81.0, 91.0, 102.0, 103.0],
+            "Low": [79.0, 89.0, 99.0, 100.0],
+            "Close": [80.0, 90.0, 101.0, 102.0],
+            "Volume": [10_000.0, 10_000.0, 1000.0, 2000.0],
+        },
+        index=pd.to_datetime(
+            [
+                "2026-05-28 14:50",
+                "2026-05-28 14:55",
+                "2026-05-29 09:00",
+                "2026-05-29 09:05",
+            ]
+        ),
+    )
+
+    snapshot = provider.build_intraday_vwap_snapshot(intraday)
+    typical_1 = (102.0 + 99.0 + 101.0) / 3
+    typical_2 = (103.0 + 100.0 + 102.0) / 3
+    expected_vwap = ((typical_1 * 1000.0) + (typical_2 * 2000.0)) / 3000.0
+
+    assert snapshot["open"] == 100.0
+    assert snapshot["volume"] == 3000.0
+    assert snapshot["vwap"] == pytest.approx(expected_vwap)
+    assert snapshot["latest_price_timestamp"] == "2026-05-29 09:05"
+
+
 def test_build_previous_session_intraday_snapshot():
     daily = pd.DataFrame(
         {

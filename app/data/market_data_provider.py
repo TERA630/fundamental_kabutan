@@ -240,6 +240,7 @@ def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str
 def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, float | str | None]:
     intraday = _normalize_history_frame(intraday_history)
     intraday = intraday[intraday["Volume"] > 0]
+    intraday = _latest_intraday_session(intraday)
     if intraday.empty:
         return build_daily_reference_vwap_snapshot(_empty_history())
 
@@ -263,6 +264,14 @@ def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, fl
         "vwap_source": "本日5分足",
         "vwap_timestamp": timestamp,
     }
+
+
+def _latest_intraday_session(intraday: pd.DataFrame) -> pd.DataFrame:
+    if intraday.empty:
+        return intraday
+    latest_date = pd.Timestamp(intraday.index[-1]).date()
+    dates = pd.Series(intraday.index.date, index=intraday.index)
+    return intraday[dates == latest_date]
 
 
 def _empty_previous_session_intraday_snapshot() -> dict[str, float | str | bool | None]:

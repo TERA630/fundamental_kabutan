@@ -21,7 +21,7 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
             [
                 f"## {rank} {RANK_LABELS[rank]}",
                 "",
-                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25日線乖離 | 出来高比 | 前日VWAP維持 | 支持線 | 抵抗線 | 60日レンジ |",
+                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 出来高比 | 前日VWAP維持 | 支持線 | 抵抗線 | 60日レンジ |",
                 "|---|---:|---:|---:|---:|---:|---:|---|---|---|---:|",
             ]
         )

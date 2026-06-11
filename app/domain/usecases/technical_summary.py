@@ -79,7 +79,7 @@ class TechnicalSummaryService:
             three_session_change_pct=result.three_session_momentum.change_pct,
             day_high=price.high,
             day_low=price.low,
-            day_close_position=snapshot.range.day_close_position,
+            day_close_position=getattr(snapshot.range, "day_close_position", None),
             day_range_atr=snapshot.range.day_range_atr,
             vwap=vwap,
             vwap_diff_pct=_pct_change(latest, vwap),
