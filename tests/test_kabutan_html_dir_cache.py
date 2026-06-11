@@ -16,6 +16,28 @@ def test_file_cache_can_save_and_fetch_kabutan_html_dir(tmp_path: Path):
     assert fetched == target_dir.resolve()
 
 
+def test_file_cache_can_save_and_fetch_kabutan_package_zip(tmp_path: Path):
+    cache = FileCache(base_dir=tmp_path / "cache")
+    zip_path = tmp_path / "kabutan_html_package.zip"
+    zip_path.write_bytes(b"zip")
+
+    cache.save_kabutan_package_zip_cache(zip_path)
+
+    fetched = cache.fetch_kabutan_package_zip_cache()
+    assert fetched == zip_path.resolve()
+
+
+def test_file_cache_can_clear_kabutan_package_zip(tmp_path: Path):
+    cache = FileCache(base_dir=tmp_path / "cache")
+    zip_path = tmp_path / "kabutan_html_package.zip"
+    zip_path.write_bytes(b"zip")
+    cache.save_kabutan_package_zip_cache(zip_path)
+
+    cache.clear_kabutan_package_zip_cache()
+
+    assert cache.fetch_kabutan_package_zip_cache() is None
+
+
 def test_resolve_kabutan_html_dir_returns_ok_for_existing_dir(tmp_path: Path):
     target_dir = tmp_path / "kabutan"
     target_dir.mkdir()

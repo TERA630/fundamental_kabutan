@@ -44,6 +44,12 @@ class FileCache:
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, path)
 
+    def delete(self, key: str) -> None:
+        try:
+            self._path(key).unlink()
+        except FileNotFoundError:
+            return
+
     def fetch_kabutan_html_dir_cache(self) -> Path | None:
         cached = self.get("kabutan_last_html_dir", ttl_sec=10**9)
         if not isinstance(cached, str) or not cached.strip():
@@ -52,6 +58,18 @@ class FileCache:
 
     def save_kabutan_html_dir_cache(self, path: Path) -> None:
         self.set("kabutan_last_html_dir", str(path.resolve()))
+
+    def fetch_kabutan_package_zip_cache(self) -> Path | None:
+        cached = self.get("kabutan_last_package_zip", ttl_sec=10**9)
+        if not isinstance(cached, str) or not cached.strip():
+            return None
+        return Path(cached)
+
+    def save_kabutan_package_zip_cache(self, path: Path) -> None:
+        self.set("kabutan_last_package_zip", str(path.resolve()))
+
+    def clear_kabutan_package_zip_cache(self) -> None:
+        self.delete("kabutan_last_package_zip")
 
     def fetch_watchlist_path_cache(self) -> Path | None:
         cached = self.get("watchlist_last_path", ttl_sec=10**9)

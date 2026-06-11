@@ -43,7 +43,11 @@
           <span>Kabutan HTML package zip</span>
           <input type="file" name="kabutan_package_zip" accept=".zip,application/zip">
         </label>
-        <button id="kabutan-package-import-button" type="submit">Zipを展開して設定</button>
+        <label>
+          <span>Uploaded package</span>
+          <input type="text" value="{{ state.kabutan_package_zip_path or '' }}" readonly>
+        </label>
+        <button id="kabutan-package-import-button" type="submit">Zipをアップロード</button>
       </form>
     </section>
 

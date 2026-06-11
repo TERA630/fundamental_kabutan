@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import os
 import shutil
+import stat
+import time
 import zipfile
 
 from app.domain.usecases.kabutan_html_normalizer import (
@@ -74,7 +77,10 @@ class KabutanHtmlPackageService:
     def import_package(self, *, zip_path: Path, output_dir: Path) -> KabutanHtmlPackageImportResult:
         output_dir = output_dir.resolve()
         if output_dir.exists():
-            shutil.rmtree(output_dir)
+            try:
+                shutil.rmtree(output_dir, onerror=self._make_writable_and_retry)
+            except PermissionError:
+                output_dir = self._next_available_output_dir(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -96,7 +102,7 @@ class KabutanHtmlPackageService:
                 raise ValueError("Zip内の html/ フォルダにHTMLファイルが見つかりません。")
         except Exception:
             if output_dir.exists():
-                shutil.rmtree(output_dir)
+                shutil.rmtree(output_dir, onerror=self._make_writable_and_retry)
             raise
 
         manifest_path = output_dir / "manifest.json"
@@ -152,6 +158,22 @@ class KabutanHtmlPackageService:
     def _validate_zip_member_name(normalized_name: str, original_name: str) -> None:
         if normalized_name.startswith("/") or normalized_name.startswith("../") or "/../" in normalized_name:
             raise ValueError(f"Zip内に不正なパスが含まれています: {original_name}")
+
+    @staticmethod
+    def _make_writable_and_retry(function, path, _exc_info) -> None:
+        os.chmod(path, stat.S_IWRITE)
+        function(path)
+
+    @staticmethod
+    def _next_available_output_dir(output_dir: Path) -> Path:
+        base_name = output_dir.name
+        parent = output_dir.parent
+        suffix = time.time_ns()
+        for index in range(1, 100):
+            candidate = parent / f"{base_name}_{suffix}_{index}"
+            if not candidate.exists():
+                return candidate
+        raise PermissionError(f"展開先ディレクトリを準備できません: {output_dir}")
 
 
 __all__ = [

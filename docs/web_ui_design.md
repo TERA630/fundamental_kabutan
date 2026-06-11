@@ -82,7 +82,7 @@
 - ポートは `PORT` 環境変数を優先し、未設定時は `8080` を使う。
 - watchlist はファイルアップロードを優先し、未指定時のみ repo内/コンテナ内パス入力を扱う。
 - 株探HTMLフォルダは、コンテナ内パス指定を基本案とする。
-- 株探HTMLは、HTMLフォルダ設定と、Tkinterで作成済みの正規化済みZipのアップロード展開に対応する。Web UIでは正規化済みZipを作成しない。運用手順は `kabutan_html_package_workflow.md` を参照する。
+- 株探HTMLは、HTMLフォルダ設定と、Tkinterで作成済みの正規化済みZipのアップロード保持に対応する。ZipはFundamental取得またはFundamentalサマリ表示時に署名別キャッシュへ自動展開する。Web UIでは正規化済みZipを作成しない。保持済みZipは画面上の `Uploaded package` 欄に表示する。運用手順は `kabutan_html_package_workflow.md` を参照する。
 
 ## 9. 確認事項
 

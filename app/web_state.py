@@ -19,6 +19,7 @@ class WebUiState:
     watchlist_path: Path | None = None
     kabutan_html_dir: Path | None = None
     kabutan_package_zip_path: Path | None = None
+    kabutan_package_zip_signature: tuple[int, int] | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
     output_cache: dict[str, str] = field(default_factory=dict)
     selected_label: str = ""
@@ -56,12 +57,22 @@ class WebUiStateManager:
                 state.watchlist_path = None
                 state.watchlist = []
 
+        fetch_resolved_kabutan_html_dir = getattr(state.controller, "fetch_resolved_kabutan_html_dir", None)
+        if callable(fetch_resolved_kabutan_html_dir):
+            resolved_kabutan_dir = fetch_resolved_kabutan_html_dir()
+            if resolved_kabutan_dir.status == "ok" and resolved_kabutan_dir.dir_path is not None:
+                state.kabutan_html_dir = resolved_kabutan_dir.dir_path
+
         fetch_kabutan_package_zip_cache = getattr(state.controller, "fetch_kabutan_package_zip_cache", None)
-        state.kabutan_package_zip_path = (
-            fetch_kabutan_package_zip_cache()
-            if callable(fetch_kabutan_package_zip_cache)
-            else None
-        )
+        if callable(fetch_kabutan_package_zip_cache):
+            state.kabutan_package_zip_path = fetch_kabutan_package_zip_cache()
+            if state.kabutan_package_zip_path is not None:
+                try:
+                    stat = state.kabutan_package_zip_path.stat()
+                    state.kabutan_package_zip_signature = (stat.st_size, stat.st_mtime_ns)
+                except OSError:
+                    state.kabutan_package_zip_path = None
+                    state.kabutan_package_zip_signature = None
 
     def select_first_if_needed(self) -> None:
         choices = self.state.stock_choices

@@ -68,6 +68,27 @@ def test_import_package_extracts_html_dir_and_manifest(tmp_path: Path):
     assert (output_dir / "html" / "7203.html").read_text(encoding="utf-8") == "<html><body>7203</body></html>"
 
 
+def test_import_package_uses_alternate_dir_when_existing_output_cannot_be_removed(tmp_path: Path, monkeypatch):
+    zip_path = tmp_path / "package.zip"
+    output_dir = tmp_path / "imported"
+    output_dir.mkdir()
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html><body>7203</body></html>")
+
+    def raise_permission_error(_path, onerror=None):
+        raise PermissionError("locked")
+
+    monkeypatch.setattr("app.services.kabutan_html_package_service.shutil.rmtree", raise_permission_error)
+
+    result = KabutanHtmlPackageService().import_package(zip_path=zip_path, output_dir=output_dir)
+
+    assert result.output_dir != output_dir.resolve()
+    assert result.output_dir.parent == output_dir.parent
+    assert result.html_dir == result.output_dir / "html"
+    assert result.html_count == 1
+
+
 def test_inspect_package_validates_without_extracting(tmp_path: Path):
     zip_path = tmp_path / "package.zip"
     with zipfile.ZipFile(zip_path, "w") as archive:

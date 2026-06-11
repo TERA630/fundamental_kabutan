@@ -11,9 +11,13 @@ Technical 解析では使わない。
 Web UI でユーザーが通常触る入力は次のどちらか。
 
 - `Kabutan HTML folder` でHTMLフォルダをアップロード、または `Kabutan_html_dir` にコンテナ内パスを入力して `フォルダ設定` を押す。
-- Tkinterで作成済みのPackage Zipを `Kabutan HTML package zip` で選択し、`Zipを展開して設定` を押す。
+- Tkinterで作成済みのPackage Zipを `Kabutan HTML package zip` で選択し、`Zipをアップロード` を押す。
 
-Package Zip は選択後すぐにアプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。
+Package Zip はアップロード時に検査し、パスをキャッシュへ保持する。この時点では展開しない。Fundamental の `取得` または `サマリ表示` が必要になった時だけ、アプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。同じZipが展開済みの場合は展開済みキャッシュを再利用する。
+
+展開先はZipのサイズと更新時刻から作る署名別ディレクトリにする。固定ディレクトリを毎回削除しないことで、Windows / OneDrive 配下で既存の `html/` フォルダ削除が拒否されるケースを避ける。
+
+Web UI 起動時は、前回キャッシュしたWatchList、株探HTMLフォルダ、Package Zipを復元する。ブラウザのファイル選択欄自体は安全上の制約で空に戻るが、保持済みPackage Zipは `Uploaded package` 欄に表示する。
 
 ## Package作成
 
@@ -52,4 +56,4 @@ kabutan_html_package.zip
 - Package Zip 内に `html/` フォルダがない場合は失敗する。
 - Package Zip 内の `html/` に `.html` がない場合は失敗する。
 - Package Zip 内の `../` など、展開先の外へ出るパスは拒否する。
-- 展開に失敗した場合は、途中展開ディレクトリを削除する。
+- 遅延展開に失敗した場合は、途中展開ディレクトリを削除する。既存展開先の削除が拒否された場合は、別の展開先ディレクトリを使う。

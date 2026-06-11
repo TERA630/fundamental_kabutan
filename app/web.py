@@ -146,8 +146,13 @@ def create_app(state: WebUiState | None = None) -> Flask:
             else:
                 path = resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
             ui_state.kabutan_html_dir = path
+            ui_state.kabutan_package_zip_path = None
+            ui_state.kabutan_package_zip_signature = None
             ui_state.output_cache.clear()
             ui_state.controller.save_kabutan_html_dir_cache(path)
+            clear_kabutan_package_zip_cache = getattr(ui_state.controller, "clear_kabutan_package_zip_cache", None)
+            if callable(clear_kabutan_package_zip_cache):
+                clear_kabutan_package_zip_cache()
             ui_state.fundamental_summary_html = ""
             ui_state.status = ui_state.view_model.build_kabutan_dir_selected_status()
         except Exception as exc:
@@ -159,23 +164,22 @@ def create_app(state: WebUiState | None = None) -> Flask:
         try:
             uploaded = request.files.get("kabutan_package_zip")
             zip_path = save_uploaded_kabutan_html_package(ui_state, uploaded)
-            result = ui_state.controller.import_kabutan_html_package(
-                zip_path=zip_path,
-                output_dir=ui_state.controller.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME,
-            )
-            ui_state.kabutan_html_dir = result.html_dir
+            result = ui_state.controller.inspect_kabutan_html_package(zip_path=zip_path)
+            ui_state.kabutan_package_zip_path = zip_path
+            ui_state.kabutan_package_zip_signature = _file_signature(zip_path)
+            ui_state.kabutan_html_dir = None
             ui_state.output_cache.clear()
-            ui_state.controller.save_kabutan_html_dir_cache(result.html_dir)
+            ui_state.controller.save_kabutan_package_zip_cache(zip_path)
             ui_state.fundamental_summary_html = ""
-            manifest_text = f" / manifest: {result.manifest_path}" if result.manifest_path is not None else ""
+            manifest_text = " / manifest: あり" if result.has_manifest else " / manifest: なし"
             ui_state.status = (
-                "株探HTMLパッケージZipを展開しました。"
+                "株探HTMLパッケージZipをアップロードしました。"
                 f" HTML: {result.html_count}件"
-                f" / html_dir: {result.html_dir}"
                 f"{manifest_text}"
+                " / Fundamental取得時に展開します。"
             )
         except Exception as exc:
-            ui_state.status = f"株探HTMLパッケージ展開失敗: {exc}"
+            ui_state.status = f"株探HTMLパッケージアップロード失敗: {exc}"
         return _render(ui_state)
 
     @app.post("/fetch")
@@ -189,7 +193,13 @@ def create_app(state: WebUiState | None = None) -> Flask:
         if selected is None:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
             return _render(ui_state)
-        if ui_state.kabutan_html_dir is None:
+        if ui_state.mode != "technical":
+            try:
+                _ensure_kabutan_html_dir_for_fundamental(ui_state)
+            except Exception as exc:
+                ui_state.status = f"株探HTMLパッケージ展開失敗: {exc}"
+                return _render(ui_state)
+        if ui_state.mode != "technical" and ui_state.kabutan_html_dir is None:
             ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
             return _render(ui_state)
 
@@ -227,11 +237,6 @@ def create_app(state: WebUiState | None = None) -> Flask:
             ui_state.status = ui_state.view_model.build_missing_stock_status()
             ui_state.fundamental_summary_html = ""
             return _render(ui_state)
-        if ui_state.mode != "technical" and ui_state.kabutan_html_dir is None:
-            ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
-            ui_state.fundamental_summary_html = ""
-            return _render(ui_state)
-
         try:
             if ui_state.mode == "technical":
                 technical_table = ui_state.controller.build_technical_summary_table(
@@ -240,6 +245,11 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 ui_state.fundamental_summary_html = build_technical_summary_html(technical_table)
                 ui_state.status = "Technicalサマリを表示しました。"
             else:
+                _ensure_kabutan_html_dir_for_fundamental(ui_state)
+                if ui_state.kabutan_html_dir is None:
+                    ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
+                    ui_state.fundamental_summary_html = ""
+                    return _render(ui_state)
                 table = ui_state.controller.build_fundamental_summary_table(
                     watchlist_entries=ui_state.watchlist,
                     kabutan_html_dir=ui_state.kabutan_html_dir,
@@ -267,6 +277,41 @@ def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
     path = state.controller.file_cache.base_dir / UPLOAD_WATCHLIST_CACHE_NAME
     path.write_bytes(data)
     return path
+
+
+def _file_signature(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return (stat.st_size, stat.st_mtime_ns)
+
+
+def _import_output_dir_for_signature(state: WebUiState, signature: tuple[int, int]) -> Path:
+    size, mtime_ns = signature
+    return state.controller.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME / f"{size}_{mtime_ns}"
+
+
+def _ensure_kabutan_html_dir_for_fundamental(state: WebUiState) -> None:
+    zip_path = state.kabutan_package_zip_path
+    if zip_path is None:
+        return
+    if not zip_path.exists() or not zip_path.is_file():
+        raise ValueError("アップロード済みの株探HTMLパッケージZipが見つかりません。")
+
+    signature = _file_signature(zip_path)
+    output_dir = _import_output_dir_for_signature(state, signature)
+    html_dir = output_dir / "html"
+    if (
+        state.kabutan_html_dir == html_dir
+        and state.kabutan_package_zip_signature == signature
+        and html_dir.exists()
+        and html_dir.is_dir()
+    ):
+        return
+
+    result = state.controller.import_kabutan_html_package(zip_path=zip_path, output_dir=output_dir)
+    state.kabutan_html_dir = result.html_dir
+    state.kabutan_package_zip_signature = signature
+    state.output_cache.clear()
+    state.controller.save_kabutan_html_dir_cache(result.html_dir)
 
 
 def _render(state: WebUiState) -> str:

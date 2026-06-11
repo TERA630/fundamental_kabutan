@@ -283,7 +283,7 @@ GUIで株探HTMLフォルダが指定されている場合は、対象銘柄のH
 - 出力ファイル名を `7203.html` 形式へ統一
 - 正規化結果とスキップ理由を `manifest.json` へ記録
 
-`app/services/kabutan_html_package_service.py` は、正規化済みHTMLと `manifest.json` を `kabutan_html_package.zip` として書庫化する。Package Zip の作成は Tkinter UI で行う。Web UI では Package Zip をアップロードしてアプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。Web UI はHTML正規化とZip作成を行わない。
+`app/services/kabutan_html_package_service.py` は、正規化済みHTMLと `manifest.json` を `kabutan_html_package.zip` として書庫化する。Package Zip の作成は Tkinter UI で行う。Web UI では Package Zip をアップロード時に検査してパスを保持する。この時点では展開しない。Fundamental解析またはFundamentalサマリが必要になった時だけ、アプリ内部のキャッシュ領域へ展開し、展開後の `html/` を既存の解析処理へ渡す。同じZipが展開済みの場合は展開済みキャッシュを再利用する。展開先はZipのサイズと更新時刻から作る署名別ディレクトリとし、固定ディレクトリを毎回削除しない。Web UI はHTML正規化とZip作成を行わない。
 
 Zipの基本構成は次の通り。
 
@@ -308,6 +308,7 @@ kabutan_html_package.zip
 |---|---|---:|
 | GUI出力 | `gui_output_cache` | 当日分のみ再利用 |
 | 株探HTMLフォルダ | `kabutan_last_html_dir` | 長期 |
+| 株探Package Zip | `kabutan_last_package_zip` | 長期 |
 | 監視銘柄ファイル | `watchlist_last_path` | 長期 |
 | 株探業績 | `kabutan_forecast_{code}` | 12時間 |
 | yFinance市況 | `yf_{code}` | 12時間 |
@@ -315,7 +316,7 @@ kabutan_html_package.zip
 | Technical日足 | `tech_daily_{code}_4mo_1d` | 12時間 |
 | Technical5分足 | `tech_intraday_{code}_5m_jst` | 5分 |
 
-GUI出力キャッシュは日付が変わると再利用しない。株探HTMLフォルダを変更した場合はGUI出力キャッシュをクリアする。
+GUI出力キャッシュは日付が変わると再利用しない。株探HTMLフォルダまたは株探Package Zipを変更した場合はGUI出力キャッシュをクリアする。Web UI 起動時は、キャッシュ済みの監視銘柄ファイル、株探HTMLフォルダ、株探Package Zipを復元する。
 
 ## 7. 欠損時の方針
 

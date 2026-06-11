@@ -26,6 +26,7 @@ from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
 from app.services.kabutan_html_package_service import (
+    KabutanHtmlPackageInspectionResult,
     KabutanHtmlPackageImportResult,
     KabutanHtmlPackageResult,
     KabutanHtmlPackageService,
@@ -123,6 +124,18 @@ class FundamentalGuiController:
     def save_kabutan_html_dir_cache(self, path: Path) -> None:
         self.kabutan_html_dir_service.save_dir(path)
 
+    def fetch_kabutan_package_zip_cache(self) -> Path | None:
+        cached_path = self.cache_service.fetch_kabutan_package_zip()
+        if cached_path is not None and cached_path.exists() and cached_path.is_file():
+            return cached_path
+        return None
+
+    def save_kabutan_package_zip_cache(self, path: Path) -> None:
+        self.cache_service.save_kabutan_package_zip(path)
+
+    def clear_kabutan_package_zip_cache(self) -> None:
+        self.cache_service.clear_kabutan_package_zip()
+
     def build_kabutan_html_package(
         self,
         *,
@@ -144,6 +157,9 @@ class FundamentalGuiController:
             zip_path=zip_path,
             output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_imported_package"),
         )
+
+    def inspect_kabutan_html_package(self, *, zip_path: Path) -> KabutanHtmlPackageInspectionResult:
+        return self.kabutan_html_package_service.inspect_package(zip_path=zip_path)
 
     def fetch_resolved_watchlist_path(self) -> ResolvedWatchlistPath:
         cached_path = self.watchlist_service.restore_watchlist_path()

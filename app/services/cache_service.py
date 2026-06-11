@@ -18,6 +18,15 @@ class CacheService:
     def save_kabutan_html_dir(self, path: Path) -> None:
         self.file_cache.save_kabutan_html_dir_cache(path)
 
+    def fetch_kabutan_package_zip(self) -> Path | None:
+        return self.file_cache.fetch_kabutan_package_zip_cache()
+
+    def save_kabutan_package_zip(self, path: Path) -> None:
+        self.file_cache.save_kabutan_package_zip_cache(path)
+
+    def clear_kabutan_package_zip(self) -> None:
+        self.file_cache.clear_kabutan_package_zip_cache()
+
     def fetch_watchlist_path(self) -> Path | None:
         return self.file_cache.fetch_watchlist_path_cache()
 
