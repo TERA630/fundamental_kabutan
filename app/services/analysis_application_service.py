@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
@@ -35,6 +33,7 @@ from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, Reso
 from app.presenters import build_fundamental_output
 from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
+from app.services.analysis_output_workflow import AnalysisOutputResult, AnalysisOutputWorkflow
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
 from app.services.kabutan_html_package_service import (
     KabutanHtmlPackageImportResult,
@@ -42,12 +41,12 @@ from app.services.kabutan_html_package_service import (
     KabutanHtmlPackageResult,
     KabutanHtmlPackageService,
 )
+from app.services.kabutan_package_workflow import KabutanPackageResolution, KabutanPackageWorkflow
 from app.services.output_cache_service import OutputCacheService
 from app.services.watchlist_service import WatchlistService
 
 FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
 TECHNICAL_SUMMARY_FILENAME_PREFIX = "technical_summary"
-WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME = "web_imported_kabutan_html_package"
 
 
 def build_fundamental_summary_filename(*, today: date | None = None) -> str:
@@ -89,20 +88,6 @@ def build_default_market_data_service(file_cache: FileCache) -> MarketDataServic
     )
 
 
-@dataclass(frozen=True)
-class KabutanPackageResolution:
-    html_dir: Path
-    signature: tuple[int, str]
-    imported: bool
-    output_cache_should_clear: bool
-
-
-@dataclass(frozen=True)
-class AnalysisOutputResult:
-    output: str
-    institutional_summary: str
-
-
 class AnalysisApplicationService:
     """Application service shared by GUI and Web entry points."""
 
@@ -127,6 +112,17 @@ class AnalysisApplicationService:
         self.build_technical_service = build_technical_service or build_default_technical_service
         self.build_market_data_service = build_market_data_service or build_default_market_data_service
         self._market_data_bundle_cache: dict[str, MarketDataBundle] = {}
+        self.kabutan_package_workflow = KabutanPackageWorkflow(
+            file_cache=self.file_cache,
+            package_service=self.kabutan_html_package_service,
+            save_kabutan_html_dir_cache=self.save_kabutan_html_dir_cache,
+        )
+        self.analysis_output_workflow = AnalysisOutputWorkflow(
+            fetch_technical_output=self.fetch_technical_output,
+            fetch_analysis_output=self.fetch_analysis_output,
+            save_output_cache_for_today=self.save_output_cache_for_today,
+            fetch_institutional_summary_text=self.fetch_institutional_summary_text,
+        )
 
     def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
         cached = self._market_data_bundle_cache.get(code4)
@@ -197,18 +193,13 @@ class AnalysisApplicationService:
         return self.kabutan_html_package_service.inspect_package(zip_path=zip_path)
 
     def build_file_signature(self, path: Path) -> tuple[int, str]:
-        digest = hashlib.sha256()
-        with path.open("rb") as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return (path.stat().st_size, digest.hexdigest()[:16])
+        return self.kabutan_package_workflow.build_file_signature(path)
 
     def import_output_dir_for_signature(self, signature: tuple[int, str]) -> Path:
-        size, digest = signature
-        return self.file_cache.base_dir / WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME / f"{size}_{digest}"
+        return self.kabutan_package_workflow.import_output_dir_for_signature(signature)
 
     def html_dir_ready(self, html_dir: Path) -> bool:
-        return html_dir.exists() and html_dir.is_dir() and any(html_dir.glob("*.html"))
+        return self.kabutan_package_workflow.html_dir_ready(html_dir)
 
     def resolve_imported_kabutan_package(
         self,
@@ -217,40 +208,10 @@ class AnalysisApplicationService:
         current_signature: tuple[int, str] | tuple[int, int] | None,
         current_html_dir: Path | None,
     ) -> KabutanPackageResolution:
-        if not zip_path.exists() or not zip_path.is_file():
-            raise ValueError("アップロード済みの株探HTMLパッケージZipが見つかりません。")
-
-        signature = self.build_file_signature(zip_path)
-        if (
-            current_signature == signature
-            and current_html_dir is not None
-            and self.html_dir_ready(current_html_dir)
-        ):
-            return KabutanPackageResolution(
-                html_dir=current_html_dir,
-                signature=signature,
-                imported=False,
-                output_cache_should_clear=False,
-            )
-
-        output_dir = self.import_output_dir_for_signature(signature)
-        html_dir = output_dir / "html"
-        if self.html_dir_ready(html_dir):
-            self.save_kabutan_html_dir_cache(html_dir)
-            return KabutanPackageResolution(
-                html_dir=html_dir,
-                signature=signature,
-                imported=False,
-                output_cache_should_clear=False,
-            )
-
-        result = self.import_kabutan_html_package(zip_path=zip_path, output_dir=output_dir)
-        self.save_kabutan_html_dir_cache(result.html_dir)
-        return KabutanPackageResolution(
-            html_dir=result.html_dir,
-            signature=signature,
-            imported=True,
-            output_cache_should_clear=True,
+        return self.kabutan_package_workflow.resolve_imported_package(
+            zip_path=zip_path,
+            current_signature=current_signature,
+            current_html_dir=current_html_dir,
         )
 
     def fetch_resolved_watchlist_path(self) -> ResolvedWatchlistPath:
@@ -311,25 +272,14 @@ class AnalysisApplicationService:
         kabutan_html_dir: Path | None = None,
         output_cache_key: str | None = None,
     ) -> AnalysisOutputResult:
-        if mode == "technical":
-            output = self.fetch_technical_output(name=name, code4=code4)
-        else:
-            if output_cache_key is None:
-                raise ValueError("output_cache_key is required for fundamental output")
-            output = self.fetch_analysis_output(
-                name=name,
-                code4=code4,
-                output_cache=output_cache,
-                output_cache_key=output_cache_key,
-                kabutan_html_dir=kabutan_html_dir,
-            )
-            self.save_output_cache_for_today(output_cache)
-        institutional_summary = self.fetch_institutional_summary_text(
+        return self.analysis_output_workflow.fetch_output_for_mode(
             name=name,
             code4=code4,
+            mode=mode,
+            output_cache=output_cache,
+            output_cache_key=output_cache_key,
             kabutan_html_dir=kabutan_html_dir,
         )
-        return AnalysisOutputResult(output=output, institutional_summary=institutional_summary)
 
     def build_fundamental_summary_table(
         self,
