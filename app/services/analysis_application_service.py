@@ -7,30 +7,23 @@ from pathlib import Path
 from typing import Callable
 
 from app.data.file_cache import FileCache
-from app.data.kabutan_repository import KabutanForecastRepository
-from app.data.market_data_provider import (
-    fetch_yfinance_analyst_estimates,
-    fetch_yfinance_daily_history,
-    fetch_yfinance_intraday_history,
-    fetch_yfinance_market_snapshot,
-    fetch_yfinance_snapshot,
-)
-from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.domain.builders.technical_output import build_technical_output
-from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.usecases.fundamental_analysis import (
     FundamentalAnalysisService,
     build_output_from_analysis_result,
 )
-from app.domain.usecases.fundamental_summary import FundamentalSummaryService
-from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
 from app.domain.usecases.market_data import MarketDataService
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
-from app.domain.usecases.technical_summary import TechnicalSummaryService
 from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
 from app.presenters import build_fundamental_output
+from app.services.analysis_service_factory import (
+    build_default_fundamental_service,
+    build_default_fundamental_service_with_market_bundle,
+    build_default_market_data_service,
+    build_default_technical_service,
+)
 from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
 from app.services.analysis_output_workflow import AnalysisOutputResult, AnalysisOutputWorkflow
@@ -43,49 +36,14 @@ from app.services.kabutan_html_package_service import (
 )
 from app.services.kabutan_package_workflow import KabutanPackageResolution, KabutanPackageWorkflow
 from app.services.output_cache_service import OutputCacheService
+from app.services.summary_workflow import (
+    FUNDAMENTAL_SUMMARY_FILENAME_PREFIX,
+    TECHNICAL_SUMMARY_FILENAME_PREFIX,
+    SummaryWorkflow,
+    build_fundamental_summary_filename,
+    build_technical_summary_filename,
+)
 from app.services.watchlist_service import WatchlistService
-
-FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
-TECHNICAL_SUMMARY_FILENAME_PREFIX = "technical_summary"
-
-
-def build_fundamental_summary_filename(*, today: date | None = None) -> str:
-    target_date = today or date.today()
-    return f"{FUNDAMENTAL_SUMMARY_FILENAME_PREFIX}-{target_date.isoformat()}.md"
-
-
-def build_technical_summary_filename(*, generated_at: datetime | None = None) -> str:
-    target = generated_at or datetime.now()
-    return f"{TECHNICAL_SUMMARY_FILENAME_PREFIX}_{target.strftime('%m-%d-%H-%M')}.md"
-
-
-def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
-    kabutan_repository = KabutanForecastRepository(file_cache=file_cache)
-    return FundamentalAnalysisService(
-        file_cache=file_cache,
-        fetch_market_snapshot=fetch_yfinance_snapshot,
-        fetch_analyst_estimates=fetch_yfinance_analyst_estimates,
-        fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
-            repository=kabutan_repository
-        ),
-    )
-
-
-def build_default_technical_service(file_cache: FileCache) -> TechnicalAnalysisService:
-    return TechnicalAnalysisService(
-        file_cache=file_cache,
-        fetch_daily_history=fetch_yfinance_daily_history,
-        fetch_intraday_history=fetch_yfinance_intraday_history,
-    )
-
-
-def build_default_market_data_service(file_cache: FileCache) -> MarketDataService:
-    return MarketDataService(
-        file_cache=file_cache,
-        fetch_daily_history=fetch_yfinance_daily_history,
-        fetch_intraday_history=fetch_yfinance_intraday_history,
-        fetch_market_snapshot=fetch_yfinance_market_snapshot,
-    )
 
 
 class AnalysisApplicationService:
@@ -123,6 +81,11 @@ class AnalysisApplicationService:
             save_output_cache_for_today=self.save_output_cache_for_today,
             fetch_institutional_summary_text=self.fetch_institutional_summary_text,
         )
+        self.summary_workflow = SummaryWorkflow(
+            file_cache=self.file_cache,
+            build_fundamental_service=self.build_fundamental_service,
+            build_technical_summary_result=self._build_technical_summary_result,
+        )
 
     def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
         cached = self._market_data_bundle_cache.get(code4)
@@ -133,20 +96,9 @@ class AnalysisApplicationService:
         return bundle
 
     def _build_default_fundamental_service_with_market_bundle(self, bundle: MarketDataBundle) -> FundamentalAnalysisService:
-        kabutan_repository = KabutanForecastRepository(file_cache=self.file_cache)
-
-        def fetch_market_snapshot(code4: str):
-            if code4 == bundle.code4:
-                return bundle.snapshot.to_dict()
-            return fetch_yfinance_snapshot(code4)
-
-        return FundamentalAnalysisService(
+        return build_default_fundamental_service_with_market_bundle(
             file_cache=self.file_cache,
-            fetch_market_snapshot=fetch_market_snapshot,
-            fetch_analyst_estimates=fetch_yfinance_analyst_estimates,
-            fetch_kabutan_forecast_usecase=FetchKabutanForecastUseCase(
-                repository=kabutan_repository
-            ),
+            bundle=bundle,
         )
 
     def fetch_resolved_kabutan_html_dir(self) -> ResolvedKabutanHtmlDir:
@@ -287,8 +239,10 @@ class AnalysisApplicationService:
         watchlist_entries: list[tuple[str, str]],
         kabutan_html_dir: Path | None = None,
     ):
-        service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
-        return service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
+        return self.summary_workflow.build_fundamental_summary_table(
+            watchlist_entries=watchlist_entries,
+            kabutan_html_dir=kabutan_html_dir,
+        )
 
     def build_and_save_fundamental_summary(
         self,
@@ -298,22 +252,19 @@ class AnalysisApplicationService:
         kabutan_html_dir: Path | None = None,
         today: date | None = None,
     ) -> Path:
-        table = self.build_fundamental_summary_table(
+        return self.summary_workflow.build_and_save_fundamental_summary(
             watchlist_entries=watchlist_entries,
+            output_dir=output_dir,
             kabutan_html_dir=kabutan_html_dir,
+            today=today,
         )
-        markdown = build_fundamental_summary_markdown(table)
-        output_path = output_dir / build_fundamental_summary_filename(today=today)
-        output_path.write_text(markdown, encoding="utf-8")
-        return output_path
 
     def build_technical_summary_table(
         self,
         *,
         watchlist_entries: list[tuple[str, str]],
     ):
-        service = TechnicalSummaryService(self._build_technical_summary_result)
-        return service.build_summary_table(watchlist_entries)
+        return self.summary_workflow.build_technical_summary_table(watchlist_entries=watchlist_entries)
 
     def build_summary_table_for_mode(
         self,
@@ -322,9 +273,8 @@ class AnalysisApplicationService:
         watchlist_entries: list[tuple[str, str]],
         kabutan_html_dir: Path | None = None,
     ):
-        if mode == "technical":
-            return self.build_technical_summary_table(watchlist_entries=watchlist_entries)
-        return self.build_fundamental_summary_table(
+        return self.summary_workflow.build_summary_table_for_mode(
+            mode=mode,
             watchlist_entries=watchlist_entries,
             kabutan_html_dir=kabutan_html_dir,
         )
@@ -336,11 +286,11 @@ class AnalysisApplicationService:
         output_dir: Path,
         generated_at: datetime | None = None,
     ) -> Path:
-        table = self.build_technical_summary_table(watchlist_entries=watchlist_entries)
-        markdown = build_technical_summary_markdown(table)
-        output_path = output_dir / build_technical_summary_filename(generated_at=generated_at)
-        output_path.write_text(markdown, encoding="utf-8")
-        return output_path
+        return self.summary_workflow.build_and_save_technical_summary(
+            watchlist_entries=watchlist_entries,
+            output_dir=output_dir,
+            generated_at=generated_at,
+        )
 
     def _build_technical_summary_result(self, name: str, code4: str):
         if self._uses_default_technical_service:

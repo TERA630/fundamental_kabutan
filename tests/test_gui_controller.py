@@ -186,8 +186,8 @@ def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path
             assert kabutan_html_dir == tmp_path / "html"
             return "TABLE"
 
-    monkeypatch.setattr("app.services.analysis_application_service.FundamentalSummaryService", DummySummaryService)
-    monkeypatch.setattr("app.services.analysis_application_service.build_fundamental_summary_markdown", lambda table: f"MD:{table}\n")
+    monkeypatch.setattr("app.services.summary_workflow.FundamentalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.services.summary_workflow.build_fundamental_summary_markdown", lambda table: f"MD:{table}\n")
 
     controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
@@ -217,8 +217,8 @@ def test_build_and_save_technical_summary_writes_dated_filename(tmp_path: Path, 
             assert watchlist_entries == [("トヨタ", "7203")]
             return "TECH_TABLE"
 
-    monkeypatch.setattr("app.services.analysis_application_service.TechnicalSummaryService", DummySummaryService)
-    monkeypatch.setattr("app.services.analysis_application_service.build_technical_summary_markdown", lambda table: f"TECH_MD:{table}\n")
+    monkeypatch.setattr("app.services.summary_workflow.TechnicalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.services.summary_workflow.build_technical_summary_markdown", lambda table: f"TECH_MD:{table}\n")
 
     controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
     output_dir = tmp_path / "out"
