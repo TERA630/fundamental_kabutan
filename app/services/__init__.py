@@ -7,6 +7,7 @@ from app.services.kabutan_html_package_service import KabutanHtmlPackageService
 from app.services.kabutan_package_workflow import KabutanPackageResolution, KabutanPackageWorkflow
 from app.services.output_cache_service import OutputCacheService
 from app.services.watchlist_service import WatchlistService
+from app.services.web_upload_workflow import WebUploadWorkflow
 
 __all__ = [
     "AnalysisApplicationService",
@@ -20,4 +21,5 @@ __all__ = [
     "KabutanPackageWorkflow",
     "OutputCacheService",
     "WatchlistService",
+    "WebUploadWorkflow",
 ]

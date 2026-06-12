@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -18,18 +17,14 @@ except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Fl
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 from app.presentation.web_fundamental_summary import build_fundamental_summary_html
 from app.presentation.web_technical_summary import build_technical_summary_html
-from app.services.watchlist_service import WatchlistService
+from app.data.file_cache import FileCache
+from app.services.web_upload_workflow import WebUploadWorkflow
 from app.ui_state_utils import build_output_cache_key
 from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
-UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
-UPLOAD_KABUTAN_HTML_DIR_NAME = "web_uploaded_kabutan_html"
-UPLOAD_KABUTAN_PACKAGE_NAME = "web_uploaded_kabutan_html_package.zip"
-KABUTAN_HTML_SUFFIXES = {".html", ".htm"}
-
 
 def parse_uploaded_watchlist(data: bytes) -> list[tuple[str, str]]:
-    return WatchlistService().parse_uploaded(data)
+    return WebUploadWorkflow(file_cache=FileCache()).parse_uploaded_watchlist(data)
 
 
 def build_copy_text(institutional_summary: str, output: str) -> str:
@@ -43,57 +38,7 @@ def build_copy_text(institutional_summary: str, output: str) -> str:
 
 
 def resolve_existing_dir(raw_path: str) -> Path:
-    path = Path(raw_path.strip()).expanduser()
-    if not raw_path.strip():
-        raise ValueError("株探HTMLフォルダのコンテナ内パスを入力してください。")
-    if not path.exists() or not path.is_dir():
-        raise ValueError("株探HTMLフォルダが見つかりません。コンテナ内の既存ディレクトリを指定してください。")
-    return path.resolve()
-
-
-def save_uploaded_kabutan_html_dir(state: WebUiState, uploaded_files: list[Any]) -> Path:
-    files = [
-        uploaded
-        for uploaded in uploaded_files
-        if uploaded is not None
-        and uploaded.filename
-        and Path(uploaded.filename).suffix.lower() in KABUTAN_HTML_SUFFIXES
-    ]
-    if not files:
-        raise ValueError("株探HTMLフォルダにHTMLファイルが見つかりませんでした。")
-
-    upload_dir = state.controller.file_cache.base_dir / UPLOAD_KABUTAN_HTML_DIR_NAME
-    if upload_dir.exists():
-        shutil.rmtree(upload_dir)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    used_names: set[str] = set()
-    for uploaded in files:
-        source_name = Path(uploaded.filename).name
-        target_name = _dedupe_filename(source_name, used_names)
-        uploaded.save(upload_dir / target_name)
-    return upload_dir.resolve()
-
-
-def save_uploaded_kabutan_html_package(state: WebUiState, uploaded_file: Any) -> Path:
-    if uploaded_file is None or not uploaded_file.filename:
-        raise ValueError("株探HTMLパッケージZipを選択してください。")
-    if Path(uploaded_file.filename).suffix.lower() != ".zip":
-        raise ValueError("株探HTMLパッケージはZipファイルを選択してください。")
-    zip_path = state.controller.file_cache.base_dir / UPLOAD_KABUTAN_PACKAGE_NAME
-    uploaded_file.save(zip_path)
-    return zip_path
-
-
-def _dedupe_filename(filename: str, used_names: set[str]) -> str:
-    path = Path(filename)
-    candidate = path.name
-    index = 2
-    while candidate.lower() in used_names:
-        candidate = f"{path.stem}_{index}{path.suffix}"
-        index += 1
-    used_names.add(candidate.lower())
-    return candidate
+    return WebUploadWorkflow(file_cache=FileCache()).resolve_existing_dir(raw_path)
 
 
 def create_app(state: WebUiState | None = None) -> Flask:
@@ -103,7 +48,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
     app = Flask(__name__)
     ui_state = state or WebUiState()
     state_manager = WebUiStateManager(ui_state)
-    watchlist_service = WatchlistService()
+    upload_workflow = WebUploadWorkflow(file_cache=getattr(ui_state.controller, "file_cache", FileCache()))
     state_manager.restore_cached_state()
 
     @app.get("/")
@@ -116,21 +61,14 @@ def create_app(state: WebUiState | None = None) -> Flask:
             uploaded = request.files.get("watchlist_file")
             if uploaded is not None and uploaded.filename:
                 data = uploaded.read()
-                ui_state.watchlist = watchlist_service.parse_uploaded(data)
-                ui_state.watchlist_path = _save_uploaded_watchlist(ui_state, data)
-                ui_state.controller.save_watchlist_path_cache(ui_state.watchlist_path)
-                ui_state.fundamental_summary_html = ""
-                ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
+                watchlist, path = upload_workflow.load_uploaded_watchlist(data)
             else:
-                raw_path = request.form.get("watchlist_path", "").strip()
-                if not raw_path:
-                    raise ValueError("監視銘柄ファイルをアップロードするか、パスを入力してください。")
-                path = Path(raw_path).expanduser().resolve()
-                ui_state.watchlist = watchlist_service.load_from_file(path)
-                ui_state.watchlist_path = path
-                ui_state.controller.save_watchlist_path_cache(path)
-                ui_state.fundamental_summary_html = ""
-                ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
+                watchlist, path = upload_workflow.load_watchlist_from_path(request.form.get("watchlist_path", ""))
+            ui_state.watchlist = watchlist
+            ui_state.watchlist_path = path
+            ui_state.controller.save_watchlist_path_cache(path)
+            ui_state.fundamental_summary_html = ""
+            ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
             state_manager.select_first_if_needed()
         except Exception as exc:
             ui_state.status = str(exc)
@@ -141,9 +79,9 @@ def create_app(state: WebUiState | None = None) -> Flask:
         try:
             uploaded_files = request.files.getlist("kabutan_html_files")
             if any(uploaded.filename for uploaded in uploaded_files):
-                path = save_uploaded_kabutan_html_dir(ui_state, uploaded_files)
+                path = upload_workflow.save_uploaded_kabutan_html_dir(uploaded_files)
             else:
-                path = resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
+                path = upload_workflow.resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
             ui_state.kabutan_html_dir = path
             ui_state.kabutan_package_zip_path = None
             ui_state.kabutan_package_zip_signature = None
@@ -162,7 +100,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
     def import_kabutan_package() -> str:
         try:
             uploaded = request.files.get("kabutan_package_zip")
-            zip_path = save_uploaded_kabutan_html_package(ui_state, uploaded)
+            zip_path = upload_workflow.save_uploaded_kabutan_html_package(uploaded)
             result = ui_state.controller.inspect_kabutan_html_package(zip_path=zip_path)
             ui_state.kabutan_package_zip_path = zip_path
             ui_state.kabutan_package_zip_signature = ui_state.controller.build_file_signature(zip_path)
@@ -276,12 +214,6 @@ def create_app(state: WebUiState | None = None) -> Flask:
         return response
 
     return app
-
-
-def _save_uploaded_watchlist(state: WebUiState, data: bytes) -> Path:
-    path = state.controller.file_cache.base_dir / UPLOAD_WATCHLIST_CACHE_NAME
-    path.write_bytes(data)
-    return path
 
 
 def _ensure_kabutan_html_dir_for_fundamental(state: WebUiState) -> None:
