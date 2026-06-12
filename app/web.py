@@ -19,7 +19,6 @@ from app.presentation.web_fundamental_summary import build_fundamental_summary_h
 from app.presentation.web_technical_summary import build_technical_summary_html
 from app.data.file_cache import FileCache
 from app.services.web_upload_workflow import WebUploadWorkflow
-from app.ui_state_utils import build_output_cache_key
 from app.web_state import DEFAULT_INSTITUTIONAL_SUMMARY, WebUiState, WebUiStateManager
 
 
@@ -64,12 +63,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 watchlist, path = upload_workflow.load_uploaded_watchlist(data)
             else:
                 watchlist, path = upload_workflow.load_watchlist_from_path(request.form.get("watchlist_path", ""))
-            ui_state.watchlist = watchlist
-            ui_state.watchlist_path = path
-            ui_state.controller.save_watchlist_path_cache(path)
-            ui_state.fundamental_summary_html = ""
-            ui_state.status = ui_state.view_model.build_loaded_status(len(ui_state.watchlist))
-            state_manager.select_first_if_needed()
+            state_manager.load_watchlist(watchlist=watchlist, path=path)
         except Exception as exc:
             ui_state.status = str(exc)
         return _render(ui_state)
@@ -82,16 +76,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 path = upload_workflow.save_uploaded_kabutan_html_dir(uploaded_files)
             else:
                 path = upload_workflow.resolve_existing_dir(request.form.get("kabutan_html_dir", ""))
-            ui_state.kabutan_html_dir = path
-            ui_state.kabutan_package_zip_path = None
-            ui_state.kabutan_package_zip_signature = None
-            ui_state.output_cache.clear()
-            ui_state.controller.save_kabutan_html_dir_cache(path)
-            clear_kabutan_package_zip_cache = getattr(ui_state.controller, "clear_kabutan_package_zip_cache", None)
-            if callable(clear_kabutan_package_zip_cache):
-                clear_kabutan_package_zip_cache()
-            ui_state.fundamental_summary_html = ""
-            ui_state.status = ui_state.view_model.build_kabutan_dir_selected_status()
+            state_manager.set_kabutan_html_dir(path)
         except Exception as exc:
             ui_state.status = str(exc)
         return _render(ui_state)
@@ -101,16 +86,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
         try:
             uploaded = request.files.get("kabutan_package_zip")
             zip_path = upload_workflow.save_uploaded_kabutan_html_package(uploaded)
-            result = ui_state.controller.inspect_kabutan_html_package(zip_path=zip_path)
-            ui_state.kabutan_package_zip_path = zip_path
-            ui_state.kabutan_package_zip_signature = ui_state.controller.build_file_signature(zip_path)
-            uploaded_html_dir = ui_state.controller.import_output_dir_for_signature(ui_state.kabutan_package_zip_signature) / "html"
-            ui_state.kabutan_html_dir = uploaded_html_dir if ui_state.controller.html_dir_ready(uploaded_html_dir) else None
-            ui_state.output_cache.clear()
-            ui_state.controller.save_kabutan_package_zip_cache(zip_path)
-            if ui_state.kabutan_html_dir is not None:
-                ui_state.controller.save_kabutan_html_dir_cache(ui_state.kabutan_html_dir)
-            ui_state.fundamental_summary_html = ""
+            result = state_manager.register_uploaded_kabutan_package(zip_path)
             manifest_text = " / manifest: あり" if result.has_manifest else " / manifest: なし"
             extract_text = (
                 f" / 展開済み: {ui_state.kabutan_html_dir}"
@@ -133,39 +109,8 @@ def create_app(state: WebUiState | None = None) -> Flask:
             request.form.get("selected_stock", ui_state.selected_label),
             request.form.get("mode", ui_state.mode),
         )
-        ui_state.fundamental_summary_html = ""
-        selected = state_manager.selected_stock()
-        if selected is None:
-            ui_state.status = ui_state.view_model.build_missing_stock_status()
-            return _render(ui_state)
-        if ui_state.mode != "technical":
-            try:
-                _ensure_kabutan_html_dir_for_fundamental(ui_state)
-            except Exception as exc:
-                ui_state.status = f"株探HTMLパッケージ展開失敗: {exc}"
-                return _render(ui_state)
-        if ui_state.mode != "technical" and ui_state.kabutan_html_dir is None:
-            ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
-            return _render(ui_state)
-
-        name, code4 = selected
         try:
-            cache_key = (
-                None
-                if ui_state.mode == "technical"
-                else build_output_cache_key(code4, ui_state.kabutan_html_dir)
-            )
-            result = ui_state.controller.fetch_output_for_mode(
-                name=name,
-                code4=code4,
-                mode=ui_state.mode,
-                output_cache=ui_state.output_cache,
-                output_cache_key=cache_key,
-                kabutan_html_dir=ui_state.kabutan_html_dir,
-            )
-            ui_state.output = result.output
-            ui_state.institutional_summary = result.institutional_summary
-            ui_state.status = ui_state.view_model.build_generated_status(name, code4)
+            state_manager.fetch_output_for_current_selection()
         except Exception as exc:
             ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
         return _render(ui_state)
@@ -176,23 +121,10 @@ def create_app(state: WebUiState | None = None) -> Flask:
             request.form.get("selected_stock", ui_state.selected_label),
             request.form.get("mode", ui_state.mode),
         )
-        if not ui_state.watchlist:
-            ui_state.status = ui_state.view_model.build_missing_stock_status()
-            ui_state.fundamental_summary_html = ""
-            return _render(ui_state)
         try:
-            if ui_state.mode != "technical":
-                _ensure_kabutan_html_dir_for_fundamental(ui_state)
-                if ui_state.kabutan_html_dir is None:
-                    ui_state.status = ui_state.view_model.build_kabutan_dir_restore_required_status()
-                    ui_state.fundamental_summary_html = ""
-                    return _render(ui_state)
-
-            table = ui_state.controller.build_summary_table_for_mode(
-                mode=ui_state.mode,
-                watchlist_entries=ui_state.watchlist,
-                kabutan_html_dir=ui_state.kabutan_html_dir,
-            )
+            table = state_manager.build_summary_table_for_current_mode()
+            if table is None:
+                return _render(ui_state)
             if ui_state.mode == "technical":
                 ui_state.fundamental_summary_html = build_technical_summary_html(table)
                 ui_state.status = "Technicalサマリを表示しました。"
@@ -214,21 +146,6 @@ def create_app(state: WebUiState | None = None) -> Flask:
         return response
 
     return app
-
-
-def _ensure_kabutan_html_dir_for_fundamental(state: WebUiState) -> None:
-    zip_path = state.kabutan_package_zip_path
-    if zip_path is None:
-        return
-    result = state.controller.resolve_imported_kabutan_package(
-        zip_path=zip_path,
-        current_signature=state.kabutan_package_zip_signature,
-        current_html_dir=state.kabutan_html_dir,
-    )
-    state.kabutan_html_dir = result.html_dir
-    state.kabutan_package_zip_signature = result.signature
-    if result.output_cache_should_clear:
-        state.output_cache.clear()
 
 
 def _render(state: WebUiState) -> str:

@@ -11,11 +11,8 @@ from app.gui_state import (
     GuiState,
     build_default_output_filename,
     build_output_cache_key,
-    build_stock_choices,
-    current_date_iso,
-    get_selected_stock,
-    should_rotate_output_cache,
 )
+from app.gui_state_manager import GuiStateManager
 from app.gui_view import FundamentalView
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
@@ -31,6 +28,12 @@ class FundamentalApp:
 
         self.state = GuiState()
         self.controller = AnalysisApplicationService()
+        self.view_model = GuiViewModel()
+        self.state_manager = GuiStateManager(
+            state=self.state,
+            controller=self.controller,
+            view_model=self.view_model,
+        )
 
         self.path_var = tk.StringVar(value="監視銘柄ファイル未選択")
         self.kabutan_dir_var = tk.StringVar(value="株探HTMLフォルダ未選択")
@@ -38,7 +41,6 @@ class FundamentalApp:
         self.status_var = tk.StringVar(value=GuiViewModel.build_initial_status())
         self.institutional_summary_var = tk.StringVar(value="機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A")
 
-        self.view_model = GuiViewModel()
         self.view = FundamentalView(
             self.master,
             self.path_var,
@@ -58,8 +60,7 @@ class FundamentalApp:
             on_summary=self.generate_summary,
             on_tab_changed=self.on_tab_changed,
         )
-        self.state.output_cache = self.controller.fetch_output_cache_for_today()
-        self.state.output_cache_date = current_date_iso()
+        self.state_manager.restore_output_cache()
         self._restore_watchlist()
         self._restore_kabutan_html_dir()
 
@@ -75,61 +76,48 @@ class FundamentalApp:
         if not path:
             return
         try:
-            watchlist = self.controller.fetch_watchlist_entries(Path(path))
+            choices = self.state_manager.load_watchlist(Path(path))
         except Exception as exc:
             messagebox.showerror("読込失敗", str(exc))
             return
 
-        self.state.watchlist_path = Path(path)
-        self.controller.save_watchlist_path_cache(self.state.watchlist_path)
-        self.state.watchlist = watchlist
-        self.state.output_cache.clear()
-        self.state.output_cache_date = current_date_iso()
-        self.controller.save_output_cache_for_today(self.state.output_cache)
         self.path_var.set(str(self.state.watchlist_path))
-        self._populate_stock_choices()
+        self._apply_stock_choices(choices)
 
     def _restore_watchlist(self) -> None:
-        resolved = self.controller.fetch_resolved_watchlist_path()
-        if resolved.status != "ok" or resolved.file_path is None:
-            return
         try:
-            watchlist = self.controller.fetch_watchlist_entries(resolved.file_path)
+            restored = self.state_manager.restore_watchlist()
         except Exception:
             return
-        self.state.watchlist_path = resolved.file_path
-        self.state.watchlist = watchlist
-        self.path_var.set(str(resolved.file_path))
-        self._populate_stock_choices()
-        self.status_var.set(self.view_model.build_watchlist_restored_status(len(watchlist)))
+        if restored is None:
+            return
+        path, choices, status = restored
+        self.path_var.set(str(path))
+        self._apply_stock_choices(choices)
+        self.status_var.set(status)
 
     def open_kabutan_html_dir(self):
         path = filedialog.askdirectory(title="株探HTML保存フォルダを選択")
         if not path:
             return
-        self.state.kabutan_html_dir = Path(path)
-        self.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
-        self.state.output_cache.clear()
-        self.state.output_cache_date = current_date_iso()
-        self.controller.save_output_cache_for_today(self.state.output_cache)
+        status = self.state_manager.select_kabutan_html_dir(Path(path))
         self.kabutan_dir_var.set(str(self.state.kabutan_html_dir))
-        self.status_var.set(self.view_model.build_kabutan_dir_selected_status())
+        self.status_var.set(status)
 
     def _restore_kabutan_html_dir(self) -> None:
-        resolved = self.controller.fetch_resolved_kabutan_html_dir()
-        if resolved.status == "ok" and resolved.dir_path is not None:
-            self.state.kabutan_html_dir = resolved.dir_path
-            self.kabutan_dir_var.set(str(resolved.dir_path))
-            self.status_var.set(resolved.message)
+        restored = self.state_manager.restore_kabutan_html_dir()
+        if restored is None:
+            return
+        path, status = restored
+        self.kabutan_dir_var.set(str(path))
+        self.status_var.set(status)
 
-    def _populate_stock_choices(self) -> None:
-        values, mapping = build_stock_choices(self.state.watchlist)
-        self.state.display_to_code = mapping
-        self.view.set_stock_choices(values)
+    def _apply_stock_choices(self, choices: list[str]) -> None:
+        self.view.set_stock_choices(choices)
 
-        if values:
-            self.stock_var.set(values[0])
-            self.status_var.set(self.view_model.build_loaded_status(len(values)))
+        if choices:
+            self.stock_var.set(choices[0])
+            self.status_var.set(self.view_model.build_loaded_status(len(choices)))
         else:
             self.stock_var.set("")
             self.view.clear_all_text()
@@ -142,7 +130,7 @@ class FundamentalApp:
         self.status_var.set(self.view_model.build_selected_status())
 
     def selected_stock(self) -> tuple[str, str] | None:
-        return get_selected_stock(self.state.display_to_code, self.stock_var.get())
+        return self.state_manager.selected_stock(self.stock_var.get())
 
     def _require_selected_stock(self) -> tuple[str, str] | None:
         selected = self.selected_stock()
@@ -220,9 +208,7 @@ class FundamentalApp:
             result = self.controller.build_kabutan_html_package(source_dir=source_dir, output_dir=output_dir)
             self.state.kabutan_html_dir = result.html_dir
             self.controller.save_kabutan_html_dir_cache(result.html_dir)
-            self.state.output_cache.clear()
-            self.state.output_cache_date = current_date_iso()
-            self.controller.save_output_cache_for_today(self.state.output_cache)
+            self.state_manager.clear_output_cache()
 
             def done():
                 self.kabutan_dir_var.set(str(result.html_dir))
@@ -255,11 +241,7 @@ class FundamentalApp:
         return True
 
     def _rotate_output_cache_if_needed(self) -> None:
-        if not should_rotate_output_cache(self.state.output_cache_date):
-            return
-        self.state.output_cache.clear()
-        self.state.output_cache_date = current_date_iso()
-        self.controller.save_output_cache_for_today(self.state.output_cache)
+        self.state_manager.rotate_output_cache_if_needed()
 
     def _start_fetch_thread(self, name: str, code4: str, cache_key: str) -> None:
         self.set_busy(True, self.view_model.build_fetching_status(name, code4))

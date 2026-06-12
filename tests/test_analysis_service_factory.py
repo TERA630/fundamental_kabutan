@@ -1,3 +1,5 @@
+import pandas as pd
+
 from app.data.file_cache import FileCache
 from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 from app.services import analysis_service_factory as factory
@@ -13,8 +15,8 @@ def test_build_default_fundamental_service_with_market_bundle_reuses_snapshot(tm
     )
     bundle = MarketDataBundle(
         code4="7203",
-        daily_history=None,
-        intraday_history=None,
+        daily_history=pd.DataFrame(),
+        intraday_history=pd.DataFrame(),
         snapshot=MarketSnapshot(price=123.0),
     )
 

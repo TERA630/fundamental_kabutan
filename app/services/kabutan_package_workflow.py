@@ -10,6 +10,8 @@ from typing import Callable
 from app.data.file_cache import FileCache
 from app.services.kabutan_html_package_service import (
     KabutanHtmlPackageImportResult,
+    KabutanHtmlPackageInspectionResult,
+    KabutanHtmlPackageResult,
     KabutanHtmlPackageService,
 )
 
@@ -50,8 +52,33 @@ class KabutanPackageWorkflow:
     def html_dir_ready(self, html_dir: Path) -> bool:
         return html_dir.exists() and html_dir.is_dir() and any(html_dir.glob("*.html"))
 
+    def build_package(
+        self,
+        *,
+        source_dir: Path,
+        output_dir: Path | None = None,
+    ) -> KabutanHtmlPackageResult:
+        return self.package_service.build_package(
+            source_dir=source_dir,
+            output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_package"),
+        )
+
     def import_package(self, *, zip_path: Path, output_dir: Path) -> KabutanHtmlPackageImportResult:
         return self.package_service.import_package(zip_path=zip_path, output_dir=output_dir)
+
+    def import_package_to_default_dir(
+        self,
+        *,
+        zip_path: Path,
+        output_dir: Path | None = None,
+    ) -> KabutanHtmlPackageImportResult:
+        return self.import_package(
+            zip_path=zip_path,
+            output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_imported_package"),
+        )
+
+    def inspect_package(self, *, zip_path: Path) -> KabutanHtmlPackageInspectionResult:
+        return self.package_service.inspect_package(zip_path=zip_path)
 
     def resolve_imported_package(
         self,
@@ -98,6 +125,9 @@ class KabutanPackageWorkflow:
 
 
 __all__ = [
+    "KabutanHtmlPackageImportResult",
+    "KabutanHtmlPackageInspectionResult",
+    "KabutanHtmlPackageResult",
     "KabutanPackageResolution",
     "KabutanPackageWorkflow",
     "WEB_KABUTAN_IMPORTED_PACKAGE_DIR_NAME",

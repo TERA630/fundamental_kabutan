@@ -246,7 +246,7 @@ def test_fetch_technical_output_uses_injected_technical_service(tmp_path: Path, 
             return result
 
     dummy_service = DummyTechnicalService()
-    monkeypatch.setattr("app.services.analysis_application_service.build_technical_output", lambda value: "TECH" if value is result else "BAD")
+    monkeypatch.setattr("app.services.stock_analysis_workflow.build_technical_output", lambda value: "TECH" if value is result else "BAD")
     controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_technical_service=lambda _cache: dummy_service,
@@ -271,7 +271,7 @@ def test_default_controller_reuses_market_data_bundle_for_technical_and_summary(
                 snapshot=MarketSnapshot(price=169.0, market_cap=3_000_000_000_000.0),
             )
 
-    monkeypatch.setattr("app.services.analysis_application_service.build_technical_output", lambda _result: "TECH")
+    monkeypatch.setattr("app.services.stock_analysis_workflow.build_technical_output", lambda _result: "TECH")
     controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_market_data_service=lambda _cache: DummyMarketDataService(),

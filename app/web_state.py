@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
-from app.ui_state_utils import build_stock_choices, get_selected_stock
+from app.ui_state_utils import build_output_cache_key, build_stock_choices, get_selected_stock
 
 DEFAULT_INSTITUTIONAL_SUMMARY = "機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A"
 
@@ -88,3 +88,104 @@ class WebUiStateManager:
     def selected_stock(self) -> tuple[str, str] | None:
         _, mapping = build_stock_choices(self.state.watchlist)
         return get_selected_stock(mapping, self.state.selected_label)
+
+    def load_watchlist(self, *, watchlist: list[tuple[str, str]], path: Path) -> None:
+        self.state.watchlist = watchlist
+        self.state.watchlist_path = path
+        self.state.controller.save_watchlist_path_cache(path)
+        self.state.fundamental_summary_html = ""
+        self.state.status = self.state.view_model.build_loaded_status(len(watchlist))
+        self.select_first_if_needed()
+
+    def set_kabutan_html_dir(self, path: Path) -> None:
+        self.state.kabutan_html_dir = path
+        self.state.kabutan_package_zip_path = None
+        self.state.kabutan_package_zip_signature = None
+        self.state.output_cache.clear()
+        self.state.controller.save_kabutan_html_dir_cache(path)
+        clear_kabutan_package_zip_cache = getattr(self.state.controller, "clear_kabutan_package_zip_cache", None)
+        if callable(clear_kabutan_package_zip_cache):
+            clear_kabutan_package_zip_cache()
+        self.state.fundamental_summary_html = ""
+        self.state.status = self.state.view_model.build_kabutan_dir_selected_status()
+
+    def register_uploaded_kabutan_package(self, zip_path: Path):
+        result = self.state.controller.inspect_kabutan_html_package(zip_path=zip_path)
+        signature = self.state.controller.build_file_signature(zip_path)
+        uploaded_html_dir = self.state.controller.import_output_dir_for_signature(signature) / "html"
+        self.state.kabutan_package_zip_path = zip_path
+        self.state.kabutan_package_zip_signature = signature
+        self.state.kabutan_html_dir = (
+            uploaded_html_dir
+            if self.state.controller.html_dir_ready(uploaded_html_dir)
+            else None
+        )
+        self.state.output_cache.clear()
+        self.state.controller.save_kabutan_package_zip_cache(zip_path)
+        if self.state.kabutan_html_dir is not None:
+            self.state.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
+        self.state.fundamental_summary_html = ""
+        return result
+
+    def ensure_kabutan_html_dir_for_fundamental(self) -> None:
+        zip_path = self.state.kabutan_package_zip_path
+        if zip_path is None:
+            return
+        result = self.state.controller.resolve_imported_kabutan_package(
+            zip_path=zip_path,
+            current_signature=self.state.kabutan_package_zip_signature,
+            current_html_dir=self.state.kabutan_html_dir,
+        )
+        self.state.kabutan_html_dir = result.html_dir
+        self.state.kabutan_package_zip_signature = result.signature
+        if result.output_cache_should_clear:
+            self.state.output_cache.clear()
+
+    def fetch_output_for_current_selection(self) -> bool:
+        self.state.fundamental_summary_html = ""
+        selected = self.selected_stock()
+        if selected is None:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            return False
+        if self.state.mode != "technical":
+            self.ensure_kabutan_html_dir_for_fundamental()
+            if self.state.kabutan_html_dir is None:
+                self.state.status = self.state.view_model.build_kabutan_dir_restore_required_status()
+                return False
+
+        name, code4 = selected
+        cache_key = (
+            None
+            if self.state.mode == "technical"
+            else build_output_cache_key(code4, self.state.kabutan_html_dir)
+        )
+        result = self.state.controller.fetch_output_for_mode(
+            name=name,
+            code4=code4,
+            mode=self.state.mode,
+            output_cache=self.state.output_cache,
+            output_cache_key=cache_key,
+            kabutan_html_dir=self.state.kabutan_html_dir,
+        )
+        self.state.output = result.output
+        self.state.institutional_summary = result.institutional_summary
+        self.state.status = self.state.view_model.build_generated_status(name, code4)
+        return True
+
+    def build_summary_table_for_current_mode(self):
+        if not self.state.watchlist:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            self.state.fundamental_summary_html = ""
+            return None
+        if self.state.mode != "technical":
+            self.ensure_kabutan_html_dir_for_fundamental()
+            if self.state.kabutan_html_dir is None:
+                self.state.status = self.state.view_model.build_kabutan_dir_restore_required_status()
+                self.state.fundamental_summary_html = ""
+                return None
+
+        return self.state.controller.build_summary_table_for_mode(
+            mode=self.state.mode,
+            watchlist_entries=self.state.watchlist,
+            kabutan_html_dir=self.state.kabutan_html_dir,
+        )

@@ -7,17 +7,12 @@ from pathlib import Path
 from typing import Callable
 
 from app.data.file_cache import FileCache
-from app.domain.builders.technical_output import build_technical_output
 from app.domain.models.market_data import MarketDataBundle
-from app.domain.usecases.fundamental_analysis import (
-    FundamentalAnalysisService,
-    build_output_from_analysis_result,
-)
-from app.domain.usecases.kabutan_html_dir import ResolveKabutanHtmlDirUseCase, ResolvedKabutanHtmlDir
+from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
+from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
 from app.domain.usecases.market_data import MarketDataService
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
-from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
-from app.presenters import build_fundamental_output
+from app.domain.usecases.watchlist_path import ResolvedWatchlistPath
 from app.services.analysis_service_factory import (
     build_default_fundamental_service,
     build_default_fundamental_service_with_market_bundle,
@@ -25,16 +20,16 @@ from app.services.analysis_service_factory import (
     build_default_technical_service,
 )
 from app.services.cache_service import CacheService
-from app.services.institutional_summary_service import InstitutionalSummaryService
 from app.services.analysis_output_workflow import AnalysisOutputResult, AnalysisOutputWorkflow
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
-from app.services.kabutan_html_package_service import (
+from app.services.kabutan_html_package_service import KabutanHtmlPackageService
+from app.services.kabutan_package_workflow import (
     KabutanHtmlPackageImportResult,
     KabutanHtmlPackageInspectionResult,
     KabutanHtmlPackageResult,
-    KabutanHtmlPackageService,
+    KabutanPackageResolution,
+    KabutanPackageWorkflow,
 )
-from app.services.kabutan_package_workflow import KabutanPackageResolution, KabutanPackageWorkflow
 from app.services.output_cache_service import OutputCacheService
 from app.services.summary_workflow import (
     FUNDAMENTAL_SUMMARY_FILENAME_PREFIX,
@@ -43,6 +38,8 @@ from app.services.summary_workflow import (
     build_fundamental_summary_filename,
     build_technical_summary_filename,
 )
+from app.services.stock_analysis_workflow import StockAnalysisWorkflow
+from app.services.ui_resource_workflow import UiResourceWorkflow
 from app.services.watchlist_service import WatchlistService
 
 
@@ -62,18 +59,30 @@ class AnalysisApplicationService:
         self.kabutan_html_dir_service = KabutanHtmlDirService(self.cache_service)
         self.kabutan_html_package_service = KabutanHtmlPackageService()
         self.output_cache_service = OutputCacheService(self.cache_service)
-        self.resolve_kabutan_html_dir_usecase = ResolveKabutanHtmlDirUseCase()
-        self.resolve_watchlist_path_usecase = ResolveWatchlistPathUseCase()
         self._uses_default_fundamental_service = build_fundamental_service is None
         self._uses_default_technical_service = build_technical_service is None
         self.build_fundamental_service = build_fundamental_service or build_default_fundamental_service
         self.build_technical_service = build_technical_service or build_default_technical_service
         self.build_market_data_service = build_market_data_service or build_default_market_data_service
         self._market_data_bundle_cache: dict[str, MarketDataBundle] = {}
+        self.stock_analysis_workflow = StockAnalysisWorkflow(
+            file_cache=self.file_cache,
+            build_fundamental_service=self.build_fundamental_service,
+            build_technical_service=self.build_technical_service,
+            uses_default_fundamental_service=self._uses_default_fundamental_service,
+            uses_default_technical_service=self._uses_default_technical_service,
+            fetch_market_data_bundle=self.fetch_market_data_bundle,
+            build_fundamental_service_with_market_bundle=self._build_default_fundamental_service_with_market_bundle,
+        )
         self.kabutan_package_workflow = KabutanPackageWorkflow(
             file_cache=self.file_cache,
             package_service=self.kabutan_html_package_service,
             save_kabutan_html_dir_cache=self.save_kabutan_html_dir_cache,
+        )
+        self.ui_resource_workflow = UiResourceWorkflow(
+            cache_service=self.cache_service,
+            watchlist_service=self.watchlist_service,
+            kabutan_html_dir_service=self.kabutan_html_dir_service,
         )
         self.analysis_output_workflow = AnalysisOutputWorkflow(
             fetch_technical_output=self.fetch_technical_output,
@@ -84,7 +93,7 @@ class AnalysisApplicationService:
         self.summary_workflow = SummaryWorkflow(
             file_cache=self.file_cache,
             build_fundamental_service=self.build_fundamental_service,
-            build_technical_summary_result=self._build_technical_summary_result,
+            build_technical_summary_result=self.stock_analysis_workflow.build_technical_summary_result,
         )
 
     def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
@@ -102,22 +111,19 @@ class AnalysisApplicationService:
         )
 
     def fetch_resolved_kabutan_html_dir(self) -> ResolvedKabutanHtmlDir:
-        return self.kabutan_html_dir_service.resolve_cached_dir()
+        return self.ui_resource_workflow.fetch_resolved_kabutan_html_dir()
 
     def save_kabutan_html_dir_cache(self, path: Path) -> None:
-        self.kabutan_html_dir_service.save_dir(path)
+        self.ui_resource_workflow.save_kabutan_html_dir_cache(path)
 
     def fetch_kabutan_package_zip_cache(self) -> Path | None:
-        cached_path = self.cache_service.fetch_kabutan_package_zip()
-        if cached_path is not None and cached_path.exists() and cached_path.is_file():
-            return cached_path
-        return None
+        return self.ui_resource_workflow.fetch_kabutan_package_zip_cache()
 
     def save_kabutan_package_zip_cache(self, path: Path) -> None:
-        self.cache_service.save_kabutan_package_zip(path)
+        self.ui_resource_workflow.save_kabutan_package_zip_cache(path)
 
     def clear_kabutan_package_zip_cache(self) -> None:
-        self.cache_service.clear_kabutan_package_zip()
+        self.ui_resource_workflow.clear_kabutan_package_zip_cache()
 
     def build_kabutan_html_package(
         self,
@@ -125,9 +131,9 @@ class AnalysisApplicationService:
         source_dir: Path,
         output_dir: Path | None = None,
     ) -> KabutanHtmlPackageResult:
-        return self.kabutan_html_package_service.build_package(
+        return self.kabutan_package_workflow.build_package(
             source_dir=source_dir,
-            output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_package"),
+            output_dir=output_dir,
         )
 
     def import_kabutan_html_package(
@@ -136,13 +142,13 @@ class AnalysisApplicationService:
         zip_path: Path,
         output_dir: Path | None = None,
     ) -> KabutanHtmlPackageImportResult:
-        return self.kabutan_html_package_service.import_package(
+        return self.kabutan_package_workflow.import_package_to_default_dir(
             zip_path=zip_path,
-            output_dir=output_dir or (self.file_cache.base_dir / "kabutan_html_imported_package"),
+            output_dir=output_dir,
         )
 
     def inspect_kabutan_html_package(self, *, zip_path: Path) -> KabutanHtmlPackageInspectionResult:
-        return self.kabutan_html_package_service.inspect_package(zip_path=zip_path)
+        return self.kabutan_package_workflow.inspect_package(zip_path=zip_path)
 
     def build_file_signature(self, path: Path) -> tuple[int, str]:
         return self.kabutan_package_workflow.build_file_signature(path)
@@ -167,11 +173,10 @@ class AnalysisApplicationService:
         )
 
     def fetch_resolved_watchlist_path(self) -> ResolvedWatchlistPath:
-        cached_path = self.watchlist_service.restore_watchlist_path()
-        return self.resolve_watchlist_path_usecase.fetch_resolved_watchlist_path(cached_path)
+        return self.ui_resource_workflow.fetch_resolved_watchlist_path()
 
     def save_watchlist_path_cache(self, path: Path) -> None:
-        self.watchlist_service.save_watchlist_path(path)
+        self.ui_resource_workflow.save_watchlist_path_cache(path)
 
     def fetch_output_cache_for_today(self) -> dict[str, str]:
         return self.output_cache_service.fetch_for_today()
@@ -180,7 +185,7 @@ class AnalysisApplicationService:
         self.output_cache_service.save_for_today(output_cache)
 
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
-        return self.watchlist_service.load_from_file(path)
+        return self.ui_resource_workflow.fetch_watchlist_entries(path)
 
     def fetch_analysis_output(
         self,
@@ -191,28 +196,13 @@ class AnalysisApplicationService:
         output_cache_key: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        cached_output = output_cache.get(output_cache_key)
-        if cached_output is not None:
-            return cached_output
-
-        if self._uses_default_fundamental_service:
-            bundle = self.fetch_market_data_bundle(code4)
-            service = self._build_default_fundamental_service_with_market_bundle(bundle)
-        else:
-            service = self.build_fundamental_service(self.file_cache)
-        build_analysis_result = getattr(service, "build_analysis_result", None)
-        if callable(build_analysis_result):
-            result = build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
-            output = build_output_from_analysis_result(result, build_fundamental_output)
-        else:
-            output = service.build_analysis_output(
-                name,
-                code4,
-                build_output_fn=build_fundamental_output,
-                kabutan_html_dir=kabutan_html_dir,
-            )
-        output_cache[output_cache_key] = output
-        return output
+        return self.stock_analysis_workflow.fetch_analysis_output(
+            name=name,
+            code4=code4,
+            output_cache=output_cache,
+            output_cache_key=output_cache_key,
+            kabutan_html_dir=kabutan_html_dir,
+        )
 
     def fetch_output_for_mode(
         self,
@@ -292,26 +282,13 @@ class AnalysisApplicationService:
             generated_at=generated_at,
         )
 
-    def _build_technical_summary_result(self, name: str, code4: str):
-        if self._uses_default_technical_service:
-            bundle = self.fetch_market_data_bundle(code4)
-            return TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
-        service = self.build_technical_service(self.file_cache)
-        return service.build_analysis_result(name=name, code4=code4)
-
     def fetch_technical_output(
         self,
         *,
         name: str,
         code4: str,
     ) -> str:
-        if self._uses_default_technical_service:
-            bundle = self.fetch_market_data_bundle(code4)
-            result = TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
-        else:
-            service = self.build_technical_service(self.file_cache)
-            result = service.build_analysis_result(name=name, code4=code4)
-        return build_technical_output(result)
+        return self.stock_analysis_workflow.fetch_technical_output(name=name, code4=code4)
 
     def fetch_institutional_summary_text(
         self,
@@ -320,16 +297,11 @@ class AnalysisApplicationService:
         code4: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        service = InstitutionalSummaryService(
-            file_cache=self.file_cache,
-            build_fundamental_service=self.build_fundamental_service,
-            build_technical_service=self.build_technical_service,
-            uses_default_fundamental_service=self._uses_default_fundamental_service,
-            uses_default_technical_service=self._uses_default_technical_service,
-            fetch_market_data_bundle=self.fetch_market_data_bundle,
-            build_fundamental_service_with_market_bundle=self._build_default_fundamental_service_with_market_bundle,
+        return self.stock_analysis_workflow.fetch_institutional_summary_text(
+            name=name,
+            code4=code4,
+            kabutan_html_dir=kabutan_html_dir,
         )
-        return service.build_text(name=name, code4=code4, kabutan_html_dir=kabutan_html_dir)
 
 
 __all__ = [

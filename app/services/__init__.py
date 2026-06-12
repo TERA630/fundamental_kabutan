@@ -12,6 +12,8 @@ from app.services.kabutan_html_package_service import KabutanHtmlPackageService
 from app.services.kabutan_package_workflow import KabutanPackageResolution, KabutanPackageWorkflow
 from app.services.output_cache_service import OutputCacheService
 from app.services.summary_workflow import SummaryWorkflow
+from app.services.stock_analysis_workflow import StockAnalysisWorkflow
+from app.services.ui_resource_workflow import UiResourceWorkflow
 from app.services.watchlist_service import WatchlistService
 from app.services.web_upload_workflow import WebUploadWorkflow
 
@@ -27,6 +29,8 @@ __all__ = [
     "KabutanPackageWorkflow",
     "OutputCacheService",
     "SummaryWorkflow",
+    "StockAnalysisWorkflow",
+    "UiResourceWorkflow",
     "WatchlistService",
     "WebUploadWorkflow",
     "build_default_fundamental_service",
