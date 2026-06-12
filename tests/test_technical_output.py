@@ -68,7 +68,10 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "25日線解離：" in output
     assert "　傾き：↑" in output
     assert "Vwap：" in output
-    assert "当日出来高：20日平均比　101%" in output
+    assert "前場Vwap：167.17" in output
+    assert "後場Vwap：167.78" in output
+    assert "当日出来高：20日平均比　101%(前日出来高比　+0.1%)　通常" in output
+    assert "60日レンジ位置：98.4%　高値圏 / 過熱・上値追い警戒" in output
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
     assert "3日安値切り上げ：〇〇〇" in output
@@ -107,6 +110,8 @@ def test_build_technical_output_marks_daily_reference_vwap():
     assert "Vwap：" in output
     assert "取得時刻：2026-04-08 終値" in output
     assert "(日足参考値)" in output
+    assert "前場Vwap：" not in output
+    assert "後場Vwap：" not in output
 
 
 def test_build_technical_output_marks_previous_session_intraday_na_when_missing():

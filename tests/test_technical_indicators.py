@@ -14,7 +14,9 @@ from app.domain.policies.technical_indicators import (
     label_pullback,
     label_range_atr,
     label_range_position,
+    label_recent60_range_position_detail,
     label_trend,
+    label_volume_vs_avg20,
     label_wick_shape,
     normalize_daily_history,
 )
@@ -63,6 +65,7 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.price.prev_close == 168.0
     assert snapshot.price.day_change_price == 1.0
     assert snapshot.price.day_change_pct == pytest.approx(0.595238)
+    assert snapshot.price.volume_vs_previous_pct == pytest.approx((1069 / 1068 - 1) * 100)
     assert snapshot.moving_average.ma5 == pytest.approx(167.0)
     assert snapshot.moving_average.ma25 == pytest.approx(157.0)
     assert snapshot.moving_average.ma25_prev5 == pytest.approx(152.0)
@@ -112,6 +115,23 @@ def test_label_boundaries():
     assert label_range_position(0.6) == "高値圏"
     assert label_range_position(0.3) == "中段"
     assert label_range_position(0.29) == "安値圏"
+
+    assert label_volume_vs_avg20(None) == "N/A"
+    assert label_volume_vs_avg20(59.9) == "出来高薄い"
+    assert label_volume_vs_avg20(60) == "出来高やや薄い"
+    assert label_volume_vs_avg20(80) == "通常"
+    assert label_volume_vs_avg20(120) == "出来高伴う"
+    assert label_volume_vs_avg20(180) == "出来高急増"
+
+    assert label_recent60_range_position_detail(None) == "N/A"
+    assert label_recent60_range_position_detail(-0.001) == "60日安値割れ / 見送り"
+    assert label_recent60_range_position_detail(0) == "安値圏 / 底割れ警戒"
+    assert label_recent60_range_position_detail(0.2) == "安値圏 / 底割れ警戒"
+    assert label_recent60_range_position_detail(0.4) == "下位圏 / 反発待ち"
+    assert label_recent60_range_position_detail(0.6) == "中位圏 / 方向確認"
+    assert label_recent60_range_position_detail(0.8) == "上位圏 / 押し目候補"
+    assert label_recent60_range_position_detail(1.0) == "高値圏 / 過熱・上値追い警戒"
+    assert label_recent60_range_position_detail(1.001) == "高値更新 / 飛びつき警戒"
 
 
 def test_candle_wick_trend_and_pullback_labels():

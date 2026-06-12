@@ -166,6 +166,9 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["latest_price_timestamp"] == "2026-05-29 09:10"
     assert snapshot["vwap_source"] == "本日5分足"
     assert snapshot["vwap_timestamp"] == "2026-05-29 09:10"
+    assert snapshot["current_am_vwap"] == pytest.approx(expected_vwap)
+    assert snapshot["current_pm_vwap"] is None
+    assert snapshot["current_intraday_session"] == "前場"
 
 
 def test_build_intraday_vwap_snapshot_uses_latest_session_only():
@@ -196,6 +199,31 @@ def test_build_intraday_vwap_snapshot_uses_latest_session_only():
     assert snapshot["volume"] == 3000.0
     assert snapshot["vwap"] == pytest.approx(expected_vwap)
     assert snapshot["latest_price_timestamp"] == "2026-05-29 09:05"
+
+
+def test_build_intraday_vwap_snapshot_splits_current_am_and_pm_vwap():
+    intraday = pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0, 103.0],
+            "High": [102.0, 103.0, 104.0, 105.0],
+            "Low": [99.0, 100.0, 101.0, 102.0],
+            "Close": [101.0, 102.0, 103.0, 104.0],
+            "Volume": [1000.0, 2000.0, 1000.0, 3000.0],
+        },
+        index=pd.to_datetime(["2026-05-29 09:00", "2026-05-29 11:25", "2026-05-29 12:30", "2026-05-29 14:55"]),
+    )
+
+    snapshot = provider.build_intraday_vwap_snapshot(intraday)
+    typical_1 = (102.0 + 99.0 + 101.0) / 3
+    typical_2 = (103.0 + 100.0 + 102.0) / 3
+    typical_3 = (104.0 + 101.0 + 103.0) / 3
+    typical_4 = (105.0 + 102.0 + 104.0) / 3
+    expected_am_vwap = ((typical_1 * 1000.0) + (typical_2 * 2000.0)) / 3000.0
+    expected_pm_vwap = ((typical_3 * 1000.0) + (typical_4 * 3000.0)) / 4000.0
+
+    assert snapshot["current_am_vwap"] == pytest.approx(expected_am_vwap)
+    assert snapshot["current_pm_vwap"] == pytest.approx(expected_pm_vwap)
+    assert snapshot["current_intraday_session"] == "後場"
 
 
 def test_build_previous_session_intraday_snapshot():
@@ -284,6 +312,9 @@ def test_build_daily_reference_vwap_snapshot():
     assert snapshot["latest_price_timestamp"] == "2026-05-29 終値"
     assert snapshot["vwap_source"] == "日足参考値"
     assert snapshot["vwap_timestamp"] == "2026-05-29 終値"
+    assert snapshot["current_am_vwap"] is None
+    assert snapshot["current_pm_vwap"] is None
+    assert snapshot["current_intraday_session"] is None
 
 
 def test_fetch_yfinance_vwap_snapshot_falls_back_to_daily_reference(monkeypatch):

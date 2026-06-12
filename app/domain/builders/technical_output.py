@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.domain.policies.technical_indicators import label_recent60_range_position_detail, label_volume_vs_avg20
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
 
@@ -44,21 +45,23 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     vwap_diff_atr = _safe_div(vwap_diff, snapshot.range.atr14)
     vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
     sessions = momentum.sessions
-    return "\n".join(
-        [
-            f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）",
-            f"取得時刻：{_fmt_text(result.intraday_price_timestamp)}",
-            f"25日線解離：{_fmt_pct(snapshot.moving_average.dev25_pct)}({_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)})　傾き：{_ma25_slope_symbol(result)}",
-            f"Vwap：{_fmt_price_signed(vwap_diff)}円({_fmt_pct(vwap_diff_pct)}/{_fmt_atr(vwap_diff_atr)}){vwap_source_suffix}",
-            f"当日出来高：20日平均比　{_fmt_volume_ratio(snapshot.price.volume, snapshot.price.volume_avg20)}",
-            "",
-            "■モメンタム",
-            f"3日高値更新：{_fmt_momentum_marks(session.high_breakout for session in sessions)}",
-            f"3日安値切り上げ：{_fmt_momentum_marks(session.low_higher for session in sessions)}",
-            f"3日騰落率　{_fmt_pct(momentum.change_pct)}",
-            f"3日出来高　{_fmt_momentum_volumes(session.volume_vs_avg20_pct for session in sessions)}",
-        ]
-    )
+    volume_vs_avg20_pct = _ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20)
+    lines = [
+        f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）",
+        f"取得時刻：{_fmt_text(result.intraday_price_timestamp)}",
+        f"25日線解離：{_fmt_pct(snapshot.moving_average.dev25_pct)}({_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)})　傾き：{_ma25_slope_symbol(result)}",
+        f"Vwap：{_fmt_price_signed(vwap_diff)}円({_fmt_pct(vwap_diff_pct)}/{_fmt_atr(vwap_diff_atr)}){vwap_source_suffix}",
+        *_format_current_session_vwap_lines(vwap_snapshot),
+        f"当日出来高：20日平均比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日出来高比　{_fmt_pct(snapshot.price.volume_vs_previous_pct)})　{label_volume_vs_avg20(volume_vs_avg20_pct)}",
+        f"60日レンジ位置：{_fmt_position_pct(snapshot.breakline.recent60_range_position)}　{label_recent60_range_position_detail(snapshot.breakline.recent60_range_position)}",
+        "",
+        "■モメンタム",
+        f"3日高値更新：{_fmt_momentum_marks(session.high_breakout for session in sessions)}",
+        f"3日安値切り上げ：{_fmt_momentum_marks(session.low_higher for session in sessions)}",
+        f"3日騰落率　{_fmt_pct(momentum.change_pct)}",
+        f"3日出来高　{_fmt_momentum_volumes(session.volume_vs_avg20_pct for session in sessions)}",
+    ]
+    return "\n".join(lines)
 
 
 def _format_previous_session(result: TechnicalAnalysisResult) -> str:
@@ -110,6 +113,11 @@ def _safe_div(numerator: float | int | None, denominator: float | int | None) ->
     return float(numerator) / float(denominator)
 
 
+def _ratio_pct(numerator: float | int | None, denominator: float | int | None) -> float | None:
+    ratio = _safe_div(numerator, denominator)
+    return None if ratio is None else ratio * 100
+
+
 def _range_position(latest: float | None, low: float | None, high: float | None) -> float | None:
     width = high - low if high is not None and low is not None else None
     return _safe_div(latest - low, width) if latest is not None and low is not None else None
@@ -157,6 +165,10 @@ def _fmt_pct(value: float | None) -> str:
 
 def _fmt_pct_unsigned(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.1f}%"
+
+
+def _fmt_pct_unsigned_no_decimal(value: float | None) -> str:
+    return "N/A" if value is None else f"{value:.0f}%"
 
 
 def _fmt_position_pct(value: float | None) -> str:
@@ -209,6 +221,16 @@ def _fmt_volume_pct(value: object) -> str:
 
 def _fmt_text(value: object) -> str:
     return value if isinstance(value, str) and value else "N/A"
+
+
+def _format_current_session_vwap_lines(vwap_snapshot: dict[str, object]) -> list[str]:
+    if vwap_snapshot.get("vwap_source") != "本日5分足":
+        return []
+    session = vwap_snapshot.get("current_intraday_session")
+    lines = [f"前場Vwap：{_fmt_price(_as_float(vwap_snapshot.get('current_am_vwap')))}"]
+    if session == "後場":
+        lines.append(f"後場Vwap：{_fmt_price(_as_float(vwap_snapshot.get('current_pm_vwap')))}")
+    return lines
 
 
 def _format_previous_high_evaluation(result: TechnicalAnalysisResult) -> str:

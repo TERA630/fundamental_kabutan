@@ -85,6 +85,9 @@ def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str
             "latest_price_timestamp": None,
             "vwap_source": "日足参考値",
             "vwap_timestamp": None,
+            "current_am_vwap": None,
+            "current_pm_vwap": None,
+            "current_intraday_session": None,
         }
     row = daily.iloc[-1]
     vwap = (float(row["High"]) + float(row["Low"]) + float(row["Close"])) / 3
@@ -101,6 +104,9 @@ def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str
         "latest_price_timestamp": timestamp,
         "vwap_source": "日足参考値",
         "vwap_timestamp": timestamp,
+        "current_am_vwap": None,
+        "current_pm_vwap": None,
+        "current_intraday_session": None,
     }
 
 
@@ -118,6 +124,7 @@ def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, fl
     row = intraday.iloc[-1]
     timestamp = _latest_timestamp_label(intraday.index[-1], fallback_suffix="")
     latest_bar_time = pd.Timestamp(intraday.index[-1]).strftime("%H:%M")
+    session_vwaps = _build_current_session_vwaps(intraday)
     return {
         "latest": _safe_float(row["Close"]),
         "open": _safe_float(intraday.iloc[0]["Open"]),
@@ -130,6 +137,9 @@ def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, fl
         "latest_price_timestamp": timestamp,
         "vwap_source": "本日5分足",
         "vwap_timestamp": timestamp,
+        "current_am_vwap": session_vwaps["am_vwap"],
+        "current_pm_vwap": session_vwaps["pm_vwap"],
+        "current_intraday_session": session_vwaps["session"],
     }
 
 
@@ -235,6 +245,19 @@ def _empty_previous_session_intraday_snapshot() -> dict[str, float | str | bool 
         "pm_low": None,
         "pm_return_pct": None,
         "pm_close_position": None,
+    }
+
+
+def _build_current_session_vwaps(frame: pd.DataFrame) -> dict[str, float | str | None]:
+    times = pd.Series(frame.index.time, index=frame.index)
+    am = frame[times < pd.Timestamp("12:30").time()]
+    pm = frame[times >= pd.Timestamp("12:30").time()]
+    latest_time = pd.Timestamp(frame.index[-1]).time()
+    session = "前場" if latest_time < pd.Timestamp("12:30").time() else "後場"
+    return {
+        "am_vwap": _calc_vwap(am),
+        "pm_vwap": _calc_vwap(pm) if session == "後場" else None,
+        "session": session,
     }
 
 

@@ -26,6 +26,7 @@ class TechnicalPriceSnapshot:
     prev_close: float | None
     volume: float | None
     volume_avg20: float | None
+    volume_vs_previous_pct: float | None
     day_change_price: float | None
     day_change_pct: float | None
 

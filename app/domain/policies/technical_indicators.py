@@ -123,6 +123,39 @@ def label_range_position(value: float | None) -> RangePositionLabel:
     return "安値圏"
 
 
+def label_volume_vs_avg20(value_pct: float | None) -> str:
+    if value_pct is None:
+        return "N/A"
+    if value_pct < 60:
+        return "出来高薄い"
+    if value_pct < 80:
+        return "出来高やや薄い"
+    if value_pct < 120:
+        return "通常"
+    if value_pct < 180:
+        return "出来高伴う"
+    return "出来高急増"
+
+
+def label_recent60_range_position_detail(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    value_pct = value * 100
+    if value_pct < 0:
+        return "60日安値割れ / 見送り"
+    if value_pct <= 20:
+        return "安値圏 / 底割れ警戒"
+    if value_pct <= 40:
+        return "下位圏 / 反発待ち"
+    if value_pct <= 60:
+        return "中位圏 / 方向確認"
+    if value_pct <= 80:
+        return "上位圏 / 押し目候補"
+    if value_pct <= 100:
+        return "高値圏 / 過熱・上値追い警戒"
+    return "高値更新 / 飛びつき警戒"
+
+
 def label_trend(latest: float | None, ma5: float | None, ma25: float | None, ma25_prev5: float | None) -> TrendLabel:
     if latest is None or ma5 is None or ma25 is None:
         return "N/A"
@@ -287,6 +320,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         prev_close=prev_close,
         volume=volume,
         volume_avg20=volume_avg20,
+        volume_vs_previous_pct=_pct_change(volume, prev_volume),
         day_change_price=latest - prev_close if latest is not None and prev_close is not None else None,
         day_change_pct=_pct_change(latest, prev_close),
     )
@@ -373,7 +407,9 @@ __all__ = [
     "label_pullback",
     "label_range_atr",
     "label_range_position",
+    "label_recent60_range_position_detail",
     "label_trend",
+    "label_volume_vs_avg20",
     "label_wick_shape",
     "normalize_daily_history",
 ]
