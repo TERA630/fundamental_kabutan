@@ -1,4 +1,7 @@
-"""Backward-compatible import surface for the shared application service."""
+"""Backward-compatible import surface for the shared application service.
+
+Prefer importing from app.services.analysis_application_service in new code.
+"""
 
 from __future__ import annotations
 

@@ -228,6 +228,12 @@ class FundamentalAnalysisService:
         build_output_fn: Callable[..., str],
         kabutan_html_dir: Path | None = None,
     ) -> str:
+        """Compatibility wrapper around ``build_analysis_result``.
+
+        New callers should prefer building a FundamentalAnalysisResult and formatting it
+        explicitly with build_output_from_analysis_result.
+        """
+
         result = self.build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
         return build_output_from_analysis_result(result, build_output_fn)
 

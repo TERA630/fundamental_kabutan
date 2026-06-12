@@ -1,4 +1,7 @@
-"""Backward-compatible import surface for shared UI state helpers."""
+"""Backward-compatible import surface for shared UI state helpers.
+
+Prefer importing from app.ui_state_utils in new code.
+"""
 
 from __future__ import annotations
 

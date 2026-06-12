@@ -4,7 +4,11 @@ from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.kabutan_balance_sheet import KabutanBalanceSheetRow
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
-from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService, KabutanFetchResult
+from app.domain.usecases.fundamental_analysis import (
+    FundamentalAnalysisService,
+    KabutanFetchResult,
+    build_output_from_analysis_result,
+)
 from app.presenters import build_fundamental_output
 
 
@@ -46,7 +50,7 @@ def _pair_with_actual_rows() -> KabutanForecastPair:
     )
 
 
-def test_build_analysis_output_passes_cf_scoring_result_to_builder():
+def test_build_output_from_analysis_result_passes_cf_scoring_result_to_builder():
     pair = _pair_with_actual_rows()
     fetch_result = KabutanFetchResult(
         pair=pair,
@@ -62,7 +66,8 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
         captured.update(kwargs)
         return "ok"
 
-    out = service.build_analysis_output("Test", "1234", build_output_fn)
+    result = service.build_analysis_result("Test", "1234")
+    out = build_output_from_analysis_result(result, build_output_fn)
 
     assert out == "ok"
     assert "cf_scoring_result" in captured
@@ -99,7 +104,7 @@ def test_build_analysis_result_returns_analysis_dto():
     assert context["price"] == 1000.0
 
 
-def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():
+def test_build_output_from_analysis_result_keeps_running_with_none_cf_score_when_data_missing():
     fetch_result = KabutanFetchResult(pair=None, source="none")
     service = ServiceForTest(fetch_result)
 
@@ -109,7 +114,8 @@ def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missin
         captured.update(kwargs)
         return "ok"
 
-    out = service.build_analysis_output("Test", "1234", build_output_fn)
+    result = service.build_analysis_result("Test", "1234")
+    out = build_output_from_analysis_result(result, build_output_fn)
 
     assert out == "ok"
     assert "cf_scoring_result" in captured
@@ -120,7 +126,7 @@ def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missin
 
 
 
-def test_build_analysis_output_reflects_opening_summary_labels_in_display():
+def test_build_output_from_analysis_result_reflects_opening_summary_labels_in_display():
     pair = _pair_with_actual_rows()
     fetch_result = KabutanFetchResult(
         pair=pair,
@@ -130,7 +136,8 @@ def test_build_analysis_output_reflects_opening_summary_labels_in_display():
     )
     service = ServiceForTest(fetch_result)
 
-    out = service.build_analysis_output("Test", "1234", build_fundamental_output)
+    result = service.build_analysis_result("Test", "1234")
+    out = build_output_from_analysis_result(result, build_fundamental_output)
 
     assert "【Test (1234)】" in out
     assert "総合評価" in out
@@ -138,6 +145,14 @@ def test_build_analysis_output_reflects_opening_summary_labels_in_display():
     assert "高ROIC" in out
     assert "投資分類：" not in out
     assert "算出基準：" not in out
+
+
+def test_build_analysis_output_compatibility_wrapper():
+    service = ServiceForTest(KabutanFetchResult(pair=None, source="none"))
+
+    out = service.build_analysis_output("Test", "1234", lambda **_kwargs: "ok")
+
+    assert out == "ok"
 
 def test_resolve_cf_scoring_as_of_falls_back_to_latest_observed_minus_one_when_actual_missing():
     rows = (
