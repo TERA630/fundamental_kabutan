@@ -7,7 +7,6 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from app.gui_controller import FundamentalGuiController
 from app.gui_state import (
     GuiState,
     build_default_output_filename,
@@ -19,6 +18,7 @@ from app.gui_state import (
 )
 from app.gui_view import FundamentalView
 from app.gui_view_model import GuiViewModel
+from app.services.analysis_application_service import AnalysisApplicationService
 
 
 class FundamentalApp:
@@ -30,7 +30,7 @@ class FundamentalApp:
         self.master.geometry("1040x820")
 
         self.state = GuiState()
-        self.controller = FundamentalGuiController()
+        self.controller = AnalysisApplicationService()
 
         self.path_var = tk.StringVar(value="監視銘柄ファイル未選択")
         self.kabutan_dir_var = tk.StringVar(value="株探HTMLフォルダ未選択")

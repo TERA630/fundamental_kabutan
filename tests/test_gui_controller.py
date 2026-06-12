@@ -6,8 +6,8 @@ import zipfile
 import pandas as pd
 
 from app.data.file_cache import FileCache
-from app.gui_controller import (
-    FundamentalGuiController,
+from app.services.analysis_application_service import (
+    AnalysisApplicationService,
     build_fundamental_summary_filename,
     build_technical_summary_filename,
 )
@@ -58,7 +58,7 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
     def build_service(_cache):
         return dummy_service
 
-    controller = FundamentalGuiController(
+    controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_fundamental_service=build_service,
     )
@@ -85,7 +85,7 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
 
 
 def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):
-    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
     target = tmp_path / "kabutan"
     target.mkdir()
 
@@ -101,7 +101,7 @@ def test_build_kabutan_html_package_uses_package_service(tmp_path: Path):
     output_dir = tmp_path / "package"
     source_dir.mkdir()
     (source_dir / "7203.html").write_text("<html><body>7203</body></html>", encoding="utf-8")
-    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
 
     result = controller.build_kabutan_html_package(source_dir=source_dir, output_dir=output_dir)
 
@@ -118,7 +118,7 @@ def test_import_kabutan_html_package_uses_package_service(tmp_path: Path):
     with zipfile.ZipFile(zip_path, "w") as archive:
         archive.writestr("manifest.json", "{}")
         archive.writestr("html/7203.html", "<html></html>")
-    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
 
     result = controller.import_kabutan_html_package(zip_path=zip_path, output_dir=output_dir)
 
@@ -127,8 +127,34 @@ def test_import_kabutan_html_package_uses_package_service(tmp_path: Path):
     assert result.html_count == 1
 
 
+def test_resolve_imported_kabutan_package_imports_once_and_reuses_html_dir(tmp_path: Path):
+    zip_path = tmp_path / "package.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("manifest.json", "{}")
+        archive.writestr("html/7203.html", "<html></html>")
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
+
+    first = controller.resolve_imported_kabutan_package(
+        zip_path=zip_path,
+        current_signature=None,
+        current_html_dir=None,
+    )
+    second = controller.resolve_imported_kabutan_package(
+        zip_path=zip_path,
+        current_signature=first.signature,
+        current_html_dir=first.html_dir,
+    )
+
+    assert first.imported is True
+    assert first.output_cache_should_clear is True
+    assert first.html_dir.exists()
+    assert second.imported is False
+    assert second.output_cache_should_clear is False
+    assert second.html_dir == first.html_dir
+
+
 def test_fetch_resolved_watchlist_path_uses_cache(tmp_path: Path):
-    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
     target = tmp_path / "watchlist.md"
     target.write_text("トヨタ (7203)\n", encoding="utf-8")
 
@@ -160,10 +186,10 @@ def test_build_and_save_fundamental_summary_writes_dated_filename(tmp_path: Path
             assert kabutan_html_dir == tmp_path / "html"
             return "TABLE"
 
-    monkeypatch.setattr("app.gui_controller.FundamentalSummaryService", DummySummaryService)
-    monkeypatch.setattr("app.gui_controller.build_fundamental_summary_markdown", lambda table: f"MD:{table}\n")
+    monkeypatch.setattr("app.services.analysis_application_service.FundamentalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.services.analysis_application_service.build_fundamental_summary_markdown", lambda table: f"MD:{table}\n")
 
-    controller = FundamentalGuiController(
+    controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_fundamental_service=lambda _cache: object(),
     )
@@ -191,10 +217,10 @@ def test_build_and_save_technical_summary_writes_dated_filename(tmp_path: Path, 
             assert watchlist_entries == [("トヨタ", "7203")]
             return "TECH_TABLE"
 
-    monkeypatch.setattr("app.gui_controller.TechnicalSummaryService", DummySummaryService)
-    monkeypatch.setattr("app.gui_controller.build_technical_summary_markdown", lambda table: f"TECH_MD:{table}\n")
+    monkeypatch.setattr("app.services.analysis_application_service.TechnicalSummaryService", DummySummaryService)
+    monkeypatch.setattr("app.services.analysis_application_service.build_technical_summary_markdown", lambda table: f"TECH_MD:{table}\n")
 
-    controller = FundamentalGuiController(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    controller = AnalysisApplicationService(file_cache=FileCache(base_dir=tmp_path / "cache"))
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -220,8 +246,8 @@ def test_fetch_technical_output_uses_injected_technical_service(tmp_path: Path, 
             return result
 
     dummy_service = DummyTechnicalService()
-    monkeypatch.setattr("app.gui_controller.build_technical_output", lambda value: "TECH" if value is result else "BAD")
-    controller = FundamentalGuiController(
+    monkeypatch.setattr("app.services.analysis_application_service.build_technical_output", lambda value: "TECH" if value is result else "BAD")
+    controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_technical_service=lambda _cache: dummy_service,
     )
@@ -245,8 +271,8 @@ def test_default_controller_reuses_market_data_bundle_for_technical_and_summary(
                 snapshot=MarketSnapshot(price=169.0, market_cap=3_000_000_000_000.0),
             )
 
-    monkeypatch.setattr("app.gui_controller.build_technical_output", lambda _result: "TECH")
-    controller = FundamentalGuiController(
+    monkeypatch.setattr("app.services.analysis_application_service.build_technical_output", lambda _result: "TECH")
+    controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_market_data_service=lambda _cache: DummyMarketDataService(),
     )
@@ -285,7 +311,7 @@ def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path:
                 "as_of": None,
             }
 
-    controller = FundamentalGuiController(
+    controller = AnalysisApplicationService(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_fundamental_service=lambda _cache: DummyFundamentalService(),
         build_technical_service=lambda _cache: DummyTechnicalService(),

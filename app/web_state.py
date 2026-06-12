@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.gui_controller import FundamentalGuiController
-from app.gui_state_utils import build_stock_choices, get_selected_stock
 from app.gui_view_model import GuiViewModel
+from app.services.analysis_application_service import AnalysisApplicationService
+from app.ui_state_utils import build_stock_choices, get_selected_stock
 
 DEFAULT_INSTITUTIONAL_SUMMARY = "機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A"
 
 
 @dataclass
 class WebUiState:
-    controller: FundamentalGuiController = field(default_factory=FundamentalGuiController)
+    controller: AnalysisApplicationService = field(default_factory=AnalysisApplicationService)
     view_model: GuiViewModel = field(default_factory=GuiViewModel)
     watchlist_path: Path | None = None
     kabutan_html_dir: Path | None = None

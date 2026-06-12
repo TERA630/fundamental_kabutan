@@ -7,7 +7,9 @@ from typing import Any, Callable, Protocol
 
 import pandas as pd
 
-from app.data.market_data_provider import (
+from app.domain.models.market_data import MarketDataBundle
+from app.domain.models.technical_snapshot import TechnicalSnapshot
+from app.domain.policies.market_history import (
     TECH_DAILY_HISTORY_TTL_SEC,
     TECH_INTRADAY_HISTORY_TTL_SEC,
     build_daily_reference_vwap_snapshot,
@@ -15,11 +17,7 @@ from app.data.market_data_provider import (
     build_previous_session_intraday_snapshot,
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
-    fetch_yfinance_daily_history,
-    fetch_yfinance_intraday_history,
 )
-from app.domain.models.market_data import MarketDataBundle
-from app.domain.models.technical_snapshot import TechnicalSnapshot
 from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
 
 
@@ -90,8 +88,10 @@ class TechnicalAnalysisService:
         fetch_intraday_history: TechnicalHistoryProvider | None = None,
     ):
         self.file_cache = file_cache
-        self.fetch_daily_history = fetch_daily_history or fetch_yfinance_daily_history
-        self.fetch_intraday_history = fetch_intraday_history or fetch_yfinance_intraday_history
+        if fetch_daily_history is None or fetch_intraday_history is None:
+            raise ValueError("TechnicalAnalysisService requires history providers")
+        self.fetch_daily_history = fetch_daily_history
+        self.fetch_intraday_history = fetch_intraday_history
 
     def build_analysis_result(self, *, name: str, code4: str) -> TechnicalAnalysisResult:
         daily_history = self.fetch_daily_history_cached(code4)

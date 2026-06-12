@@ -78,6 +78,47 @@ class KabutanFetchResult:
     quarterly_message: str | None = None
 
 
+@dataclass(frozen=True)
+class FundamentalAnalysisResult:
+    name: str
+    code4: str
+    master: dict[str, Any] | None
+    price_snapshot: dict[str, float | str | None]
+    analyst_estimates: AnalystEstimates
+    kabutan_fetch_result: KabutanFetchResult
+    financial_metric_rows: tuple[FinancialMetricInputRow, ...]
+    quarterly_metric_rows: tuple[QuarterlyMetricRow, ...]
+    cf_scoring_input: CfScoringInput | None
+    cf_scoring_result: CfScoringResult | None
+    growth_phase: GrowthPhase | None
+    per_level: PerLevel | None
+    roic_level: RoicLevel | None
+    operating_profit_cagr_3y: float | None
+
+    def to_output_context(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "code4": self.code4,
+            "master": self.master,
+            "price": self.price_snapshot.get("price"),
+            "market_cap": self.price_snapshot.get("market_cap"),
+            "market_snapshot": self.price_snapshot,
+            "analyst_estimates": self.analyst_estimates,
+            "kabutan_forecast_pair": self.kabutan_fetch_result.pair,
+            "kabutan_cashflow_rows": self.kabutan_fetch_result.cashflow_rows,
+            "kabutan_source": self.kabutan_fetch_result.source,
+            "kabutan_source_message": self.kabutan_fetch_result.message,
+            "financial_metric_rows": self.financial_metric_rows,
+            "quarterly_metric_rows": self.quarterly_metric_rows,
+            "quarterly_message": self.kabutan_fetch_result.quarterly_message,
+            "cf_scoring_result": self.cf_scoring_result,
+            "growth_phase": self.growth_phase,
+            "per_level": self.per_level,
+            "roic_level": self.roic_level,
+            "operating_profit_cagr_3y": self.operating_profit_cagr_3y,
+        }
+
+
 class FundamentalAnalysisService:
     """ドメイン層ユースケース: 分析出力の組み立て実行を担当。"""
 
@@ -122,13 +163,12 @@ class FundamentalAnalysisService:
         self.cache.set(cache_key, estimates.to_dict())
         return estimates
 
-    def build_analysis_output(
+    def build_analysis_result(
         self,
         name: str,
         code4: str,
-        build_output_fn: Callable[..., str],
         kabutan_html_dir: Path | None = None,
-    ) -> str:
+    ) -> FundamentalAnalysisResult:
         master: dict[str, Any] | None = None
         price_snapshot = self.fetch_price_snapshot(code4)
         analyst_estimates = self.fetch_cached_analyst_estimates(code4)
@@ -155,47 +195,41 @@ class FundamentalAnalysisService:
             financial_metric_rows=financial_metric_rows,
         )
         cf_scoring_result = calculate_cf_score(cf_scoring_input) if cf_scoring_input is not None else None
+        quarterly_metric_rows = self.build_quarterly_metric_rows(
+            code4=code4,
+            rows=kabutan_fetch_result.quarterly_actual_rows,
+            forecast_pair=kabutan_fetch_result.pair,
+        )
 
-        output_context = {
-            "name": name,
-            "code4": code4,
-            "master": master,
-            "price": price_snapshot.get("price"),
-            "market_cap": price_snapshot.get("market_cap"),
-            "market_snapshot": price_snapshot,
-            "analyst_estimates": analyst_estimates,
-            "kabutan_forecast_pair": kabutan_fetch_result.pair,
-            "kabutan_cashflow_rows": kabutan_fetch_result.cashflow_rows,
-            "kabutan_source": kabutan_fetch_result.source,
-            "kabutan_source_message": kabutan_fetch_result.message,
-            "financial_metric_rows": financial_metric_rows,
-            "quarterly_metric_rows": self.build_quarterly_metric_rows(
-                code4=code4,
-                rows=kabutan_fetch_result.quarterly_actual_rows,
-                forecast_pair=kabutan_fetch_result.pair,
-            ),
-            "quarterly_message": kabutan_fetch_result.quarterly_message,
-            "cf_scoring_result": cf_scoring_result,
-            "growth_phase": self.build_growth_phase(kabutan_fetch_result.pair),
-            "per_level": self.build_per_level(
+        return FundamentalAnalysisResult(
+            name=name,
+            code4=code4,
+            master=master,
+            price_snapshot=price_snapshot,
+            analyst_estimates=analyst_estimates,
+            kabutan_fetch_result=kabutan_fetch_result,
+            financial_metric_rows=financial_metric_rows,
+            quarterly_metric_rows=quarterly_metric_rows,
+            cf_scoring_input=cf_scoring_input,
+            cf_scoring_result=cf_scoring_result,
+            growth_phase=self.build_growth_phase(kabutan_fetch_result.pair),
+            per_level=self.build_per_level(
                 cf_scoring_input=cf_scoring_input,
                 industry=price_snapshot.get("industry"),
             ),
-            "roic_level": self.build_roic_level(cf_scoring_input),
-            "operating_profit_cagr_3y": calculations.calculate_operating_profit_cagr_3y(kabutan_fetch_result.pair),
-        }
-        signature = inspect.signature(build_output_fn)
-        accepts_var_keyword = any(
-            parameter.kind == inspect.Parameter.VAR_KEYWORD
-            for parameter in signature.parameters.values()
+            roic_level=self.build_roic_level(cf_scoring_input),
+            operating_profit_cagr_3y=calculations.calculate_operating_profit_cagr_3y(kabutan_fetch_result.pair),
         )
-        if accepts_var_keyword:
-            return build_output_fn(**output_context)
 
-        accepted_params = signature.parameters
-        safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
-        return build_output_fn(**safe_context)
-
+    def build_analysis_output(
+        self,
+        name: str,
+        code4: str,
+        build_output_fn: Callable[..., str],
+        kabutan_html_dir: Path | None = None,
+    ) -> str:
+        result = self.build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
+        return build_output_from_analysis_result(result, build_output_fn)
 
     @staticmethod
     def resolve_cf_scoring_as_of(
@@ -355,4 +389,27 @@ class FundamentalAnalysisService:
         return candidates
 
 
-__all__ = ["FundamentalAnalysisService"]
+def build_output_from_analysis_result(
+    result: FundamentalAnalysisResult,
+    build_output_fn: Callable[..., str],
+) -> str:
+    output_context = result.to_output_context()
+    signature = inspect.signature(build_output_fn)
+    accepts_var_keyword = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
+    if accepts_var_keyword:
+        return build_output_fn(**output_context)
+
+    accepted_params = signature.parameters
+    safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
+    return build_output_fn(**safe_context)
+
+
+__all__ = [
+    "FundamentalAnalysisResult",
+    "FundamentalAnalysisService",
+    "KabutanFetchResult",
+    "build_output_from_analysis_result",
+]

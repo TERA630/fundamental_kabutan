@@ -6,16 +6,13 @@ from typing import Any, Mapping, Protocol
 
 import pandas as pd
 
-from app.data.market_data_provider import (
+from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
+from app.domain.policies.market_history import (
     TECH_DAILY_HISTORY_TTL_SEC,
     TECH_INTRADAY_HISTORY_TTL_SEC,
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
-    fetch_yfinance_daily_history,
-    fetch_yfinance_intraday_history,
-    fetch_yfinance_market_snapshot,
 )
-from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 from app.domain.usecases.technical_analysis import dataframe_from_cache_payload, dataframe_to_cache_payload
 
 MARKET_SNAPSHOT_TTL_SEC = 12 * 60 * 60
@@ -65,9 +62,11 @@ class MarketDataService:
         fetch_market_snapshot: MarketSnapshotProvider | None = None,
     ):
         self.file_cache = file_cache
-        self.fetch_daily_history = fetch_daily_history or fetch_yfinance_daily_history
-        self.fetch_intraday_history = fetch_intraday_history or fetch_yfinance_intraday_history
-        self.fetch_market_snapshot = fetch_market_snapshot or fetch_yfinance_market_snapshot
+        if fetch_daily_history is None or fetch_intraday_history is None or fetch_market_snapshot is None:
+            raise ValueError("MarketDataService requires market data providers")
+        self.fetch_daily_history = fetch_daily_history
+        self.fetch_intraday_history = fetch_intraday_history
+        self.fetch_market_snapshot = fetch_market_snapshot
 
     def fetch_bundle(self, code4: str) -> MarketDataBundle:
         daily_history = self.fetch_daily_history_cached(code4)

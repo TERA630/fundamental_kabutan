@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from app.domain.models.cf_scoring_result import CfScoringResult
-from app.gui_state_utils import (
+from app.ui_state_utils import (
     build_default_output_filename,
     build_output_cache_key,
     build_stock_choices,

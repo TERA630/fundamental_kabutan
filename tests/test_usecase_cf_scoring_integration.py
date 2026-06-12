@@ -76,6 +76,29 @@ def test_build_analysis_output_passes_cf_scoring_result_to_builder():
     assert captured["operating_profit_cagr_3y"] is not None
 
 
+def test_build_analysis_result_returns_analysis_dto():
+    pair = _pair_with_actual_rows()
+    fetch_result = KabutanFetchResult(
+        pair=pair,
+        source="html",
+        cashflow_rows=(KabutanCashflowRow("2025.03", 2025, 3, 600, 1000, -400, -100, 300),),
+        balance_sheet_rows=(KabutanBalanceSheetRow("2025.03", 2025, 3, 1500.0, None, None, 4000, None, 0.5),),
+    )
+    service = ServiceForTest(fetch_result)
+
+    result = service.build_analysis_result("Test", "1234")
+
+    assert result.name == "Test"
+    assert result.code4 == "1234"
+    assert result.kabutan_fetch_result is fetch_result
+    assert result.cf_scoring_result is not None
+    assert result.quarterly_metric_rows == ()
+    context = result.to_output_context()
+    assert context["kabutan_forecast_pair"] is pair
+    assert context["cf_scoring_result"] is result.cf_scoring_result
+    assert context["price"] == 1000.0
+
+
 def test_build_analysis_output_keeps_running_with_none_cf_score_when_data_missing():
     fetch_result = KabutanFetchResult(pair=None, source="none")
     service = ServiceForTest(fetch_result)

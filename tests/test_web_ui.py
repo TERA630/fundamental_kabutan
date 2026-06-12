@@ -83,6 +83,11 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
             assert watchlist_entries == [("トヨタ", "7203")]
             return "TECH_TABLE"
 
+        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None):
+            assert mode == "technical"
+            assert kabutan_html_dir is None
+            return self.build_technical_summary_table(watchlist_entries=watchlist_entries)
+
     monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
 
     state = WebUiState(controller=FakeController())
@@ -203,6 +208,15 @@ def test_upload_kabutan_package_zip_keeps_zip_without_extracting(tmp_path: Path)
             self.inspected_zip = zip_path
             return SimpleNamespace(zip_path=zip_path.resolve(), html_count=2, has_manifest=True)
 
+        def build_file_signature(self, path):
+            return file_signature(path)
+
+        def import_output_dir_for_signature(self, signature):
+            return tmp_path / "web_imported_kabutan_html_package" / f"{signature[0]}_{signature[1]}"
+
+        def html_dir_ready(self, html_dir):
+            return html_dir.exists() and html_dir.is_dir() and any(html_dir.glob("*.html"))
+
         def save_kabutan_package_zip_cache(self, path):
             self.saved_zip = path
 
@@ -267,6 +281,23 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
         def save_kabutan_html_dir_cache(self, path):
             self.saved_dir = path
 
+        def resolve_imported_kabutan_package(self, *, zip_path, current_signature, current_html_dir):
+            signature = file_signature(zip_path)
+            html_dir = tmp_path / "web_imported_kabutan_html_package" / f"{signature[0]}_{signature[1]}" / "html"
+            if html_dir.exists():
+                return SimpleNamespace(
+                    html_dir=html_dir,
+                    signature=signature,
+                    output_cache_should_clear=False,
+                )
+            result = self.import_kabutan_html_package(zip_path=zip_path, output_dir=html_dir.parent)
+            self.save_kabutan_html_dir_cache(result.html_dir)
+            return SimpleNamespace(
+                html_dir=result.html_dir,
+                signature=signature,
+                output_cache_should_clear=True,
+            )
+
         def fetch_analysis_output(self, **kwargs):
             self.analysis_dirs.append(kwargs["kabutan_html_dir"])
             return "Fundamental output"
@@ -276,6 +307,25 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
 
         def fetch_institutional_summary_text(self, **_kwargs):
             return "機関投資サマリ\n時価総額：N/A"
+
+        def fetch_output_for_mode(self, *, name, code4, mode, output_cache, kabutan_html_dir=None, output_cache_key=None):
+            assert mode == "fundamental"
+            output = self.fetch_analysis_output(
+                name=name,
+                code4=code4,
+                output_cache=output_cache,
+                output_cache_key=output_cache_key,
+                kabutan_html_dir=kabutan_html_dir,
+            )
+            self.save_output_cache_for_today(output_cache)
+            return SimpleNamespace(
+                output=output,
+                institutional_summary=self.fetch_institutional_summary_text(
+                    name=name,
+                    code4=code4,
+                    kabutan_html_dir=kabutan_html_dir,
+                ),
+            )
 
     zip_path = tmp_path / "web_uploaded_kabutan_html_package.zip"
     zip_path.write_bytes(b"zip")
@@ -338,10 +388,34 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
         def save_kabutan_html_dir_cache(self, _path):
             return None
 
+        def resolve_imported_kabutan_package(self, *, zip_path, current_signature, current_html_dir):
+            signature = file_signature(zip_path)
+            html_dir = tmp_path / "web_imported_kabutan_html_package" / f"{signature[0]}_{signature[1]}" / "html"
+            if html_dir.exists():
+                return SimpleNamespace(
+                    html_dir=html_dir,
+                    signature=signature,
+                    output_cache_should_clear=False,
+                )
+            result = self.import_kabutan_html_package(zip_path=zip_path, output_dir=html_dir.parent)
+            self.save_kabutan_html_dir_cache(result.html_dir)
+            return SimpleNamespace(
+                html_dir=result.html_dir,
+                signature=signature,
+                output_cache_should_clear=True,
+            )
+
         def build_fundamental_summary_table(self, *, watchlist_entries, kabutan_html_dir):
             assert watchlist_entries == [("トヨタ", "7203")]
             self.summary_dir = kabutan_html_dir
             return "FUND_TABLE"
+
+        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None):
+            assert mode == "fundamental"
+            return self.build_fundamental_summary_table(
+                watchlist_entries=watchlist_entries,
+                kabutan_html_dir=kabutan_html_dir,
+            )
 
     monkeypatch.setattr("app.web.build_fundamental_summary_html", lambda table: f"<section>{table}</section>")
 

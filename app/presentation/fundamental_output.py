@@ -9,7 +9,7 @@ from app.domain.builders.fundamental_output import (
     build_fundamental_output_sections,
     build_fundamental_output_text,
 )
-from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+from app.presentation.kabutan_output import build_kabutan_forecast_output
 from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.cf_scoring_result import CfScoringResult
 from app.domain.models.financial_snapshot import FinancialMetricInputRow

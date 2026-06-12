@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.gui_state_utils import current_date_iso
 from app.services.cache_service import CacheService
+from app.ui_state_utils import current_date_iso
 
 
 class OutputCacheService:

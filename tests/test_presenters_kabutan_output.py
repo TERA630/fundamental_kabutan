@@ -231,7 +231,7 @@ def test_build_kabutan_forecast_output_financial_block_na_when_empty():
 
 
 def test_build_kabutan_output_summarizes_growth_with_cagr_lines():
-    from app.domain.builders.kabutan_output import build_kabutan_forecast_output
+    from app.presentation.kabutan_output import build_kabutan_forecast_output
     from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
     rows = (
