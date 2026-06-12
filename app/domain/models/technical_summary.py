@@ -7,7 +7,19 @@ from typing import Literal
 
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
-TechnicalSummaryRank = Literal["A1", "A2", "B1", "B2", "C1", "C2", "E"]
+TechnicalSummaryRank = Literal["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2", "D3", "E"]
+
+
+@dataclass(frozen=True)
+class TechnicalHeadlineSummary:
+    rank: TechnicalSummaryRank
+    rank_label: str
+    comment: str
+    next_action: str
+
+    @property
+    def text(self) -> str:
+        return f"{self.rank} {self.rank_label}｜{self.comment}｜{self.next_action}"
 
 
 @dataclass(frozen=True)
@@ -39,6 +51,8 @@ class TechnicalSummaryRow:
     support_lines: tuple[TechnicalSummaryLine, ...]
     resistance_lines: tuple[TechnicalSummaryLine, ...]
     recent60_range_position: float | None
+    headline_comment: str = ""
+    next_action: str = ""
 
 
 @dataclass(frozen=True)
@@ -57,6 +71,7 @@ class TechnicalSummaryTable:
 
 __all__ = [
     "SkippedTechnicalSummaryStock",
+    "TechnicalHeadlineSummary",
     "TechnicalSummaryLine",
     "TechnicalSummaryRank",
     "TechnicalSummaryRow",

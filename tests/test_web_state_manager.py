@@ -63,6 +63,7 @@ def test_fetch_output_for_current_selection_uses_screen_state(tmp_path: Path):
     state = WebUiState(controller=controller)
     state.watchlist = [("トヨタ", "7203")]
     state.selected_label = "トヨタ (7203)"
+    state.mode = "fundamental"
     state.kabutan_html_dir = tmp_path / "html"
     manager = WebUiStateManager(state)
 

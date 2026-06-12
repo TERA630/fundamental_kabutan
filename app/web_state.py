@@ -23,7 +23,7 @@ class WebUiState:
     watchlist: list[tuple[str, str]] = field(default_factory=list)
     output_cache: dict[str, str] = field(default_factory=dict)
     selected_label: str = ""
-    mode: str = "fundamental"
+    mode: str = "technical"
     output: str = ""
     institutional_summary: str = DEFAULT_INSTITUTIONAL_SUMMARY
     fundamental_summary_html: str = ""

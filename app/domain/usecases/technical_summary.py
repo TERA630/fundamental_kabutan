@@ -11,10 +11,9 @@ from app.domain.models.technical_summary import (
 )
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 from app.domain.policies.technical_summary import (
-    RANK_LABELS,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
-    classify_technical_summary_rank,
+    build_technical_headline_summary,
     is_focus_theme,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
@@ -62,17 +61,35 @@ class TechnicalSummaryService:
         if vwap is None:
             raise ValueError("VWAPが取得できません")
 
-        rank = classify_technical_summary_rank(
+        volume_vs_avg20_pct = (
+            None
+            if price.volume is None or price.volume_avg20 in (None, 0)
+            else (price.volume / price.volume_avg20) * 100
+        )
+        momentum_sessions = getattr(result.three_session_momentum, "sessions", ())
+        high_breakout_count = _count_true(session.high_breakout for session in momentum_sessions)
+        low_higher_count = _count_true(session.low_higher for session in momentum_sessions)
+        headline = build_technical_headline_summary(
             dev25_pct=dev25_pct,
             latest=latest,
             vwap=vwap,
             focus_theme=is_focus_theme(result.name),
+            ma25_distance_atr=moving_average.ma25_distance_atr,
+            ma25=moving_average.ma25,
+            ma25_prev5=moving_average.ma25_prev5,
+            rsi14=getattr(snapshot, "rsi14", None),
+            three_session_change_pct=result.three_session_momentum.change_pct,
+            high_breakout_count=high_breakout_count,
+            low_higher_count=low_higher_count,
+            day_close_position=getattr(snapshot.range, "day_close_position", None),
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
+            recent60_range_position=breakline.recent60_range_position,
         )
         return TechnicalSummaryRow(
             name=result.name,
             code4=result.code4,
-            rank=rank,
-            rank_label=RANK_LABELS[rank],
+            rank=headline.rank,
+            rank_label=headline.rank_label,
             latest=latest,
             day_change_price=price.day_change_price,
             day_change_pct=price.day_change_pct,
@@ -85,9 +102,7 @@ class TechnicalSummaryService:
             vwap_diff_pct=_pct_change(latest, vwap),
             dev25_pct=dev25_pct,
             ma25_distance_atr=moving_average.ma25_distance_atr,
-            volume_vs_avg20_pct=None
-            if price.volume is None or price.volume_avg20 in (None, 0)
-            else (price.volume / price.volume_avg20) * 100,
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
             previous_vwap_maintained=_previous_vwap_maintained(result),
             support_lines=build_nearby_support_lines(
                 latest=latest,
@@ -105,6 +120,8 @@ class TechnicalSummaryService:
                 ma25=moving_average.ma25,
             ),
             recent60_range_position=breakline.recent60_range_position,
+            headline_comment=headline.comment,
+            next_action=headline.next_action,
         )
 
 
@@ -129,6 +146,10 @@ def _as_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _count_true(values: Iterable[bool | None]) -> int:
+    return sum(1 for value in values if value is True)
 
 
 __all__ = ["TechnicalSummaryService"]

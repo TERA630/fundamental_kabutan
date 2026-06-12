@@ -12,6 +12,9 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
     if table.us_market is not None:
         lines.extend(_format_us_market_table(table.us_market))
         lines.append("")
+    if table.rows:
+        lines.extend(_format_headline_table(table.rows))
+        lines.append("")
     rows_by_rank = {rank: [row for row in table.rows if row.rank == rank] for rank in RANK_ORDER}
     for rank in RANK_ORDER:
         rows = rows_by_rank[rank]
@@ -52,6 +55,17 @@ def _format_us_market_table(table: UsMarketSummaryTable) -> list[str]:
     return lines
 
 
+def _format_headline_table(rows: tuple[TechnicalSummaryRow, ...]) -> list[str]:
+    lines = [
+        "## 冒頭短評",
+        "",
+        "| 銘柄 | 短評 |",
+        "|---|---|",
+    ]
+    lines.extend(f"| {row.name}({row.code4}) | {_format_headline_text(row)} |" for row in rows)
+    return lines
+
+
 def _format_us_market_row(row: UsMarketSummaryRow) -> str:
     return (
         f"| {row.name} "
@@ -77,6 +91,12 @@ def _format_row(row: TechnicalSummaryRow) -> str:
         f"| {_fmt_resistance_lines(row.resistance_lines)} "
         f"| {_fmt_position(row.recent60_range_position)} |"
     )
+
+
+def _format_headline_text(row: TechnicalSummaryRow) -> str:
+    comment = row.headline_comment or "N/A"
+    next_action = row.next_action or "N/A"
+    return f"{row.rank} {row.rank_label}｜{comment}｜{next_action}"
 
 
 def _fmt_current(row: TechnicalSummaryRow) -> str:

@@ -12,15 +12,39 @@ from app.domain.usecases.technical_summary import TechnicalSummaryService
 
 def test_classify_technical_summary_rank_uses_focus_theme_thresholds():
     assert classify_technical_summary_rank(dev25_pct=4.5, latest=105, vwap=100, focus_theme=True) == "A2"
-    assert classify_technical_summary_rank(dev25_pct=7.5, latest=95, vwap=100, focus_theme=True) == "B1"
-    assert classify_technical_summary_rank(dev25_pct=7.5, latest=105, vwap=100, focus_theme=False) == "A2"
-    assert classify_technical_summary_rank(dev25_pct=8.5, latest=95, vwap=100, focus_theme=False) == "B1"
+    assert classify_technical_summary_rank(dev25_pct=7.5, latest=105, vwap=100, focus_theme=True) == "B1"
+    assert classify_technical_summary_rank(dev25_pct=6.5, latest=105, vwap=100, focus_theme=False) == "A2"
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=8.5,
+            latest=95,
+            vwap=100,
+            focus_theme=False,
+            recent60_range_position=0.85,
+        )
+        == "B1"
+    )
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
     assert classify_technical_summary_rank(dev25_pct=3.0, latest=95, vwap=100, focus_theme=False) == "C1"
-    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100, focus_theme=False) == "C2"
+    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100, focus_theme=False) == "D1"
     assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100, focus_theme=False) == "E"
+
+
+def test_classify_technical_summary_rank_covers_bottoming_start():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=-3.0,
+            latest=105,
+            vwap=100,
+            focus_theme=False,
+            high_breakout_count=1,
+            low_higher_count=2,
+            day_close_position=0.65,
+        )
+        == "D3"
+    )
 
 
 def test_build_nearby_support_and_resistance_lines_select_two_nearest():
@@ -87,7 +111,10 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert isinstance(table, TechnicalSummaryTable)
     assert table.rows[0].rank == "A1"
     assert table.rows[0].previous_vwap_maintained is False
+    assert table.rows[0].headline_comment == "順張り可。過熱なし。"
     assert "## A1 位置良好" in markdown
+    assert "## 冒頭短評" in markdown
+    assert "A1 位置良好｜順張り可。過熱なし。" in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown

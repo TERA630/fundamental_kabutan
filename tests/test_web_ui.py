@@ -68,6 +68,16 @@ def test_index_renders_technical_output_as_pre_text_not_visible_textarea():
     assert '<button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>' in html
 
 
+def test_web_ui_defaults_to_technical_mode():
+    state = WebUiState()
+    client = create_app(state).test_client()
+
+    html = client.get("/").data.decode("utf-8")
+
+    assert state.mode == "technical"
+    assert 'name="mode" value="technical" checked' in html
+
+
 def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeypatch):
     class FakeController:
         def fetch_output_cache_for_today(self):

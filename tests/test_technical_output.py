@@ -1,4 +1,6 @@
-from app.domain.builders.technical_output import build_technical_output
+from types import SimpleNamespace
+
+from app.domain.builders.technical_output import _build_resistance_lines, build_technical_output
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
 import pandas as pd
 
@@ -72,15 +74,24 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "後場Vwap：167.78" in output
     assert "当日出来高：20日平均比　101%(前日出来高比　+0.1%)　通常" in output
     assert "60日レンジ位置：98.4%　高値圏 / 過熱・上値追い警戒" in output
+    assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
+    assert output.index("短評：B2 過熱極大") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
     assert "3日安値切り上げ：〇〇〇" in output
     assert "3日騰落率　+1.2%" in output
     assert "3日出来高　101%→101%→101%" in output
     assert "■当日位置・レンジ" in output
+    assert "O 168.00　H 171.00　L 166.00　C 169.00" in output
+    assert "\n始値：" not in output
+    assert "\n高値：" not in output
+    assert "\n安値：" not in output
+    assert "\n終値：" not in output
     assert "■移動平均" in output
     assert "■移動平均・出来高" not in output
     assert "出来高：1,069株" not in output
+    assert "■抵抗線" in output
+    assert "前日高値：170.00" in output
     assert "■前日評価" in output
     assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
     assert "前日Vwap(前・後場)　〇/〇  高値更新 〇 / 安値維持 〇" in output
@@ -127,3 +138,22 @@ def test_build_technical_output_marks_previous_session_intraday_na_when_missing(
     assert "終値 168（VWAP N/A円 / N/A / N/A）騰落率+0.6%" in output
     assert "前日Vwap(前・後場)　N/A/N/A  高値更新 〇 / 安値維持 〇" in output
     assert "後場評価 N/A / VWAPN/A" in output
+
+
+def test_build_resistance_lines_keeps_only_prices_above_latest_in_ascending_order():
+    result = SimpleNamespace(
+        snapshot=SimpleNamespace(
+            price=SimpleNamespace(latest=100.0),
+            previous_session=SimpleNamespace(prev_high=104.0),
+            moving_average=SimpleNamespace(ma25=102.0),
+            breakline=SimpleNamespace(recent20_high=98.0, recent60_high=106.0),
+        )
+    )
+
+    lines = _build_resistance_lines(result)
+
+    assert [(line.label, line.price) for line in lines] == [
+        ("25日線", 102.0),
+        ("前日高値", 104.0),
+        ("60日高値", 106.0),
+    ]

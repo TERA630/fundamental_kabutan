@@ -88,6 +88,7 @@ class FundamentalView:
 
         self.fundamental_text = self._build_text_area(self.fundamental_frame)
         self.technical_text = self._build_text_area(self.technical_frame)
+        self.notebook.select(self.technical_frame)
 
     def _build_text_area(self, parent: ttk.Frame) -> tk.Text:
         text_frame = ttk.Frame(parent)

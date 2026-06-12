@@ -127,13 +127,28 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 
 1. 銘柄ヘッダ
 2. 先頭サマリ
-3. `■モメンタム`
-4. `■当日位置・レンジ`
-5. `■移動平均`
-6. `■前日評価`
-7. `■支持線`
+3. 冒頭短評
+4. `■モメンタム`
+5. `■当日位置・レンジ`
+6. `■移動平均`
+7. `■前日評価`
+8. `■支持線`
 
 先頭サマリは、現在値、前日比、終端位置、取得時刻、25日線解離、25日線傾き、VWAP差分、当日出来高の20日平均比、60日レンジ位置を表示する。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
+
+冒頭短評は、先頭サマリの直後、`■モメンタム` の直前に表示する。表示形式は次の通り。
+
+```text
+短評：{区分} {表示名}｜{冒頭コメント}｜{次アクション}
+```
+
+例:
+
+```text
+短評：D1 戻り途中｜25日線回復待ち。｜後場VWAP維持なら監視継続
+```
+
+冒頭短評の判定は domain policy で行い、`app/domain/builders/technical_output.py` は受け取った判定結果を文字列化する。GUI層には判定ロジックを持たない。分類と文言は `docs/Summery_spec.md` の `Technical Summary 冒頭短評` に合わせる。
 
 日中5分足が取得できる場合、先頭サマリには前後場VWAPを追加表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
 
@@ -157,6 +172,8 @@ Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
 後場Vwap：{pm_vwap}
 当日出来高：20日平均比　{volume_vs_avg20_pct}(前日出来高比　{volume_vs_previous_pct})　{volume_ratio_label}
 60日レンジ位置：{recent60_range_position}　{recent60_range_position_label_detail}
+
+短評：{headline_summary}
 
 ■モメンタム
 3日高値更新：{high_breakout_3bd_ago}{high_breakout_2bd_ago}{high_breakout_1bd_ago}
@@ -303,7 +320,7 @@ VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` �
 | `app/domain/policies/market_history.py` | 本日5分足から前場VWAP、後場VWAP、最新足が前場か後場かを計算する純粋関数を追加し、`build_intraday_vwap_snapshot()` の戻り値へ含める |
 | `app/domain/policies/technical_indicators.py` | 当日出来高の前日比を算出する。60日レンジ位置は既存の `recent60_range_position` を使う |
 | `app/domain/policies/technical_output_labels.py` もしくは既存policy | 出来高20日平均比コメント、60日レンジ位置コメントを純粋関数として追加する。小規模なら既存のtechnical系policyに追加する |
-| `app/domain/builders/technical_output.py` | 先頭サマリに前場/後場VWAP、出来高評価コメント、前日出来高比、60日レンジ位置と判定を表示する |
+| `app/domain/builders/technical_output.py` | 先頭サマリに前場/後場VWAP、出来高評価コメント、前日出来高比、60日レンジ位置と判定を表示し、その直後に冒頭短評を表示する |
 | `tests/test_market_data_provider_technical.py` | 前場のみ、後場あり、出来高0、日足参考値フォールバック時の前後場VWAPを検証する |
 | `tests/test_technical_output.py` | 新しい先頭サマリの表示文字列、N/A表示、前場時に後場VWAPを出さないことを検証する |
 | `tests/test_technical_indicators.py` | 当日出来高の前日比、60日レンジ境界値の材料値を検証する |
@@ -312,5 +329,5 @@ VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` �
 
 1. `market_history.py` に本日前後場VWAP計算を追加し、既存の5分足正規化とセッション抽出を再利用する。
 2. 出来高コメント、60日レンジコメントをdomain policyへ追加し、境界値テストを先に書く。
-3. `technical_output.py` の先頭サマリだけを小さく変更する。
+3. `technical_output.py` の先頭サマリ直後に冒頭短評を追加する。
 4. `python -m pytest tests/test_market_data_provider_technical.py tests/test_technical_indicators.py tests/test_technical_output.py` で確認する。
