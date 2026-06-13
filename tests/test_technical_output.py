@@ -70,11 +70,13 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "取得時刻：2026-04-07 14:55" in output
     assert "位置：25日線" in output
     assert "傾き：" not in output
-    assert "Vmap" in output
+    assert "VWAP" in output
+    assert "Vmap" not in output
     assert "需給：前場Vwap：◯ 後場Vwap：◯" in output
     assert "出来高比　101%(前日比+0.1%)" in output
     assert "60日レンジ　98.4% |" in output
-    assert "支持：165(preL)→146(20dL)→106(60dL)" in output
+    assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
+    assert "\n　支持：" not in output
     assert "抵抗：170(preH/20dH/60dH)" in output
     assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
     assert "崩れ警戒：低（1点）" in output
@@ -129,7 +131,8 @@ def test_build_technical_output_marks_daily_reference_vwap():
 
     output = build_technical_output(result)
 
-    assert "Vmap" in output
+    assert "VWAP" in output
+    assert "Vmap" not in output
     assert "取得時刻：2026-04-08 終値" in output
     assert "(日足参考値)" in output
     assert "需給：前場Vwap：N/A 後場Vwap：N/A" in output
@@ -215,3 +218,29 @@ def test_build_resistance_lines_keeps_only_prices_above_latest_in_ascending_orde
         ("前日高値", 104.0),
         ("60日高値", 106.0),
     ]
+
+
+def test_opening_downside_targets_include_moving_averages_and_keep_three_nearest_levels():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(result.snapshot.moving_average, ma25=168.0, ma75=160.0)
+    previous_session = replace(result.snapshot.previous_session, prev_low=165.0)
+    breakline = replace(result.snapshot.breakline, recent20_low=160.0, recent60_low=150.0)
+    result = replace(
+        result,
+        snapshot=replace(
+            result.snapshot,
+            moving_average=moving_average,
+            previous_session=previous_session,
+            breakline=breakline,
+        ),
+    )
+
+    output = build_technical_output(result)
+
+    assert "下値目安：168(25ME)→165(preL)→160(20dL/75ME)" in output
+    assert "150(60dL)" not in output.split("\n　抵抗：", 1)[0]

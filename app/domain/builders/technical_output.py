@@ -87,9 +87,9 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
         f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）"
         f" | 出来高比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)})",
         f"　位置：25日線{_fmt_pct(snapshot.moving_average.dev25_pct)}/{_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)}"
-        f" | Vmap{_fmt_price_signed(vwap_diff)}円/{_fmt_pct(vwap_diff_pct)}/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
+        f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_pct(vwap_diff_pct)}/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
-        f"　支持：{_format_opening_supports(result)}",
+        f"　下値目安：{_format_opening_supports(result)}",
         f"　抵抗：{_format_opening_resistances(result)}",
         f"　需給：{_format_current_session_vwap_marks(latest, vwap_snapshot).strip() or '前場Vwap：N/A 後場Vwap：N/A'}",
     ]
@@ -103,10 +103,12 @@ def _format_opening_supports(result: TechnicalAnalysisResult) -> str:
         return "N/A"
     candidates = (
         ("preL", snapshot.previous_session.prev_low),
+        ("25ME", snapshot.moving_average.ma25),
         ("20dL", snapshot.breakline.recent20_low),
         ("60dL", snapshot.breakline.recent60_low),
+        ("75ME", snapshot.moving_average.ma75),
     )
-    return _format_grouped_price_levels(candidates, latest=latest, ascending=False)
+    return _format_grouped_price_levels(candidates, latest=latest, ascending=False, max_levels=3)
 
 
 def _format_opening_resistances(result: TechnicalAnalysisResult) -> str:
@@ -128,6 +130,7 @@ def _format_grouped_price_levels(
     *,
     latest: float,
     ascending: bool,
+    max_levels: int | None = None,
 ) -> str:
     grouped: dict[float, list[str]] = {}
     for label, price in candidates:
@@ -137,6 +140,8 @@ def _format_grouped_price_levels(
     if not grouped:
         return "N/A"
     prices = sorted(grouped, reverse=not ascending)
+    if max_levels is not None:
+        prices = prices[:max_levels]
     return "→".join(
         f"{_fmt_level_price(price)}({'/'.join(grouped[price])})"
         for price in prices

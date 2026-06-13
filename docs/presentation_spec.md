@@ -134,7 +134,7 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 7. `■移動平均・Vwap`
 8. `■前日評価`
 
-先頭サマリは、取得時刻、銘柄名と銘柄コード、現在値、前日比、終端位置、出来高比、25日線乖離、VWAP差分、60日レンジ位置、支持線、抵抗線、当日前後場VWAP判定を7行に圧縮して表示する。支持線と抵抗線は同価格のラベルを `/` で併記し、現在値に近い順に `→` で連結する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
+先頭サマリは、取得時刻、銘柄名と銘柄コード、現在値、前日比、終端位置、出来高比、25日線乖離、VWAP差分、60日レンジ位置、下値目安、抵抗線、当日前後場VWAP判定を7行に圧縮して表示する。下値目安は前日安値、25日線、20日安値、60日安値、75日線のうち現在値未満の価格を近い順に最大3価格表示する。下値目安と抵抗線は同価格のラベルを `/` で併記し、現在値に近い順に `→` で連結する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
 
 冒頭短評は、先頭サマリの直後、`■モメンタム` の直前に表示する。表示形式は次の通り。
 
@@ -176,8 +176,8 @@ Technicalタブの表示例は次の通り。
 取得時刻：{intraday_price_timestamp}
 【銘柄】{name} ({code4})
 　株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（終端位置{day_close_position}） | 出来高比　{volume_vs_avg20_pct}(前日比{volume_vs_previous_pct})
-　位置：25日線{dev25_pct}/{ma25_distance_atr} | Vmap{vwap_diff_price}円/{vwap_diff_pct}/{vwap_diff_atr}{vwap_source_suffix} | 60日レンジ　{recent60_range_position} |
-　支持：{support_levels}
+　位置：25日線{dev25_pct}/{ma25_distance_atr} | VWAP{vwap_diff_price}円/{vwap_diff_pct}/{vwap_diff_atr}{vwap_source_suffix} | 60日レンジ　{recent60_range_position} |
+　下値目安：{downside_target_levels}
 　抵抗：{resistance_levels}
 　需給：前場Vwap：{am_mark} 後場Vwap：{pm_mark}
 
