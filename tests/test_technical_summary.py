@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryTable
 from app.domain.policies.technical_summary import (
+    build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     classify_technical_summary_rank,
@@ -44,6 +45,89 @@ def test_classify_technical_summary_rank_covers_bottoming_start():
             day_close_position=0.65,
         )
         == "D3"
+    )
+
+
+def test_d2_bottoming_candidate_requires_support_rebound_and_vwap_proximity():
+    rank = classify_technical_summary_rank(
+        dev25_pct=-6.0,
+        latest=99.0,
+        vwap=100.0,
+        focus_theme=False,
+        day_open=99.6,
+        day_high=100.0,
+        day_low=97.4,
+        day_close_position=0.62,
+        atr14=2.0,
+        volume_vs_avg20_pct=90.0,
+        rsi14=40.0,
+        low_higher_count=1,
+        previous_low=98.0,
+    )
+
+    assert rank == "D2"
+
+
+def test_d2_headline_uses_strong_comment_when_two_auxiliary_conditions_pass():
+    headline = build_technical_headline_summary(
+        dev25_pct=-6.0,
+        latest=99.0,
+        vwap=100.0,
+        day_open=99.6,
+        day_high=100.0,
+        day_low=97.4,
+        day_close_position=0.62,
+        atr14=2.0,
+        volume_vs_avg20_pct=90.0,
+        rsi14=40.0,
+        low_higher_count=1,
+        previous_low=98.0,
+    )
+
+    assert headline.rank == "D2"
+    assert headline.comment == "底打ち候補強。"
+    assert headline.next_action == "VWAP回復待ち(補助指標2つ以上)。"
+
+
+def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
+    headline = build_technical_headline_summary(
+        dev25_pct=-6.0,
+        latest=99.0,
+        vwap=100.0,
+        day_open=98.2,
+        day_high=100.0,
+        day_low=98.0,
+        day_close_position=0.5,
+        atr14=2.0,
+        volume_vs_avg20_pct=50.0,
+        rsi14=55.0,
+        low_higher_count=1,
+        previous_low=98.0,
+    )
+
+    assert headline.rank == "D2"
+    assert headline.comment == "底打ち候補。"
+    assert headline.next_action == "買い急がず(補助指標1つ以下)。"
+
+
+def test_d2_exclusion_falls_to_downtrend():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=-6.0,
+            latest=97.8,
+            vwap=100.0,
+            focus_theme=False,
+            day_open=99.0,
+            day_high=100.0,
+            day_low=97.6,
+            day_close_position=0.6,
+            atr14=2.0,
+            volume_vs_avg20_pct=90.0,
+            rsi14=40.0,
+            low_higher_count=1,
+            previous_low=98.0,
+        )
+        == "E"
     )
 
 

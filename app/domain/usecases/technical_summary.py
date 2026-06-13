@@ -82,8 +82,16 @@ class TechnicalSummaryService:
             high_breakout_count=high_breakout_count,
             low_higher_count=low_higher_count,
             day_close_position=getattr(snapshot.range, "day_close_position", None),
+            day_open=getattr(price, "open", None),
+            day_high=price.high,
+            day_low=price.low,
+            atr14=getattr(snapshot.range, "atr14", None),
             volume_vs_avg20_pct=volume_vs_avg20_pct,
             recent60_range_position=breakline.recent60_range_position,
+            previous_low=previous.prev_low,
+            recent20_low=breakline.recent20_low,
+            ma75=moving_average.ma75,
+            recent60_low=breakline.recent60_low,
         )
         return TechnicalSummaryRow(
             name=result.name,

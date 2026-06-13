@@ -113,8 +113,16 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
         high_breakout_count=_count_true(session.high_breakout for session in result.three_session_momentum.sessions),
         low_higher_count=_count_true(session.low_higher for session in result.three_session_momentum.sessions),
         day_close_position=snapshot.range.day_close_position,
+        day_open=snapshot.price.open,
+        day_high=snapshot.price.high,
+        day_low=snapshot.price.low,
+        atr14=snapshot.range.atr14,
         volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
         recent60_range_position=snapshot.breakline.recent60_range_position,
+        previous_low=snapshot.previous_session.prev_low,
+        recent20_low=snapshot.breakline.recent20_low,
+        ma75=snapshot.moving_average.ma75,
+        recent60_low=snapshot.breakline.recent60_low,
     )
     return f"短評：{headline.text}"
 
