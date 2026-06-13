@@ -7,9 +7,20 @@ from app.domain.policies.technical_summary import (
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     build_technical_position_assessment,
+    build_technical_strategy_lines,
     classify_technical_summary_rank,
 )
 from app.domain.usecases.technical_summary import TechnicalSummaryService
+
+
+def test_build_technical_strategy_lines_uses_rank_criteria_and_support_prices():
+    assert build_technical_strategy_lines("A1", support_range="97〜98")[0] == (
+        "前場深押し○：支持線付近 97〜98円で検討。約定後はVWAP回復・維持を確認。"
+    )
+    assert build_technical_strategy_lines("B1", nearest_support="98")[0] == (
+        "前場深押し△：支持線付近 98円でのみ小さく検討。VWAP未回復なら撤退。"
+    )
+    assert build_technical_strategy_lines("D3") == ("N/A（判定基準未設定）",)
 
 
 def test_classify_technical_summary_rank_uses_focus_theme_thresholds():

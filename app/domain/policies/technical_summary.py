@@ -50,12 +50,68 @@ NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
     "E": "監視のみ。新規買い不可。",
 }
 
+STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
+    "A1": (
+        "前場深押し○：支持線付近 {support_range}円で検討。約定後はVWAP回復・維持を確認。",
+        "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。",
+        "後場VWAP回復◎：後場VWAP上維持ならエントリー可。ホールド適性も高い。",
+    ),
+    "A2": (
+        "前場深押し△：支持線付近 {support_range}円で小さく検討。追随買いは避ける。",
+        "前場VWAP回復○：VWAP近辺まで押した後、再回復＋維持ならエントリー可。",
+        "後場VWAP回復○：後場VWAP上維持ならエントリー可。ただし高値追いは避ける。",
+    ),
+    "B1": (
+        "前場深押し△：支持線付近 {nearest_support}円でのみ小さく検討。VWAP未回復なら撤退。",
+        "前場VWAP回復△：VWAP回復＋維持でも新規は慎重。高値追いは避ける。",
+        "後場VWAP回復△：後場VWAP上維持なら短期限定で検討可。持ち越しは慎重。",
+    ),
+    "B2": (
+        "前場深押し×：深押しに見えても崩れ初動の可能性が高い。",
+        "前場VWAP回復×：VWAP回復だけでは新規不可。",
+        "後場VWAP回復×：新規不可。保有中なら利確・逆指値管理を優先。",
+    ),
+    "C1": (
+        "前場深押し×：VWAP下では深押し指値を避ける。支持線割れの中腹をつかみやすい。",
+        "前場VWAP回復△：VWAP回復＋15分以上維持なら検討可。慎重なら後場まで待つ。",
+        "後場VWAP回復○：後場VWAP回復＋上維持＋安値切り上げがあればエントリー可。",
+    ),
+    "C2": (
+        "前場深押し×：25日線下では深押し指値を避ける。戻り売りの中腹をつかみやすい。",
+        "前場VWAP回復×：VWAP回復だけでは根拠不足。25日線下ではだまし上げに注意。",
+        "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら25日線回復を待つ。",
+    ),
+    "D1": None,
+    "D2": None,
+    "D3": None,
+    "E": (
+        "前場深押し×：下降トレンド中の深押しは避ける。",
+        "前場VWAP回復×：前場VWAP回復だけでは新規不可。だまし上げ警戒。",
+        "後場VWAP回復△：後場VWAP回復＋上維持＋安値切り上げ＋出来高増加が揃えば小さく検討可。原則は25日線回復待ち。",
+    ),
+}
+
 FOCUS_THEME_KEYWORDS = ("半導体", "電線", "AI", "ＡＩ")
 
 
 def is_focus_theme(name: str) -> bool:
     normalized = name.upper()
     return any(keyword.upper() in normalized for keyword in FOCUS_THEME_KEYWORDS)
+
+
+def build_technical_strategy_lines(
+    rank: TechnicalSummaryRank,
+    *,
+    support_range: str = "N/A",
+    nearest_support: str = "N/A",
+) -> tuple[str, ...]:
+    templates = STRATEGY_LINES[rank]
+    if templates is None:
+        return ("N/A（判定基準未設定）",)
+    return tuple(
+        template.format(support_range=support_range, nearest_support=nearest_support)
+        for template in templates
+    )
 
 
 def classify_technical_summary_rank(
@@ -554,6 +610,7 @@ __all__ = [
     "RANK_ORDER",
     "build_technical_headline_summary",
     "build_technical_position_assessment",
+    "build_technical_strategy_lines",
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",
     "classify_technical_summary_rank",

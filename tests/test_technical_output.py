@@ -64,24 +64,27 @@ def test_build_technical_output_contains_summary_and_sections():
 
     output = build_technical_output(result)
 
-    assert "【銘柄】Sample (1234)" in output
+    assert output.startswith("取得時刻：2026-04-07 14:55\n【銘柄】Sample (1234)")
     assert "株価：" in output
     assert "終端位置" in output
     assert "取得時刻：2026-04-07 14:55" in output
     assert "25日線解離：" in output
-    assert "　傾き：↑" in output
+    assert "傾き：" not in output
     assert "Vwap：" in output
-    assert "前場Vwap：167.17" in output
-    assert "後場Vwap：167.78" in output
-    assert "当日出来高：20日平均比　101%(前日出来高比　+0.1%)　通常" in output
-    assert "60日レンジ位置：98.4%　高値圏 / 過熱・上値追い警戒" in output
+    assert "前場：◯ 後場：◯" in output
+    assert "当日出来高比：　20日平均比　101%（前日比+0.1%）" in output
+    assert "60日レンジ　98.4%　高値圏 / 過熱・上値追い警戒" in output
     assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
-    assert "崩れ警戒：低" in output
-    assert "崩れ警戒スコア：1点" in output
+    assert "崩れ警戒：低（1点）" in output
+    assert "崩れ警戒スコア：" not in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
+    assert "戦略判定：\n前場深押し×：深押しに見えても崩れ初動の可能性が高い。" in output
+    assert "前場VWAP回復×：VWAP回復だけでは新規不可。" in output
+    assert "後場VWAP回復×：新規不可。保有中なら利確・逆指値管理を優先。" in output
     assert output.index("短評：B2 過熱極大") < output.index("■モメンタム")
-    assert output.index("崩れ警戒：低") < output.index("■モメンタム")
+    assert output.index("崩れ警戒：低（1点）") < output.index("■モメンタム")
+    assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
     assert "3日安値切り上げ：〇〇〇" in output
@@ -93,7 +96,9 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "\n高値：" not in output
     assert "\n安値：" not in output
     assert "\n終値：" not in output
-    assert "■移動平均" in output
+    assert "■移動平均・Vwap" in output
+    assert "前場Vwap：167.17" in output
+    assert "後場Vwap：167.78" in output
     assert "■移動平均・出来高" not in output
     assert "出来高：1,069株" not in output
     assert "■抵抗線" in output
@@ -112,6 +117,9 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■節目・ブレイクライン" not in output
     assert "■流れ" not in output
     assert "トレンド：" not in output
+    assert output.index("■移動平均・Vwap") < output.index("■支持線")
+    assert output.index("■支持線") < output.index("■抵抗線")
+    assert output.index("■抵抗線") < output.index("■前日評価")
 
 
 def test_build_technical_output_marks_daily_reference_vwap():
@@ -129,6 +137,29 @@ def test_build_technical_output_marks_daily_reference_vwap():
     assert "(日足参考値)" in output
     assert "前場Vwap：" not in output
     assert "後場Vwap：" not in output
+
+
+def test_build_technical_output_marks_each_session_vwap_against_latest_price():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    result = replace(
+        result,
+        vwap_snapshot={
+            **result.vwap_snapshot,
+            "current_am_vwap": 170.0,
+            "current_pm_vwap": 168.0,
+        },
+    )
+
+    output = build_technical_output(result)
+
+    assert "前場：× 後場：◯" in output
+    assert "前場Vwap：170.00" in output
+    assert "後場Vwap：168.00" in output
 
 
 def test_build_technical_output_shows_bottoming_start_only_below_ma25():
@@ -151,6 +182,7 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
     assert "短評：D3 底打ち初動" in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
+    assert "戦略判定：\nN/A（判定基準未設定）" in output
 
 
 def test_build_technical_output_marks_previous_session_intraday_na_when_missing():

@@ -125,17 +125,18 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 
 表示順は次の通り。
 
-1. 銘柄ヘッダ
-2. 先頭サマリ
+1. 取得時刻
+2. 銘柄ヘッダと先頭サマリ
 3. 冒頭短評
-4. 崩れ警戒、崩れ警戒スコア、底打ち初動判定、ホールド判定
+4. 崩れ警戒（スコアを同一行に表示）、底打ち初動判定、ホールド判定
 5. `■モメンタム`
 6. `■当日位置・レンジ`
-7. `■移動平均`
-8. `■前日評価`
-9. `■支持線`
+7. `■移動平均・Vwap`
+8. `■支持線`
+9. `■抵抗線`
+10. `■前日評価`
 
-先頭サマリは、現在値、前日比、終端位置、取得時刻、25日線解離、25日線傾き、VWAP差分、当日出来高の20日平均比、60日レンジ位置を表示する。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
+先頭サマリは、取得時刻、銘柄名と銘柄コード、現在値、前日比、終端位置、25日線解離、VWAP差分、当日前後場VWAP判定、当日出来高の20日平均比、60日レンジ位置を表示する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
 
 冒頭短評は、先頭サマリの直後、`■モメンタム` の直前に表示する。表示形式は次の通り。
 
@@ -154,15 +155,14 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 冒頭短評の直後には次の判定を表示する。崩れ警戒とホールド判定は25日線の上下にかかわらず表示する。底打ち初動判定は現在値が25日線未満の場合だけ表示する。スコアリングと判定条件は `docs/current_implementation_spec.md` の `単一銘柄の崩れ警戒スコア` および `底打ち初動・ホールド判定` を正とする。
 
 ```text
-崩れ警戒：{低/中/高}
-崩れ警戒スコア：{score}点
+崩れ警戒：{低/中/高}（{score}点）
 底打ち初動判定：{未成立/成立}
 ホールド判定：{◎/○/△/×}
 ```
 
 25日線以上の場合は `底打ち初動判定` 行を出力しない。主要値が欠損して判定できない場合は、該当値を `N/A` と表示する。
 
-日中5分足が取得できる場合、先頭サマリには前後場VWAPを追加表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
+日中5分足が取得できる場合、先頭サマリのVWAP行には現在株価が前場・後場それぞれのVWAP以上なら `◯`、未満なら `×`、判定不能なら `N/A` を表示する。前後場VWAPの価格は `■移動平均・Vwap` に表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
 
 - 最新バーが前場の場合: 前場VWAPのみ表示する。
 - 最新バーが後場の場合: 前場VWAPと後場VWAPを表示する。
@@ -175,19 +175,16 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 Technicalタブの表示例は次の通り。
 
 ```text
+取得時刻：{intraday_price_timestamp}
 【銘柄】{name} ({code4})
 株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（終端位置{day_close_position}）
-取得時刻：{intraday_price_timestamp}
-25日線解離：{dev25_pct}({ma25_distance_atr})　傾き：{ma25_slope_symbol}
-Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
-前場Vwap：{am_vwap}
-後場Vwap：{pm_vwap}
-当日出来高：20日平均比　{volume_vs_avg20_pct}(前日出来高比　{volume_vs_previous_pct})　{volume_ratio_label}
-60日レンジ位置：{recent60_range_position}　{recent60_range_position_label_detail}
+25日線解離：{dev25_pct}({ma25_distance_atr})
+Vwap：{vwap_diff_price}円（{vwap_diff_pct}/{vwap_diff_atr}）{vwap_source_suffix}  前場：{am_mark} 後場：{pm_mark}
+当日出来高比：　20日平均比　{volume_vs_avg20_pct}（前日比{volume_vs_previous_pct}）
+60日レンジ　{recent60_range_position}　{recent60_range_position_label_detail}
 
 短評：{headline_summary}
-崩れ警戒：{collapse_risk_level}
-崩れ警戒スコア：{collapse_risk_score}点
+崩れ警戒：{collapse_risk_level}（{collapse_risk_score}点）
 底打ち初動判定：{bottoming_start_judgement}
 ホールド判定：{hold_judgement}
 
@@ -204,10 +201,20 @@ Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
 終値：{close}
 当日値幅：{day_range}（ATR比 {day_range_atr} / {day_range_label}）
 
-■移動平均
+■移動平均・Vwap
+前場Vwap：{am_vwap}
+後場Vwap：{pm_vwap}
 5日線：{ma5}（乖離 {dev5_pct}）
 25日線：{ma25}（乖離 {dev25_pct} / ATR比 {ma25_distance_atr}）
 14日ATR：{atr14}
+
+■支持線
+前日安値：{prev_low}
+20日安値：{recent20_low}
+60日安値：{recent60_low}
+
+■抵抗線
+{resistance_lines}
 
 ■前日評価
 終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
@@ -220,13 +227,9 @@ Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
 前日レンジ {prev_low}-{prev_high}（{prev_range_atr}）　終位置 {prev_close_position}
 前日ローソク足型：　{prev_candle_body_label}
 
-■支持線
-前日安値：{prev_low}
-20日安値：{recent20_low}
-60日安値：{recent60_low}
 ```
 
-実装上の出力は `■支持線` までを本文として返す。
+実装上の出力は `■前日評価` までを本文として返す。
 
 VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` を付ける。日中値の日時が取得できない場合は `取得時刻：N/A` と表示する。日中値が5分足の場合は最新足の日時を使い、日足参考値へフォールバックした場合は日足データの日付と `終値` を使う。
 
@@ -236,7 +239,7 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 
 後場に入った直後など、後場の出来高付き5分足がまだ存在しない場合、後場VWAPは `N/A` とする。前場のみの時間帯では後場VWAP行を表示しない。
 
-当日出来高の20日平均比は、当日出来高を当日時点の20日平均出来高で割った比率として表示する。あわせて、当日出来高を前営業日出来高で割った騰落率を `前日出来高比` として表示する。`■移動平均` ブロックでは当日出来高の実数は表示しない。
+当日出来高の20日平均比は、当日出来高を当日時点の20日平均出来高で割った比率として表示する。あわせて、当日出来高を前営業日出来高で割った騰落率を `前日比` として表示する。`■移動平均・Vwap` ブロックでは当日出来高の実数は表示しない。
 
 当日出来高の20日平均比には次の評価コメントを付ける。
 
