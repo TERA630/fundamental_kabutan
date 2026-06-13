@@ -8,6 +8,8 @@ from typing import Literal
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
 TechnicalSummaryRank = Literal["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2", "D3", "E"]
+CollapseRiskLevel = Literal["低", "中", "高"]
+HoldJudgement = Literal["◎", "○", "△", "×"]
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,14 @@ class TechnicalHeadlineSummary:
     @property
     def text(self) -> str:
         return f"{self.rank} {self.rank_label}｜{self.comment}｜{self.next_action}"
+
+
+@dataclass(frozen=True)
+class TechnicalPositionAssessment:
+    collapse_risk_score: int
+    collapse_risk_level: CollapseRiskLevel
+    hold_judgement: HoldJudgement
+    bottoming_start_established: bool
 
 
 @dataclass(frozen=True)
@@ -70,8 +80,11 @@ class TechnicalSummaryTable:
 
 
 __all__ = [
+    "CollapseRiskLevel",
+    "HoldJudgement",
     "SkippedTechnicalSummaryStock",
     "TechnicalHeadlineSummary",
+    "TechnicalPositionAssessment",
     "TechnicalSummaryLine",
     "TechnicalSummaryRank",
     "TechnicalSummaryRow",

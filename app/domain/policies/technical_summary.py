@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.domain.models.technical_summary import (
     TechnicalHeadlineSummary,
+    TechnicalPositionAssessment,
     TechnicalSummaryLine,
     TechnicalSummaryRank,
 )
@@ -219,6 +220,85 @@ def build_technical_headline_summary(
     )
 
 
+def build_technical_position_assessment(
+    *,
+    latest: float,
+    vwap: float,
+    ma25: float,
+    atr14: float | None,
+    day_open: float | None,
+    day_high: float | None,
+    day_low: float | None,
+    day_close_position: float | None,
+    volume_vs_avg20_pct: float | None,
+    high_breakouts: tuple[bool | None, ...],
+    low_highers: tuple[bool | None, ...],
+    previous_low: float | None,
+    recent20_low: float | None,
+    ma75: float | None,
+    recent60_low: float | None,
+    headline_rank: TechnicalSummaryRank,
+) -> TechnicalPositionAssessment:
+    """Score collapse risk and derive the single-stock hold judgement."""
+    all_high_breakouts_failed = _all_false(high_breakouts)
+    all_low_highers_failed = _all_false(low_highers)
+    support_distance_atr = _nearest_support_distance_atr(
+        latest=latest,
+        atr14=atr14,
+        supports=(ma25, previous_low, recent20_low, ma75, recent60_low),
+    )
+    support_is_far = support_distance_atr is not None and support_distance_atr > 0.7
+    support_is_near = support_distance_atr is not None and support_distance_atr <= 0.7
+    bearish_or_stalling = _is_significant_bearish(
+        latest=latest,
+        day_open=day_open,
+        atr14=atr14,
+    ) or _is_upper_price_stalling(
+        latest=latest,
+        day_open=day_open,
+        day_high=day_high,
+        day_low=day_low,
+    )
+
+    score = sum(
+        (
+            latest < ma25,
+            latest < vwap,
+            all_low_highers_failed,
+            all_high_breakouts_failed,
+            day_close_position is not None and day_close_position < 0.4,
+            volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 100 and bearish_or_stalling,
+            support_is_far,
+        )
+    )
+    level = "低" if score <= 1 else "中" if score <= 3 else "高"
+
+    ma25_up = latest >= ma25
+    vwap_up = latest >= vwap
+    ma25_near = atr14 not in (None, 0) and abs(latest - ma25) / atr14 <= 0.7
+    any_low_higher = any(value is True for value in low_highers)
+    close_is_low = day_close_position is not None and day_close_position < 0.5
+    volume_is_low = volume_vs_avg20_pct is not None and volume_vs_avg20_pct < 80
+
+    if not vwap_up and not ma25_up and all_low_highers_failed and support_is_far:
+        hold = "×"
+    elif (vwap_up and not ma25_up) or close_is_low or volume_is_low:
+        hold = "△"
+    elif ma25_up and vwap_up and _gte(_position_pct(day_close_position), 50) and _gte(volume_vs_avg20_pct, 80) and support_is_near:
+        hold = "◎"
+    elif (ma25_up or ma25_near) and vwap_up and any_low_higher:
+        hold = "○"
+    else:
+        hold = "△"
+
+    return TechnicalPositionAssessment(
+        collapse_risk_score=score,
+        collapse_risk_level=level,
+        hold_judgement=hold,
+        bottoming_start_established=latest < ma25 and headline_rank == "D3",
+    )
+
+
 def build_nearby_support_lines(
     *,
     latest: float,
@@ -424,10 +504,56 @@ def _lower_wick_ratio(*, day_open: float, day_high: float, day_low: float, lates
     return max(0.0, min(day_open, latest) - day_low) / day_range
 
 
+def _all_false(values: tuple[bool | None, ...]) -> bool:
+    return bool(values) and all(value is False for value in values)
+
+
+def _nearest_support_distance_atr(
+    *,
+    latest: float,
+    atr14: float | None,
+    supports: tuple[float | None, ...],
+) -> float | None:
+    if atr14 in (None, 0):
+        return None
+    candidates = [support for support in supports if support is not None and support < latest]
+    if not candidates:
+        return None
+    nearest = max(candidates)
+    return (latest - nearest) / atr14
+
+
+def _is_significant_bearish(*, latest: float, day_open: float | None, atr14: float | None) -> bool:
+    return (
+        day_open is not None
+        and atr14 not in (None, 0)
+        and latest < day_open
+        and abs(latest - day_open) >= 0.15 * atr14
+    )
+
+
+def _is_upper_price_stalling(
+    *,
+    latest: float,
+    day_open: float | None,
+    day_high: float | None,
+    day_low: float | None,
+) -> bool:
+    if day_open is None or day_high is None or day_low is None:
+        return False
+    day_range = day_high - day_low
+    if day_range <= 0:
+        return False
+    body = abs(latest - day_open)
+    upper_wick = day_high - max(day_open, latest)
+    return upper_wick / day_range >= 0.45 and upper_wick >= body * 1.5
+
+
 __all__ = [
     "RANK_LABELS",
     "RANK_ORDER",
     "build_technical_headline_summary",
+    "build_technical_position_assessment",
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",
     "classify_technical_summary_rank",

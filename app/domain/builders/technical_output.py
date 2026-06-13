@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_indicators import label_recent60_range_position_detail, label_volume_vs_avg20
-from app.domain.policies.technical_summary import build_technical_headline_summary, is_focus_theme
+from app.domain.policies.technical_summary import (
+    build_technical_headline_summary,
+    build_technical_position_assessment,
+    is_focus_theme,
+)
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
 
@@ -15,6 +19,7 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         _format_opening_summary(result),
         "",
         _format_headline_summary(result),
+        _format_position_assessment(result),
         "",
         _format_momentum(result),
         "",
@@ -125,6 +130,68 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
         recent60_low=snapshot.breakline.recent60_low,
     )
     return f"短評：{headline.text}"
+
+
+def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
+    snapshot = result.snapshot
+    latest = snapshot.price.latest
+    vwap = _as_float(result.vwap_snapshot.get("vwap"))
+    ma25 = snapshot.moving_average.ma25
+    dev25_pct = snapshot.moving_average.dev25_pct
+    if latest is None or vwap is None or ma25 is None or dev25_pct is None:
+        return "崩れ警戒：N/A\n崩れ警戒スコア：N/A\nホールド判定：N/A"
+
+    headline = build_technical_headline_summary(
+        dev25_pct=dev25_pct,
+        latest=latest,
+        vwap=vwap,
+        focus_theme=is_focus_theme(result.name),
+        ma25_distance_atr=snapshot.moving_average.ma25_distance_atr,
+        ma25=ma25,
+        ma25_prev5=snapshot.moving_average.ma25_prev5,
+        rsi14=snapshot.rsi14,
+        three_session_change_pct=result.three_session_momentum.change_pct,
+        high_breakout_count=_count_true(session.high_breakout for session in result.three_session_momentum.sessions),
+        low_higher_count=_count_true(session.low_higher for session in result.three_session_momentum.sessions),
+        day_close_position=snapshot.range.day_close_position,
+        day_open=snapshot.price.open,
+        day_high=snapshot.price.high,
+        day_low=snapshot.price.low,
+        atr14=snapshot.range.atr14,
+        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
+        recent60_range_position=snapshot.breakline.recent60_range_position,
+        previous_low=snapshot.previous_session.prev_low,
+        recent20_low=snapshot.breakline.recent20_low,
+        ma75=snapshot.moving_average.ma75,
+        recent60_low=snapshot.breakline.recent60_low,
+    )
+    assessment = build_technical_position_assessment(
+        latest=latest,
+        vwap=vwap,
+        ma25=ma25,
+        atr14=snapshot.range.atr14,
+        day_open=snapshot.price.open,
+        day_high=snapshot.price.high,
+        day_low=snapshot.price.low,
+        day_close_position=snapshot.range.day_close_position,
+        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
+        high_breakouts=tuple(session.high_breakout for session in result.three_session_momentum.sessions),
+        low_highers=tuple(session.low_higher for session in result.three_session_momentum.sessions),
+        previous_low=snapshot.previous_session.prev_low,
+        recent20_low=snapshot.breakline.recent20_low,
+        ma75=snapshot.moving_average.ma75,
+        recent60_low=snapshot.breakline.recent60_low,
+        headline_rank=headline.rank,
+    )
+    lines = [
+        f"崩れ警戒：{assessment.collapse_risk_level}",
+        f"崩れ警戒スコア：{assessment.collapse_risk_score}点",
+    ]
+    if latest < ma25:
+        established = "成立" if assessment.bottoming_start_established else "未成立"
+        lines.append(f"底打ち初動判定：{established}")
+    lines.append(f"ホールド判定：{assessment.hold_judgement}")
+    return "\n".join(lines)
 
 
 def _format_momentum(result: TechnicalAnalysisResult) -> str:

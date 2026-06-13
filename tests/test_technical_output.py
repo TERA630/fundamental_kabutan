@@ -1,3 +1,4 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 from app.domain.builders.technical_output import _build_resistance_lines, build_technical_output
@@ -75,7 +76,12 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "当日出来高：20日平均比　101%(前日出来高比　+0.1%)　通常" in output
     assert "60日レンジ位置：98.4%　高値圏 / 過熱・上値追い警戒" in output
     assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
+    assert "崩れ警戒：低" in output
+    assert "崩れ警戒スコア：1点" in output
+    assert "底打ち初動判定：" not in output
+    assert "ホールド判定：○" in output
     assert output.index("短評：B2 過熱極大") < output.index("■モメンタム")
+    assert output.index("崩れ警戒：低") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
     assert "3日安値切り上げ：〇〇〇" in output
@@ -123,6 +129,28 @@ def test_build_technical_output_marks_daily_reference_vwap():
     assert "(日足参考値)" in output
     assert "前場Vwap：" not in output
     assert "後場Vwap：" not in output
+
+
+def test_build_technical_output_shows_bottoming_start_only_below_ma25():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(
+        result.snapshot.moving_average,
+        ma25=170.0,
+        dev25_pct=-0.59,
+        ma25_distance_atr=0.2,
+    )
+    result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+
+    output = build_technical_output(result)
+
+    assert "短評：D3 底打ち初動" in output
+    assert "底打ち初動判定：成立" in output
+    assert "ホールド判定：△" in output
 
 
 def test_build_technical_output_marks_previous_session_intraday_na_when_missing():

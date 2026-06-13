@@ -6,6 +6,7 @@ from app.domain.policies.technical_summary import (
     build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
+    build_technical_position_assessment,
     classify_technical_summary_rank,
 )
 from app.domain.usecases.technical_summary import TechnicalSummaryService
@@ -150,6 +151,105 @@ def test_build_nearby_support_and_resistance_lines_select_two_nearest():
 
     assert support == (TechnicalSummaryLine("25ME", 98), TechnicalSummaryLine("20D-L", 97))
     assert resistance == (TechnicalSummaryLine("PrevH", 103), TechnicalSummaryLine("60D-H", 105))
+
+
+def test_position_assessment_scores_all_collapse_risk_conditions():
+    assessment = build_technical_position_assessment(
+        latest=90.0,
+        vwap=92.0,
+        ma25=95.0,
+        atr14=5.0,
+        day_open=91.0,
+        day_high=93.0,
+        day_low=89.0,
+        day_close_position=0.3,
+        volume_vs_avg20_pct=120.0,
+        high_breakouts=(False, False, False),
+        low_highers=(False, False, False),
+        previous_low=85.0,
+        recent20_low=80.0,
+        ma75=70.0,
+        recent60_low=60.0,
+        headline_rank="E",
+    )
+
+    assert assessment.collapse_risk_score == 7
+    assert assessment.collapse_risk_level == "高"
+    assert assessment.hold_judgement == "×"
+    assert assessment.bottoming_start_established is False
+
+
+def test_position_assessment_requires_all_three_momentum_marks_to_fail():
+    assessment = build_technical_position_assessment(
+        latest=101.0,
+        vwap=100.0,
+        ma25=100.0,
+        atr14=2.0,
+        day_open=100.0,
+        day_high=102.0,
+        day_low=99.0,
+        day_close_position=0.6,
+        volume_vs_avg20_pct=90.0,
+        high_breakouts=(False, False, True),
+        low_highers=(False, False, True),
+        previous_low=100.0,
+        recent20_low=95.0,
+        ma75=90.0,
+        recent60_low=80.0,
+        headline_rank="A1",
+    )
+
+    assert assessment.collapse_risk_score == 0
+    assert assessment.collapse_risk_level == "低"
+    assert assessment.hold_judgement == "◎"
+
+
+def test_position_assessment_counts_volume_with_upper_price_stalling():
+    assessment = build_technical_position_assessment(
+        latest=101.0,
+        vwap=100.0,
+        ma25=100.0,
+        atr14=2.0,
+        day_open=100.8,
+        day_high=102.8,
+        day_low=99.0,
+        day_close_position=0.5,
+        volume_vs_avg20_pct=101.0,
+        high_breakouts=(True, True, True),
+        low_highers=(True, True, True),
+        previous_low=100.0,
+        recent20_low=95.0,
+        ma75=90.0,
+        recent60_low=80.0,
+        headline_rank="A1",
+    )
+
+    assert assessment.collapse_risk_score == 1
+    assert assessment.collapse_risk_level == "低"
+
+
+def test_position_assessment_marks_d3_below_ma25_as_bottoming_start():
+    assessment = build_technical_position_assessment(
+        latest=99.0,
+        vwap=98.0,
+        ma25=100.0,
+        atr14=2.0,
+        day_open=98.0,
+        day_high=100.0,
+        day_low=97.0,
+        day_close_position=0.7,
+        volume_vs_avg20_pct=100.0,
+        high_breakouts=(False, False, True),
+        low_highers=(False, True, True),
+        previous_low=98.0,
+        recent20_low=95.0,
+        ma75=90.0,
+        recent60_low=80.0,
+        headline_rank="D3",
+    )
+
+    assert assessment.bottoming_start_established is True
+    assert assessment.hold_judgement == "△"
 
 
 def test_technical_summary_service_builds_row_and_markdown():

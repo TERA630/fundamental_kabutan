@@ -128,11 +128,12 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 1. 銘柄ヘッダ
 2. 先頭サマリ
 3. 冒頭短評
-4. `■モメンタム`
-5. `■当日位置・レンジ`
-6. `■移動平均`
-7. `■前日評価`
-8. `■支持線`
+4. 崩れ警戒、崩れ警戒スコア、底打ち初動判定、ホールド判定
+5. `■モメンタム`
+6. `■当日位置・レンジ`
+7. `■移動平均`
+8. `■前日評価`
+9. `■支持線`
 
 先頭サマリは、現在値、前日比、終端位置、取得時刻、25日線解離、25日線傾き、VWAP差分、当日出来高の20日平均比、60日レンジ位置を表示する。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
 
@@ -149,6 +150,17 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 ```
 
 冒頭短評の判定は domain policy で行い、`app/domain/builders/technical_output.py` は受け取った判定結果を文字列化する。GUI層には判定ロジックを持たない。分類と文言は `docs/Summery_spec.md` の `Technical Summary 冒頭短評` に合わせる。
+
+冒頭短評の直後には次の判定を表示する。崩れ警戒とホールド判定は25日線の上下にかかわらず表示する。底打ち初動判定は現在値が25日線未満の場合だけ表示する。スコアリングと判定条件は `docs/current_implementation_spec.md` の `単一銘柄の崩れ警戒スコア` および `底打ち初動・ホールド判定` を正とする。
+
+```text
+崩れ警戒：{低/中/高}
+崩れ警戒スコア：{score}点
+底打ち初動判定：{未成立/成立}
+ホールド判定：{◎/○/△/×}
+```
+
+25日線以上の場合は `底打ち初動判定` 行を出力しない。主要値が欠損して判定できない場合は、該当値を `N/A` と表示する。
 
 日中5分足が取得できる場合、先頭サマリには前後場VWAPを追加表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
 
@@ -174,6 +186,10 @@ Vwap：{vwap_diff_price}円({vwap_diff_pct}/{vwap_diff_atr}){vwap_source_suffix}
 60日レンジ位置：{recent60_range_position}　{recent60_range_position_label_detail}
 
 短評：{headline_summary}
+崩れ警戒：{collapse_risk_level}
+崩れ警戒スコア：{collapse_risk_score}点
+底打ち初動判定：{bottoming_start_judgement}
+ホールド判定：{hold_judgement}
 
 ■モメンタム
 3日高値更新：{high_breakout_3bd_ago}{high_breakout_2bd_ago}{high_breakout_1bd_ago}
