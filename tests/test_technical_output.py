@@ -68,12 +68,14 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "株価：" in output
     assert "終端位置" in output
     assert "取得時刻：2026-04-07 14:55" in output
-    assert "25日線解離：" in output
+    assert "位置：25日線" in output
     assert "傾き：" not in output
-    assert "Vwap：" in output
-    assert "前場：◯ 後場：◯" in output
-    assert "当日出来高比：　20日平均比　101%（前日比+0.1%）" in output
-    assert "60日レンジ　98.4%　高値圏 / 過熱・上値追い警戒" in output
+    assert "Vmap" in output
+    assert "需給：前場Vwap：◯ 後場Vwap：◯" in output
+    assert "出来高比　101%(前日比+0.1%)" in output
+    assert "60日レンジ　98.4% |" in output
+    assert "支持：165(preL)→146(20dL)→106(60dL)" in output
+    assert "抵抗：170(preH/20dH/60dH)" in output
     assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
     assert "崩れ警戒：低（1点）" in output
     assert "崩れ警戒スコア：" not in output
@@ -101,8 +103,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "後場Vwap：167.78" in output
     assert "■移動平均・出来高" not in output
     assert "出来高：1,069株" not in output
-    assert "■抵抗線" in output
-    assert "前日高値：170.00" in output
+    assert "■抵抗線" not in output
     assert "■前日評価" in output
     assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
     assert "前日Vwap(前・後場)　〇/〇  高値更新 〇 / 安値維持 〇" in output
@@ -111,15 +112,11 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
     assert "前日ローソク足型：　小陽線" in output
     assert "前日ローソク足型：　小陽線＋" not in output
-    assert "■支持線" in output
-    assert "20日安値：" in output
-    assert "60日安値：" in output
+    assert "■支持線" not in output
     assert "■節目・ブレイクライン" not in output
     assert "■流れ" not in output
     assert "トレンド：" not in output
-    assert output.index("■移動平均・Vwap") < output.index("■支持線")
-    assert output.index("■支持線") < output.index("■抵抗線")
-    assert output.index("■抵抗線") < output.index("■前日評価")
+    assert output.index("■移動平均・Vwap") < output.index("■前日評価")
 
 
 def test_build_technical_output_marks_daily_reference_vwap():
@@ -132,11 +129,12 @@ def test_build_technical_output_marks_daily_reference_vwap():
 
     output = build_technical_output(result)
 
-    assert "Vwap：" in output
+    assert "Vmap" in output
     assert "取得時刻：2026-04-08 終値" in output
     assert "(日足参考値)" in output
-    assert "前場Vwap：" not in output
-    assert "後場Vwap：" not in output
+    assert "需給：前場Vwap：N/A 後場Vwap：N/A" in output
+    assert "\n前場Vwap：" not in output
+    assert "\n後場Vwap：" not in output
 
 
 def test_build_technical_output_marks_each_session_vwap_against_latest_price():
@@ -157,7 +155,7 @@ def test_build_technical_output_marks_each_session_vwap_against_latest_price():
 
     output = build_technical_output(result)
 
-    assert "前場：× 後場：◯" in output
+    assert "前場Vwap：× 後場Vwap：◯" in output
     assert "前場Vwap：170.00" in output
     assert "後場Vwap：168.00" in output
 

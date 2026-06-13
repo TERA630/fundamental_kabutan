@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.domain.models.technical_summary import TechnicalSummaryLine
-from app.domain.policies.technical_indicators import label_recent60_range_position_detail
 from app.domain.policies.technical_summary import (
     build_technical_headline_summary,
     build_technical_position_assessment,
@@ -35,14 +34,6 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         f"5日線：{_fmt_price(snapshot.moving_average.ma5)}（乖離 {_fmt_pct(snapshot.moving_average.dev5_pct)}）",
         f"25日線：{_fmt_price(snapshot.moving_average.ma25)}（乖離 {_fmt_pct(snapshot.moving_average.dev25_pct)} / ATR比 {_fmt_multiple(snapshot.moving_average.ma25_distance_atr)}）",
         f"14日ATR：{_fmt_price(snapshot.range.atr14)}",
-        "",
-        "■支持線",
-        f"前日安値：{_fmt_price(snapshot.previous_session.prev_low)}",
-        f"20日安値：{_fmt_price(snapshot.breakline.recent20_low)}",
-        f"60日安値：{_fmt_price(snapshot.breakline.recent60_low)}",
-        "",
-        "■抵抗線",
-        *_format_resistance_lines(result),
         "",
         _format_previous_session(result),
     ]
@@ -93,13 +84,63 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     lines = [
         f"取得時刻：{_fmt_text(result.intraday_price_timestamp)}",
         f"【銘柄】{result.name} ({result.code4})",
-        f"株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）",
-        f"25日線解離：{_fmt_pct(snapshot.moving_average.dev25_pct)}({_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)})",
-        f"Vwap：{_fmt_price_signed(vwap_diff)}円（{_fmt_pct(vwap_diff_pct)}/{_fmt_atr(vwap_diff_atr)}）{vwap_source_suffix}{_format_current_session_vwap_marks(latest, vwap_snapshot)}",
-        f"当日出来高比：　20日平均比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}（前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)}）",
-        f"60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)}　{label_recent60_range_position_detail(snapshot.breakline.recent60_range_position)}",
+        f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）"
+        f" | 出来高比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)})",
+        f"　位置：25日線{_fmt_pct(snapshot.moving_average.dev25_pct)}/{_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)}"
+        f" | Vmap{_fmt_price_signed(vwap_diff)}円/{_fmt_pct(vwap_diff_pct)}/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
+        f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
+        f"　支持：{_format_opening_supports(result)}",
+        f"　抵抗：{_format_opening_resistances(result)}",
+        f"　需給：{_format_current_session_vwap_marks(latest, vwap_snapshot).strip() or '前場Vwap：N/A 後場Vwap：N/A'}",
     ]
     return "\n".join(lines)
+
+
+def _format_opening_supports(result: TechnicalAnalysisResult) -> str:
+    snapshot = result.snapshot
+    latest = snapshot.price.latest
+    if latest is None:
+        return "N/A"
+    candidates = (
+        ("preL", snapshot.previous_session.prev_low),
+        ("20dL", snapshot.breakline.recent20_low),
+        ("60dL", snapshot.breakline.recent60_low),
+    )
+    return _format_grouped_price_levels(candidates, latest=latest, ascending=False)
+
+
+def _format_opening_resistances(result: TechnicalAnalysisResult) -> str:
+    snapshot = result.snapshot
+    latest = snapshot.price.latest
+    if latest is None:
+        return "N/A"
+    candidates = (
+        ("preH", snapshot.previous_session.prev_high),
+        ("25ME", snapshot.moving_average.ma25),
+        ("20dH", snapshot.breakline.recent20_high),
+        ("60dH", snapshot.breakline.recent60_high),
+    )
+    return _format_grouped_price_levels(candidates, latest=latest, ascending=True)
+
+
+def _format_grouped_price_levels(
+    candidates: tuple[tuple[str, float | None], ...],
+    *,
+    latest: float,
+    ascending: bool,
+) -> str:
+    grouped: dict[float, list[str]] = {}
+    for label, price in candidates:
+        if price is None or (price <= latest if ascending else price >= latest):
+            continue
+        grouped.setdefault(price, []).append(label)
+    if not grouped:
+        return "N/A"
+    prices = sorted(grouped, reverse=not ascending)
+    return "→".join(
+        f"{_fmt_level_price(price)}({'/'.join(grouped[price])})"
+        for price in prices
+    )
 
 
 def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
@@ -341,6 +382,12 @@ def _fmt_price_compact(value: float | None) -> str:
     return f"{value:,.2f}"
 
 
+def _fmt_level_price(value: float) -> str:
+    if float(value).is_integer():
+        return f"{value:.0f}"
+    return f"{value:.2f}"
+
+
 def _fmt_price_current(value: float | None) -> str:
     if value is None:
         return "N/A"
@@ -429,9 +476,9 @@ def _format_current_session_vwap_marks(latest: float | None, vwap_snapshot: dict
     if vwap_snapshot.get("vwap_source") != "本日5分足":
         return ""
     session = vwap_snapshot.get("current_intraday_session")
-    marks = [f"前場：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_am_vwap')))}"]
+    marks = [f"前場Vwap：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_am_vwap')))}"]
     if session == "後場":
-        marks.append(f"後場：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_pm_vwap')))}")
+        marks.append(f"後場Vwap：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_pm_vwap')))}")
     return "  " + " ".join(marks)
 
 
