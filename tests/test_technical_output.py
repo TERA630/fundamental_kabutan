@@ -72,7 +72,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "傾き：" not in output
     assert "VWAP" in output
     assert "Vmap" not in output
-    assert "需給：前場Vwap：◯ 後場Vwap：◯" in output
+    assert "需給（VWAP）：当日前場／後場　◯／◯　前日前場／後場　◯／◯" in output
     assert "出来高比　101%(前日比+0.1%)" in output
     assert "60日レンジ　98.4% |" in output
     assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
@@ -108,9 +108,11 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■抵抗線" not in output
     assert "■前日評価" in output
     assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
-    assert "前日Vwap(前・後場)　〇/〇  高値更新 〇 / 安値維持 〇" in output
+    assert "前日Vwap(前・後場)" not in output
+    assert "高値更新 〇 / 安値維持 〇" not in output
     assert "前日出来高：　20日平均比　100.9%(前々日比　+0.1%)" in output
-    assert "後場評価 高値維持 / VWAP上" in output
+    assert "後場評価 高値維持" in output
+    assert "後場評価 高値維持 / VWAP上" not in output
     assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
     assert "前日ローソク足型：　小陽線" in output
     assert "前日ローソク足型：　小陽線＋" not in output
@@ -135,7 +137,7 @@ def test_build_technical_output_marks_daily_reference_vwap():
     assert "Vmap" not in output
     assert "取得時刻：2026-04-08 終値" in output
     assert "(日足参考値)" in output
-    assert "需給：前場Vwap：N/A 後場Vwap：N/A" in output
+    assert "需給（VWAP）：当日 N/A　前日前場／後場　N/A／N/A" in output
     assert "\n前場Vwap：" not in output
     assert "\n後場Vwap：" not in output
 
@@ -158,9 +160,33 @@ def test_build_technical_output_marks_each_session_vwap_against_latest_price():
 
     output = build_technical_output(result)
 
-    assert "前場Vwap：× 後場Vwap：◯" in output
+    assert "需給（VWAP）：当日前場／後場　×／◯　前日前場／後場　◯／◯" in output
     assert "前場Vwap：170.00" in output
     assert "後場Vwap：168.00" in output
+
+
+def test_build_technical_output_omits_current_pm_mark_during_am_session():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    result = replace(
+        result,
+        vwap_snapshot={
+            **result.vwap_snapshot,
+            "current_intraday_session": "前場",
+            "current_am_vwap": 170.0,
+            "current_pm_vwap": None,
+        },
+    )
+
+    output = build_technical_output(result)
+    supply_line = next(line for line in output.splitlines() if "需給（VWAP）" in line)
+
+    assert supply_line == "　需給（VWAP）：当日前場　×　前日前場／後場　◯／◯"
+    assert "当日後場" not in supply_line
 
 
 def test_build_technical_output_shows_bottoming_start_only_below_ma25():
@@ -197,8 +223,11 @@ def test_build_technical_output_marks_previous_session_intraday_na_when_missing(
     output = build_technical_output(result)
 
     assert "終値 168（VWAP N/A円 / N/A / N/A）騰落率+0.6%" in output
-    assert "前日Vwap(前・後場)　N/A/N/A  高値更新 〇 / 安値維持 〇" in output
-    assert "後場評価 N/A / VWAPN/A" in output
+    assert "需給（VWAP）：当日 N/A　前日前場／後場　N/A／N/A" in output
+    assert "前日Vwap(前・後場)" not in output
+    assert "高値更新 〇 / 安値維持 〇" not in output
+    assert "後場評価 N/A" in output
+    assert "/ VWAPN/A" not in output
 
 
 def test_build_resistance_lines_keeps_only_prices_above_latest_in_ascending_order():

@@ -160,11 +160,13 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 
 25日線以上の場合は `底打ち初動判定` 行を出力しない。主要値が欠損して判定できない場合は、該当値を `N/A` と表示する。
 
-日中5分足が取得できる場合、先頭サマリのVWAP行には現在株価が前場・後場それぞれのVWAP以上なら `◯`、未満なら `×`、判定不能なら `N/A` を表示する。前後場VWAPの価格は `■移動平均・Vwap` に表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
+日中5分足が取得できる場合、先頭サマリの `需給（VWAP）` 行には、現在株価が当日前場・後場それぞれのVWAP以上なら `◯`、未満なら `×`、判定不能なら `N/A` を表示する。同じ行へ前日前場・後場のVWAP維持判定も表示する。前後場VWAPの価格は `■移動平均・Vwap` に表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
 
-- 最新バーが前場の場合: 前場VWAPのみ表示する。
-- 最新バーが後場の場合: 前場VWAPと後場VWAPを表示する。
-- 日中5分足が取得できず日足参考値へフォールバックした場合: 前場VWAP、後場VWAPは `N/A` とする。
+- 最新バーが前場の場合: 当日前場のみ表示し、当日後場は表示しない。前日前場・後場は両方表示する。
+- 最新バーが後場の場合: 当日前場・後場と前日前場・後場を表示する。
+- 日中5分足が取得できず日足参考値へフォールバックした場合: 当日は `N/A` とし、前日前場・後場は取得結果を表示する。
+
+`■前日評価` では、前日前場・後場のVWAP維持判定を重複表示しない。後場評価は分類ラベルだけを表示し、`/ VWAP上` などのVWAP位置を併記しない。前日単独の高値更新・安値維持も、`■モメンタム` の3日系列と重複するため表示しない。
 
 `■モメンタム` は、3営業日前、2営業日前、前営業日の順に、高値更新、安値切り上げ、3日騰落率、20日平均出来高比を表示する。
 
@@ -179,7 +181,7 @@ Technicalタブの表示例は次の通り。
 　位置：25日線{dev25_pct}/{ma25_distance_atr} | VWAP{vwap_diff_price}円/{vwap_diff_pct}/{vwap_diff_atr}{vwap_source_suffix} | 60日レンジ　{recent60_range_position} |
 　下値目安：{downside_target_levels}
 　抵抗：{resistance_levels}
-　需給：前場Vwap：{am_mark} 後場Vwap：{pm_mark}
+　需給（VWAP）：当日前場／後場　{current_am_mark}／{current_pm_mark}　前日前場／後場　{previous_am_mark}／{previous_pm_mark}
 
 短評：{headline_summary}
 崩れ警戒：{collapse_risk_level}（{collapse_risk_score}点）
@@ -209,10 +211,9 @@ Technicalタブの表示例は次の通り。
 ■前日評価
 終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
 
-前日Vwap(前・後場)　{am_mark}/{pm_mark}  高値更新 {high_mark} / 安値維持 {low_mark}
 前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
 
-後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
+後場評価 {previous_pm_evaluation}
 
 前日レンジ {prev_low}-{prev_high}（{prev_range_atr}）　終位置 {prev_close_position}
 前日ローソク足型：　{prev_candle_body_label}
@@ -274,10 +275,9 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 ■前日評価
 終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
 
-前日Vwap(前・後場)　{am_mark}/{pm_mark}  高値更新 {high_mark} / 安値維持 {low_mark}
 前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
 
-後場評価 {previous_pm_evaluation} / VWAP{previous_pm_vwap_position}
+後場評価 {previous_pm_evaluation}
 
 前日レンジ {prev_low}-{prev_high}（{prev_range_atr}）　終位置 {prev_close_position}
 前日ローソク足型：　{prev_candle_body_label}

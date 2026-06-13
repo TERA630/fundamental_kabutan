@@ -91,7 +91,7 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
         f"　下値目安：{_format_opening_supports(result)}",
         f"　抵抗：{_format_opening_resistances(result)}",
-        f"　需給：{_format_current_session_vwap_marks(latest, vwap_snapshot).strip() or '前場Vwap：N/A 後場Vwap：N/A'}",
+        f"　需給（VWAP）：{_format_vwap_supply_marks(result)}",
     ]
     return "\n".join(lines)
 
@@ -318,16 +318,14 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
     prev_vwap_diff_pct = ((prev_close / prev_vwap) - 1) * 100 if prev_close is not None and prev_vwap not in (None, 0) else None
     prev_vwap_diff_atr = _safe_div(prev_vwap_diff, snapshot.range.atr14)
     pm_evaluation = intraday.get("previous_pm_evaluation")
-    pm_vwap_position = intraday.get("previous_pm_vwap_position")
     return "\n".join(
         [
             "■前日評価",
             f"終値 {_fmt_price_compact(prev_close)}（VWAP {_fmt_price_signed_compact(prev_vwap_diff)}円 / {_fmt_pct(prev_vwap_diff_pct)} / {_fmt_atr_unsigned(prev_vwap_diff_atr)}）騰落率{_fmt_pct(previous.prev_change_pct)}",
             "",
-            f"前日Vwap(前・後場)　{_fmt_bool_mark(_as_bool(intraday.get('prev_am_vwap_maintained')))}/{_fmt_bool_mark(_as_bool(intraday.get('prev_pm_vwap_maintained')))}  高値更新 {_fmt_bool_mark(previous.prev_high_higher)} / 安値維持 {_fmt_bool_mark(previous.prev_low_higher)}",
             f"前日出来高：　20日平均比　{_fmt_pct_unsigned(previous.prev_volume_vs_avg20_pct)}(前々日比　{_fmt_pct(previous.prev_volume_change_pct)})",
             "",
-            f"後場評価 {_fmt_text(pm_evaluation)} / VWAP{_fmt_text(pm_vwap_position)}",
+            f"後場評価 {_fmt_text(pm_evaluation)}",
             "",
             f"前日レンジ {_fmt_price_compact(previous.prev_low)}-{_fmt_price_compact(previous.prev_high)}（{_fmt_atr_unsigned(previous.prev_range_atr)}）　終位置 {_fmt_position_pct(previous.prev_close_position)}",
             f"前日ローソク足型：　{_format_previous_candle(previous.candle_body_label, previous.wick_label)}",
@@ -477,14 +475,38 @@ def _fmt_text(value: object) -> str:
     return value if isinstance(value, str) and value else "N/A"
 
 
-def _format_current_session_vwap_marks(latest: float | None, vwap_snapshot: dict[str, object]) -> str:
-    if vwap_snapshot.get("vwap_source") != "本日5分足":
-        return ""
-    session = vwap_snapshot.get("current_intraday_session")
-    marks = [f"前場Vwap：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_am_vwap')))}"]
-    if session == "後場":
-        marks.append(f"後場Vwap：{_fmt_vwap_mark(latest, _as_float(vwap_snapshot.get('current_pm_vwap')))}")
-    return "  " + " ".join(marks)
+def _format_vwap_supply_marks(result: TechnicalAnalysisResult) -> str:
+    current = result.vwap_snapshot
+    previous = result.previous_intraday_snapshot
+    latest = result.snapshot.price.latest
+    session = current.get("current_intraday_session")
+
+    if current.get("vwap_source") != "本日5分足":
+        current_text = "当日 N/A"
+    elif session == "後場":
+        current_text = (
+            "当日前場／後場　"
+            f"{_fmt_vwap_mark(latest, _as_float(current.get('current_am_vwap')))}／"
+            f"{_fmt_vwap_mark(latest, _as_float(current.get('current_pm_vwap')))}"
+        )
+    else:
+        current_text = (
+            "当日前場　"
+            f"{_fmt_vwap_mark(latest, _as_float(current.get('current_am_vwap')))}"
+        )
+
+    previous_text = (
+        "前日前場／後場　"
+        f"{_fmt_vwap_bool_mark(_as_bool(previous.get('prev_am_vwap_maintained')))}／"
+        f"{_fmt_vwap_bool_mark(_as_bool(previous.get('prev_pm_vwap_maintained')))}"
+    )
+    return f"{current_text}　{previous_text}"
+
+
+def _fmt_vwap_bool_mark(value: bool | None) -> str:
+    if value is None:
+        return "N/A"
+    return "◯" if value else "×"
 
 
 def _format_current_session_vwap_price_lines(vwap_snapshot: dict[str, object]) -> list[str]:
