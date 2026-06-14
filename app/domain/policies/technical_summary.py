@@ -398,6 +398,7 @@ def build_technical_position_assessment(
     latest: float,
     vwap: float,
     ma25: float,
+    ma25_prev5: float | None = None,
     atr14: float | None,
     day_open: float | None,
     day_high: float | None,
@@ -433,6 +434,9 @@ def build_technical_position_assessment(
         day_low=day_low,
     )
 
+    # 追加: 25日線傾き低下フラグ（ma25_prev5 が与えられた場合）を加点対象とする
+    ma25_slope = _ma25_slope(ma25, ma25_prev5)
+
     score = sum(
         (
             latest < ma25,
@@ -440,8 +444,9 @@ def build_technical_position_assessment(
             all_low_highers_failed,
             all_high_breakouts_failed,
             day_close_position is not None and day_close_position < 0.4,
-            volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 100 and bearish_or_stalling,
+            volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 110 and bearish_or_stalling,
             support_is_far,
+            ma25_slope in {"down", "flat"},
         )
     )
     level = "低" if score <= 1 else "中" if score <= 3 else "高"
@@ -464,9 +469,50 @@ def build_technical_position_assessment(
     else:
         hold = "△"
 
+    # 表示ラベルをランク別に決定
+    def _collapse_label_for(rank: TechnicalSummaryRank, s: int) -> str:
+        primary_set = {"A1", "A2", "B1", "B2", "D2", "D3", "E"}
+        if rank in primary_set:
+            if s <= 2:
+                return "崩れ軽微"
+            if s <= 4:
+                return "上値重い"
+            if s <= 6:
+                return "崩れ警戒"
+            return "買い不可"
+        if rank == "C1":
+            if s <= 2:
+                return "押し目候補"
+            if s <= 4:
+                return "VWAP回復待ち"
+            return "押し目ではなく崩れ警戒"
+        if rank == "C2":
+            if s <= 2:
+                return "軽度崩れ"
+            if s <= 4:
+                return "崩れ警戒"
+            return "買い不可"
+        if rank == "D1":
+            if s <= 2:
+                return "戻り良好"
+            if s <= 4:
+                return "25日線奪回待ち"
+            return "戻り売り警戒"
+        # デフォルト
+        if s <= 2:
+            return "崩れ軽微"
+        if s <= 4:
+            return "上値重い"
+        if s <= 6:
+            return "崩れ警戒"
+        return "買い不可"
+
+    collapse_label = _collapse_label_for(headline_rank, score)
+
     return TechnicalPositionAssessment(
         collapse_risk_score=score,
         collapse_risk_level=level,
+        collapse_risk_label=collapse_label,
         hold_judgement=hold,
         bottoming_start_established=latest < ma25 and headline_rank == "D3",
     )
@@ -795,7 +841,7 @@ def _is_upper_price_stalling(
         return False
     body = abs(latest - day_open)
     upper_wick = day_high - max(day_open, latest)
-    return upper_wick / day_range >= 0.45 and upper_wick >= body * 1.5
+    return upper_wick / day_range >= 0.35 and upper_wick >= body * 1.5
 
 
 __all__ = [

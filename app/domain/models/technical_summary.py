@@ -28,6 +28,7 @@ class TechnicalHeadlineSummary:
 class TechnicalPositionAssessment:
     collapse_risk_score: int
     collapse_risk_level: CollapseRiskLevel
+    collapse_risk_label: str
     hold_judgement: HoldJudgement
     bottoming_start_established: bool
 

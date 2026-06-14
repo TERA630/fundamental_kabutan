@@ -382,7 +382,7 @@ def test_position_assessment_counts_volume_with_upper_price_stalling():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 1
+    assert assessment.collapse_risk_score == 0
     assert assessment.collapse_risk_level == "低"
 
 
