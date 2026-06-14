@@ -51,8 +51,8 @@ class TechnicalSummaryService:
         moving_average = snapshot.moving_average
         previous = snapshot.previous_session
         breakline = snapshot.breakline
-        latest = price.latest
-        dev25_pct = moving_average.dev25_pct
+        latest = _evaluation_price(result)
+        dev25_pct = _pct_change(latest, moving_average.ma25)
         vwap = _as_float(result.vwap_snapshot.get("vwap"))
         if latest is None:
             raise ValueError("現在値が取得できません")
@@ -61,30 +61,39 @@ class TechnicalSummaryService:
         if vwap is None:
             raise ValueError("VWAPが取得できません")
 
+        evaluation_volume = _evaluation_intraday_field(result, "volume", price.volume)
+        evaluation_open = _evaluation_intraday_field(result, "open", getattr(price, "open", None))
+        evaluation_high = _evaluation_intraday_field(result, "high", price.high)
+        evaluation_low = _evaluation_intraday_field(result, "low", price.low)
         volume_vs_avg20_pct = (
             None
-            if price.volume is None or price.volume_avg20 in (None, 0)
-            else (price.volume / price.volume_avg20) * 100
+            if evaluation_volume is None or price.volume_avg20 in (None, 0)
+            else (evaluation_volume / price.volume_avg20) * 100
         )
         momentum_sessions = getattr(result.three_session_momentum, "sessions", ())
         high_breakout_count = _count_true(session.high_breakout for session in momentum_sessions)
         low_higher_count = _count_true(session.low_higher for session in momentum_sessions)
+        day_close_position = _range_position(latest, evaluation_low, evaluation_high)
+        ma25_distance_atr = _safe_div(
+            None if moving_average.ma25 is None else latest - moving_average.ma25,
+            getattr(snapshot.range, "atr14", None),
+        )
         headline = build_technical_headline_summary(
             dev25_pct=dev25_pct,
             latest=latest,
             vwap=vwap,
             focus_theme=is_focus_theme(result.name),
-            ma25_distance_atr=moving_average.ma25_distance_atr,
+            ma25_distance_atr=ma25_distance_atr,
             ma25=moving_average.ma25,
             ma25_prev5=moving_average.ma25_prev5,
             rsi14=getattr(snapshot, "rsi14", None),
             three_session_change_pct=result.three_session_momentum.change_pct,
             high_breakout_count=high_breakout_count,
             low_higher_count=low_higher_count,
-            day_close_position=getattr(snapshot.range, "day_close_position", None),
-            day_open=getattr(price, "open", None),
-            day_high=price.high,
-            day_low=price.low,
+            day_close_position=day_close_position,
+            day_open=evaluation_open,
+            day_high=evaluation_high,
+            day_low=evaluation_low,
             atr14=getattr(snapshot.range, "atr14", None),
             volume_vs_avg20_pct=volume_vs_avg20_pct,
             recent60_range_position=breakline.recent60_range_position,
@@ -92,6 +101,8 @@ class TechnicalSummaryService:
             recent20_low=breakline.recent20_low,
             ma75=moving_average.ma75,
             recent60_low=breakline.recent60_low,
+            vwap_maintained_15m=_as_bool(result.vwap_snapshot.get("vwap_maintained_15m")),
+            low_highers=tuple(session.low_higher for session in momentum_sessions),
         )
         return TechnicalSummaryRow(
             name=result.name,
@@ -99,17 +110,30 @@ class TechnicalSummaryService:
             rank=headline.rank,
             rank_label=headline.rank_label,
             latest=latest,
-            day_change_price=price.day_change_price,
-            day_change_pct=price.day_change_pct,
+            day_change_price=(
+                latest - price.prev_close
+                if getattr(price, "prev_close", None) is not None
+                else price.day_change_price
+            ),
+            day_change_pct=(
+                _pct_change(latest, price.prev_close)
+                if getattr(price, "prev_close", None) is not None
+                else price.day_change_pct
+            ),
             three_session_change_pct=result.three_session_momentum.change_pct,
-            day_high=price.high,
-            day_low=price.low,
-            day_close_position=getattr(snapshot.range, "day_close_position", None),
-            day_range_atr=snapshot.range.day_range_atr,
+            day_high=evaluation_high,
+            day_low=evaluation_low,
+            day_close_position=day_close_position,
+            day_range_atr=_safe_div(
+                None
+                if evaluation_high is None or evaluation_low is None
+                else evaluation_high - evaluation_low,
+                getattr(snapshot.range, "atr14", None),
+            ),
             vwap=vwap,
             vwap_diff_pct=_pct_change(latest, vwap),
             dev25_pct=dev25_pct,
-            ma25_distance_atr=moving_average.ma25_distance_atr,
+            ma25_distance_atr=ma25_distance_atr,
             volume_vs_avg20_pct=volume_vs_avg20_pct,
             previous_vwap_maintained=_previous_vwap_maintained(result),
             support_lines=build_nearby_support_lines(
@@ -154,6 +178,40 @@ def _as_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _as_bool(value: object) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _evaluation_price(result: TechnicalAnalysisResult) -> float | None:
+    value = getattr(result, "evaluation_price", None)
+    return _as_float(value) if value is not None else result.snapshot.price.latest
+
+
+def _evaluation_intraday_field(
+    result: TechnicalAnalysisResult,
+    key: str,
+    daily_value: float | None,
+) -> float | None:
+    source = getattr(result, "evaluation_price_source", "daily_close")
+    if source in {"intraday_5m", "provisional_close"}:
+        value = _as_float(result.vwap_snapshot.get(key))
+        if value is not None:
+            return value
+    return daily_value
+
+
+def _range_position(latest: float, low: float | None, high: float | None) -> float | None:
+    if low is None or high is None or high <= low:
+        return None
+    return (latest - low) / (high - low)
+
+
+def _safe_div(value: float | None, divisor: float | None) -> float | None:
+    if value is None or divisor in (None, 0):
+        return None
+    return value / divisor
 
 
 def _count_true(values: Iterable[bool | None]) -> int:

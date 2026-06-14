@@ -94,6 +94,9 @@ def test_build_analysis_result_fetches_and_caches_histories():
     second = service.build_analysis_result(name="Sample", code4="1234")
 
     assert first.snapshot.price.latest == 169.0
+    assert first.evaluation_price == 169.0
+    assert first.evaluation_price_source == "daily_close"
+    assert first.evaluation_price_timestamp == "2026-04-08 終値"
     assert first.intraday_price_timestamp == "2026-04-07 14:55"
     assert first.three_session_momentum.change_pct == pytest.approx((168.0 / 166.0 - 1) * 100)
     assert first.vwap_snapshot["vwap_source"] == "本日5分足"
@@ -118,6 +121,62 @@ def test_build_analysis_result_falls_back_to_daily_reference_vwap():
     assert result.vwap_snapshot["latest_bar_time"] == "終値"
     assert result.intraday_price_timestamp == "2026-04-08 終値"
     assert result.previous_intraday_snapshot["previous_pm_evaluation"] == "N/A"
+
+
+def test_build_analysis_result_uses_same_day_intraday_evaluation_price():
+    daily = _daily_history()
+    current_date = daily.index[-1].date().isoformat()
+    intraday = pd.DataFrame(
+        {
+            "Open": [168.0, 169.0, 169.5],
+            "High": [169.5, 170.5, 171.0],
+            "Low": [167.5, 168.5, 169.0],
+            "Close": [169.0, 170.0, 170.5],
+            "Volume": [1000.0, 1000.0, 1000.0],
+        },
+        index=pd.to_datetime(
+            [f"{current_date} 09:00", f"{current_date} 09:05", f"{current_date} 09:10"]
+        ),
+    )
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: daily,
+        fetch_intraday_history=lambda _code4: intraday,
+    )
+
+    result = service.build_analysis_result(name="Sample", code4="1234")
+
+    assert result.evaluation_price == 170.5
+    assert result.evaluation_price_source == "intraday_5m"
+    assert result.evaluation_price_timestamp == "2026-04-08 09:10"
+
+
+def test_build_analysis_result_uses_daily_close_after_market_close():
+    daily = _daily_history()
+    current_date = daily.index[-1].date().isoformat()
+    intraday = pd.DataFrame(
+        {
+            "Open": [168.0, 169.0, 170.0],
+            "High": [169.5, 170.5, 172.0],
+            "Low": [167.5, 168.5, 169.5],
+            "Close": [169.0, 170.0, 171.0],
+            "Volume": [1000.0, 1000.0, 1000.0],
+        },
+        index=pd.to_datetime(
+            [f"{current_date} 15:15", f"{current_date} 15:20", f"{current_date} 15:25"]
+        ),
+    )
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: daily,
+        fetch_intraday_history=lambda _code4: intraday,
+    )
+
+    result = service.build_analysis_result(name="Sample", code4="1234")
+
+    assert result.evaluation_price == 169.0
+    assert result.evaluation_price_source == "daily_close"
+    assert result.evaluation_price_timestamp == "2026-04-08 終値"
 
 
 def test_build_analysis_result_from_market_data_bundle():

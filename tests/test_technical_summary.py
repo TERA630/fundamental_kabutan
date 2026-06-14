@@ -3,6 +3,9 @@ from types import SimpleNamespace
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryTable
 from app.domain.policies.technical_summary import (
+    build_d1_detail,
+    build_d3_detail,
+    build_dev25_risk_label,
     build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
@@ -55,6 +58,7 @@ def test_classify_technical_summary_rank_covers_bottoming_start():
             high_breakout_count=1,
             low_higher_count=2,
             day_close_position=0.65,
+            vwap_maintained_15m=True,
         )
         == "D3"
     )
@@ -97,8 +101,8 @@ def test_d2_headline_uses_strong_comment_when_two_auxiliary_conditions_pass():
     )
 
     assert headline.rank == "D2"
-    assert headline.comment == "底打ち候補強。"
-    assert headline.next_action == "VWAP回復待ち(補助指標2つ以上)。"
+    assert headline.comment == "支持線反発待ち。"
+    assert headline.next_action == "まだ入らない。VWAP回復待ち。"
 
 
 def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
@@ -118,8 +122,76 @@ def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
     )
 
     assert headline.rank == "D2"
-    assert headline.comment == "底打ち候補。"
-    assert headline.next_action == "買い急がず(補助指標1つ以下)。"
+    assert headline.comment == "支持線反発待ち。"
+    assert headline.next_action == "まだ入らない。VWAP回復待ち。"
+
+
+def test_d3_requires_vwap_maintenance_but_not_volume():
+    base = dict(
+        dev25_pct=-12.0,
+        latest=105.0,
+        vwap=100.0,
+        focus_theme=False,
+        high_breakout_count=1,
+        low_higher_count=2,
+        day_close_position=0.65,
+    )
+
+    assert classify_technical_summary_rank(**base, vwap_maintained_15m=False) == "D1"
+    assert (
+        classify_technical_summary_rank(
+            **base,
+            vwap_maintained_15m=True,
+            volume_vs_avg20_pct=40.0,
+        )
+        == "D3"
+    )
+
+
+def test_d1_and_d3_detail_labels_follow_atr_and_volume_boundaries():
+    assert build_d1_detail(ma25_distance_atr=-2.0) == ("D1a", "戻り途中・25日線接近")
+    assert build_d1_detail(ma25_distance_atr=-2.01) == ("D1b", "戻り途中・25日線遠い")
+    assert build_d3_detail(volume_vs_avg20_pct=80.0) == ("D3強", "VWAP維持・出来高伴う")
+    assert build_d3_detail(volume_vs_avg20_pct=60.0) == ("D3", "VWAP維持・出来高やや不足")
+    assert build_d3_detail(volume_vs_avg20_pct=59.9) == ("D3弱", "反転形あるも出来高不足")
+
+
+def test_d_rank_deviation_labels_do_not_change_classification():
+    assert build_dev25_risk_label("D2", -16.0) == "深掘れ反発候補・リスク大"
+    assert build_dev25_risk_label("D3", -16.0) == "急落リバ・戻り売り警戒"
+
+
+def test_d2_excludes_clear_support_break_and_missing_direct_support():
+    common = dict(
+        dev25_pct=-6.0,
+        vwap=100.0,
+        focus_theme=False,
+        day_open=99.0,
+        day_high=100.0,
+        day_close_position=0.6,
+        atr14=2.0,
+        volume_vs_avg20_pct=90.0,
+        rsi14=40.0,
+        low_higher_count=1,
+    )
+    assert (
+        classify_technical_summary_rank(
+            **common,
+            latest=97.0,
+            day_low=96.0,
+            previous_low=98.0,
+        )
+        == "E"
+    )
+    assert (
+        classify_technical_summary_rank(
+            **common,
+            latest=99.0,
+            day_low=98.8,
+            previous_low=95.0,
+        )
+        == "E"
+    )
 
 
 def test_d2_exclusion_falls_to_downtrend():

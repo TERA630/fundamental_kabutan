@@ -88,6 +88,9 @@ def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str
             "current_am_vwap": None,
             "current_pm_vwap": None,
             "current_intraday_session": None,
+            "vwap_maintained_bars": None,
+            "vwap_maintained_minutes": None,
+            "vwap_maintained_15m": None,
         }
     row = daily.iloc[-1]
     vwap = (float(row["High"]) + float(row["Low"]) + float(row["Close"])) / 3
@@ -107,10 +110,13 @@ def build_daily_reference_vwap_snapshot(daily_history: pd.DataFrame) -> dict[str
         "current_am_vwap": None,
         "current_pm_vwap": None,
         "current_intraday_session": None,
+        "vwap_maintained_bars": None,
+        "vwap_maintained_minutes": None,
+        "vwap_maintained_15m": None,
     }
 
 
-def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, float | str | None]:
+def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, float | str | bool | int | None]:
     intraday = normalize_history_frame(intraday_history)
     intraday = intraday[intraday["Volume"] > 0]
     intraday = _latest_intraday_session(intraday)
@@ -125,6 +131,7 @@ def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, fl
     timestamp = _latest_timestamp_label(intraday.index[-1], fallback_suffix="")
     latest_bar_time = pd.Timestamp(intraday.index[-1]).strftime("%H:%M")
     session_vwaps = _build_current_session_vwaps(intraday)
+    maintained_bars = _count_trailing_vwap_maintained_bars(intraday, vwap_series)
     return {
         "latest": _safe_float(row["Close"]),
         "open": _safe_float(intraday.iloc[0]["Open"]),
@@ -140,6 +147,9 @@ def build_intraday_vwap_snapshot(intraday_history: pd.DataFrame) -> dict[str, fl
         "current_am_vwap": session_vwaps["am_vwap"],
         "current_pm_vwap": session_vwaps["pm_vwap"],
         "current_intraday_session": session_vwaps["session"],
+        "vwap_maintained_bars": maintained_bars,
+        "vwap_maintained_minutes": maintained_bars * 5,
+        "vwap_maintained_15m": maintained_bars >= 3,
     }
 
 
@@ -269,6 +279,44 @@ def _calc_vwap(frame: pd.DataFrame) -> float | None:
     if volume_sum == 0:
         return None
     return _safe_float((typical_price * frame["Volume"]).sum() / volume_sum)
+
+
+def _count_trailing_vwap_maintained_bars(frame: pd.DataFrame, vwap_series: pd.Series) -> int:
+    if frame.empty or vwap_series.empty:
+        return 0
+    confirmed = _confirmed_intraday_bars(frame)
+    if confirmed.empty:
+        return 0
+    latest_time = pd.Timestamp(confirmed.index[-1]).time()
+    session_start = (
+        pd.Timestamp("09:00").time()
+        if latest_time < pd.Timestamp("12:30").time()
+        else pd.Timestamp("12:30").time()
+    )
+    times = pd.Series(confirmed.index.time, index=confirmed.index)
+    session_index = confirmed.index[times >= session_start]
+    count = 0
+    newer_index: pd.Timestamp | None = None
+    for index in reversed(session_index):
+        timestamp = pd.Timestamp(index)
+        if newer_index is not None and newer_index - timestamp != pd.Timedelta(minutes=5):
+            break
+        close = _safe_float(confirmed.at[index, "Close"])
+        vwap = _safe_float(vwap_series.at[index])
+        if close is None or vwap is None or close <= vwap:
+            break
+        count += 1
+        newer_index = timestamp
+    return count
+
+
+def _confirmed_intraday_bars(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    now_jst = pd.Timestamp.now(tz="Asia/Tokyo").tz_localize(None)
+    timestamps = pd.DatetimeIndex(frame.index)
+    confirmed_mask = timestamps + pd.Timedelta(minutes=5) <= now_jst
+    return frame.loc[confirmed_mask]
 
 
 def _classify_previous_pm_evaluation(

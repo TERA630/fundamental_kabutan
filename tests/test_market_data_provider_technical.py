@@ -169,6 +169,50 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["current_am_vwap"] == pytest.approx(expected_vwap)
     assert snapshot["current_pm_vwap"] is None
     assert snapshot["current_intraday_session"] == "前場"
+    assert snapshot["vwap_maintained_bars"] == 1
+    assert snapshot["vwap_maintained_minutes"] == 5
+    assert snapshot["vwap_maintained_15m"] is False
+
+
+def test_build_intraday_vwap_snapshot_marks_three_trailing_bars_above_vwap():
+    index = pd.to_datetime(["2026-05-29 09:00", "2026-05-29 09:05", "2026-05-29 09:10"])
+    intraday = pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0],
+            "High": [102.0, 103.0, 104.0],
+            "Low": [99.0, 100.0, 101.0],
+            "Close": [101.0, 102.0, 103.0],
+            "Volume": [1000.0, 1000.0, 1000.0],
+        },
+        index=index,
+    )
+
+    snapshot = provider.build_intraday_vwap_snapshot(intraday)
+
+    assert snapshot["vwap_maintained_bars"] == 3
+    assert snapshot["vwap_maintained_minutes"] == 15
+    assert snapshot["vwap_maintained_15m"] is True
+
+
+def test_build_intraday_vwap_snapshot_resets_maintenance_at_afternoon_session():
+    index = pd.to_datetime(
+        ["2026-05-29 11:20", "2026-05-29 11:25", "2026-05-29 12:30", "2026-05-29 12:35"]
+    )
+    intraday = pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0, 103.0],
+            "High": [102.0, 103.0, 104.0, 105.0],
+            "Low": [99.0, 100.0, 101.0, 102.0],
+            "Close": [101.0, 102.0, 103.0, 104.0],
+            "Volume": [1000.0, 1000.0, 1000.0, 1000.0],
+        },
+        index=index,
+    )
+
+    snapshot = provider.build_intraday_vwap_snapshot(intraday)
+
+    assert snapshot["vwap_maintained_bars"] == 2
+    assert snapshot["vwap_maintained_15m"] is False
 
 
 def test_build_intraday_vwap_snapshot_uses_latest_session_only():

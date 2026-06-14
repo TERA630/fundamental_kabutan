@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
+    build_d1_detail,
+    build_d3_detail,
+    build_dev25_risk_label,
     build_technical_headline_summary,
     build_technical_position_assessment,
     build_technical_strategy_lines,
@@ -26,8 +29,8 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         _format_momentum(result),
         "",
         "■当日位置・レンジ",
-        f"O {_fmt_price(snapshot.price.open)}　H {_fmt_price(snapshot.price.high)}　L {_fmt_price(snapshot.price.low)}　C {_fmt_price(snapshot.price.close)}",
-        f"当日値幅：{_fmt_price(snapshot.range.day_range)}（ATR比 {_fmt_multiple(snapshot.range.day_range_atr)} / {snapshot.range.day_range_label}）",
+        f"O {_fmt_price(_evaluation_open(result))}　H {_fmt_price(_evaluation_high(result))}　L {_fmt_price(_evaluation_low(result))}　C {_fmt_price(_evaluation_price(result))}",
+        f"当日値幅：{_fmt_price(_evaluation_day_range(result))}（ATR比 {_fmt_multiple(_safe_div(_evaluation_day_range(result), snapshot.range.atr14))} / {snapshot.range.day_range_label}）",
         "",
         "■移動平均・Vwap",
         *_format_current_session_vwap_price_lines(result.vwap_snapshot),
@@ -49,7 +52,7 @@ def _format_resistance_lines(result: TechnicalAnalysisResult) -> list[str]:
 
 def _build_resistance_lines(result: TechnicalAnalysisResult) -> tuple[TechnicalSummaryLine, ...]:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     if latest is None:
         return ()
 
@@ -74,19 +77,19 @@ def _build_resistance_lines(result: TechnicalAnalysisResult) -> tuple[TechnicalS
 def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
     vwap_snapshot = result.vwap_snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     vwap = _as_float(vwap_snapshot.get("vwap"))
     vwap_diff = latest - vwap if latest is not None and vwap is not None else None
     vwap_diff_pct = ((latest / vwap) - 1) * 100 if latest is not None and vwap not in (None, 0) else None
     vwap_diff_atr = _safe_div(vwap_diff, snapshot.range.atr14)
     vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
-    volume_vs_avg20_pct = _ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20)
+    volume_vs_avg20_pct = _ratio_pct(_evaluation_volume(result), snapshot.price.volume_avg20)
     lines = [
-        f"取得時刻：{_fmt_text(result.intraday_price_timestamp)}",
+        f"取得時刻：{_fmt_text(result.evaluation_price_timestamp)}",
         f"【銘柄】{result.name} ({result.code4})",
-        f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(snapshot.price.day_change_price)}円：{_fmt_pct(snapshot.price.day_change_pct)}）（終端位置{_fmt_position_pct(snapshot.range.day_close_position)}）"
+        f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(_price_change(result))}円：{_fmt_pct(_price_change_pct(result))}）（終端位置{_fmt_position_pct(_range_position(latest, _evaluation_low(result), _evaluation_high(result)))}）"
         f" | 出来高比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)})",
-        f"　位置：25日線{_fmt_pct(snapshot.moving_average.dev25_pct)}/{_fmt_atr_distance(snapshot.moving_average.ma25_distance_atr)}"
+        f"　位置：25日線{_fmt_pct(_evaluation_dev25_pct(result))}/{_fmt_atr_distance(_evaluation_ma25_distance_atr(result))}"
         f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_pct(vwap_diff_pct)}/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
         f"　下値目安：{_format_opening_supports(result)}",
@@ -98,7 +101,7 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
 
 def _format_opening_supports(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     if latest is None:
         return "N/A"
     candidates = (
@@ -113,7 +116,7 @@ def _format_opening_supports(result: TechnicalAnalysisResult) -> str:
 
 def _format_opening_resistances(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     if latest is None:
         return "N/A"
     candidates = (
@@ -149,82 +152,35 @@ def _format_grouped_price_levels(
 
 
 def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
-    snapshot = result.snapshot
-    latest = snapshot.price.latest
-    vwap = _as_float(result.vwap_snapshot.get("vwap"))
-    dev25_pct = snapshot.moving_average.dev25_pct
-    if latest is None or vwap is None or dev25_pct is None:
+    headline = _build_headline(result)
+    if headline is None:
         return "短評：N/A"
-    headline = build_technical_headline_summary(
-        dev25_pct=dev25_pct,
-        latest=latest,
-        vwap=vwap,
-        focus_theme=is_focus_theme(result.name),
-        ma25_distance_atr=snapshot.moving_average.ma25_distance_atr,
-        ma25=snapshot.moving_average.ma25,
-        ma25_prev5=snapshot.moving_average.ma25_prev5,
-        rsi14=snapshot.rsi14,
-        three_session_change_pct=result.three_session_momentum.change_pct,
-        high_breakout_count=_count_true(session.high_breakout for session in result.three_session_momentum.sessions),
-        low_higher_count=_count_true(session.low_higher for session in result.three_session_momentum.sessions),
-        day_close_position=snapshot.range.day_close_position,
-        day_open=snapshot.price.open,
-        day_high=snapshot.price.high,
-        day_low=snapshot.price.low,
-        atr14=snapshot.range.atr14,
-        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
-        recent60_range_position=snapshot.breakline.recent60_range_position,
-        previous_low=snapshot.previous_session.prev_low,
-        recent20_low=snapshot.breakline.recent20_low,
-        ma75=snapshot.moving_average.ma75,
-        recent60_low=snapshot.breakline.recent60_low,
-    )
-    return f"短評：{headline.text}"
+    detail = _format_rank_detail(result, headline.rank)
+    return f"短評：{headline.text}" if detail is None else f"短評：{headline.text}\n詳細：{detail}"
 
 
 def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     vwap = _as_float(result.vwap_snapshot.get("vwap"))
     ma25 = snapshot.moving_average.ma25
-    dev25_pct = snapshot.moving_average.dev25_pct
+    dev25_pct = _evaluation_dev25_pct(result)
     if latest is None or vwap is None or ma25 is None or dev25_pct is None:
         return "崩れ警戒：N/A\nホールド判定：N/A"
 
-    headline = build_technical_headline_summary(
-        dev25_pct=dev25_pct,
-        latest=latest,
-        vwap=vwap,
-        focus_theme=is_focus_theme(result.name),
-        ma25_distance_atr=snapshot.moving_average.ma25_distance_atr,
-        ma25=ma25,
-        ma25_prev5=snapshot.moving_average.ma25_prev5,
-        rsi14=snapshot.rsi14,
-        three_session_change_pct=result.three_session_momentum.change_pct,
-        high_breakout_count=_count_true(session.high_breakout for session in result.three_session_momentum.sessions),
-        low_higher_count=_count_true(session.low_higher for session in result.three_session_momentum.sessions),
-        day_close_position=snapshot.range.day_close_position,
-        day_open=snapshot.price.open,
-        day_high=snapshot.price.high,
-        day_low=snapshot.price.low,
-        atr14=snapshot.range.atr14,
-        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
-        recent60_range_position=snapshot.breakline.recent60_range_position,
-        previous_low=snapshot.previous_session.prev_low,
-        recent20_low=snapshot.breakline.recent20_low,
-        ma75=snapshot.moving_average.ma75,
-        recent60_low=snapshot.breakline.recent60_low,
-    )
+    headline = _build_headline(result)
+    if headline is None:
+        return "崩れ警戒：N/A\nホールド判定：N/A"
     assessment = build_technical_position_assessment(
         latest=latest,
         vwap=vwap,
         ma25=ma25,
         atr14=snapshot.range.atr14,
-        day_open=snapshot.price.open,
-        day_high=snapshot.price.high,
-        day_low=snapshot.price.low,
-        day_close_position=snapshot.range.day_close_position,
-        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
+        day_open=_evaluation_open(result),
+        day_high=_evaluation_high(result),
+        day_low=_evaluation_low(result),
+        day_close_position=_range_position(latest, _evaluation_low(result), _evaluation_high(result)),
+        volume_vs_avg20_pct=_ratio_pct(_evaluation_volume(result), snapshot.price.volume_avg20),
         high_breakouts=tuple(session.high_breakout for session in result.three_session_momentum.sessions),
         low_highers=tuple(session.low_higher for session in result.three_session_momentum.sessions),
         previous_low=snapshot.previous_session.prev_low,
@@ -245,36 +201,15 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
 
 def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     vwap = _as_float(result.vwap_snapshot.get("vwap"))
-    dev25_pct = snapshot.moving_average.dev25_pct
+    dev25_pct = _evaluation_dev25_pct(result)
     if latest is None or vwap is None or dev25_pct is None:
         return "戦略判定：\nN/A"
 
-    headline = build_technical_headline_summary(
-        dev25_pct=dev25_pct,
-        latest=latest,
-        vwap=vwap,
-        focus_theme=is_focus_theme(result.name),
-        ma25_distance_atr=snapshot.moving_average.ma25_distance_atr,
-        ma25=snapshot.moving_average.ma25,
-        ma25_prev5=snapshot.moving_average.ma25_prev5,
-        rsi14=snapshot.rsi14,
-        three_session_change_pct=result.three_session_momentum.change_pct,
-        high_breakout_count=_count_true(session.high_breakout for session in result.three_session_momentum.sessions),
-        low_higher_count=_count_true(session.low_higher for session in result.three_session_momentum.sessions),
-        day_close_position=snapshot.range.day_close_position,
-        day_open=snapshot.price.open,
-        day_high=snapshot.price.high,
-        day_low=snapshot.price.low,
-        atr14=snapshot.range.atr14,
-        volume_vs_avg20_pct=_ratio_pct(snapshot.price.volume, snapshot.price.volume_avg20),
-        recent60_range_position=snapshot.breakline.recent60_range_position,
-        previous_low=snapshot.previous_session.prev_low,
-        recent20_low=snapshot.breakline.recent20_low,
-        ma75=snapshot.moving_average.ma75,
-        recent60_low=snapshot.breakline.recent60_low,
-    )
+    headline = _build_headline(result)
+    if headline is None:
+        return "戦略判定：\nN/A"
     supports = build_nearby_support_lines(
         latest=latest,
         ma25=snapshot.moving_average.ma25,
@@ -335,6 +270,124 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
 
 def _format_previous_candle(candle_body_label: str, wick_label: str) -> str:
     return candle_body_label if not wick_label else f"{candle_body_label}＋{wick_label}"
+
+
+def _build_headline(result: TechnicalAnalysisResult):
+    snapshot = result.snapshot
+    latest = _evaluation_price(result)
+    vwap = _as_float(result.vwap_snapshot.get("vwap"))
+    dev25_pct = _evaluation_dev25_pct(result)
+    if latest is None or vwap is None or dev25_pct is None:
+        return None
+    sessions = result.three_session_momentum.sessions
+    return build_technical_headline_summary(
+        dev25_pct=dev25_pct,
+        latest=latest,
+        vwap=vwap,
+        focus_theme=is_focus_theme(result.name),
+        ma25_distance_atr=_evaluation_ma25_distance_atr(result),
+        ma25=snapshot.moving_average.ma25,
+        ma25_prev5=snapshot.moving_average.ma25_prev5,
+        rsi14=snapshot.rsi14,
+        three_session_change_pct=result.three_session_momentum.change_pct,
+        high_breakout_count=_count_true(session.high_breakout for session in sessions),
+        low_higher_count=_count_true(session.low_higher for session in sessions),
+        day_close_position=_range_position(latest, _evaluation_low(result), _evaluation_high(result)),
+        day_open=_evaluation_open(result),
+        day_high=_evaluation_high(result),
+        day_low=_evaluation_low(result),
+        atr14=snapshot.range.atr14,
+        volume_vs_avg20_pct=_ratio_pct(_evaluation_volume(result), snapshot.price.volume_avg20),
+        recent60_range_position=snapshot.breakline.recent60_range_position,
+        previous_low=snapshot.previous_session.prev_low,
+        recent20_low=snapshot.breakline.recent20_low,
+        ma75=snapshot.moving_average.ma75,
+        recent60_low=snapshot.breakline.recent60_low,
+        vwap_maintained_15m=_as_bool(result.vwap_snapshot.get("vwap_maintained_15m")),
+        low_highers=tuple(session.low_higher for session in sessions),
+    )
+
+
+def _format_rank_detail(result: TechnicalAnalysisResult, rank: str) -> str | None:
+    dev25_pct = _evaluation_dev25_pct(result)
+    risk_label = None if dev25_pct is None else build_dev25_risk_label(rank, dev25_pct)
+    if rank == "D1":
+        code, label = build_d1_detail(ma25_distance_atr=_evaluation_ma25_distance_atr(result))
+        return f"{code} {label}"
+    if rank == "D3":
+        code, label = build_d3_detail(
+            volume_vs_avg20_pct=_ratio_pct(
+                _evaluation_volume(result),
+                result.snapshot.price.volume_avg20,
+            )
+        )
+        prefix = "D3強い" if code == "D3強" else code
+        text = f"{prefix}｜{label}"
+        return text if risk_label is None else f"{text}｜{risk_label}"
+    if rank == "D2" and risk_label is not None:
+        return risk_label
+    return None
+
+
+def _evaluation_price(result: TechnicalAnalysisResult) -> float | None:
+    value = getattr(result, "evaluation_price", None)
+    return _as_float(value) if value is not None else result.snapshot.price.latest
+
+
+def _evaluation_open(result: TechnicalAnalysisResult) -> float | None:
+    return _evaluation_intraday_field(result, "open", result.snapshot.price.open)
+
+
+def _evaluation_high(result: TechnicalAnalysisResult) -> float | None:
+    return _evaluation_intraday_field(result, "high", result.snapshot.price.high)
+
+
+def _evaluation_low(result: TechnicalAnalysisResult) -> float | None:
+    return _evaluation_intraday_field(result, "low", result.snapshot.price.low)
+
+
+def _evaluation_volume(result: TechnicalAnalysisResult) -> float | None:
+    return _evaluation_intraday_field(result, "volume", result.snapshot.price.volume)
+
+
+def _evaluation_day_range(result: TechnicalAnalysisResult) -> float | None:
+    high = _evaluation_high(result)
+    low = _evaluation_low(result)
+    return high - low if high is not None and low is not None else None
+
+
+def _evaluation_intraday_field(
+    result: TechnicalAnalysisResult,
+    key: str,
+    daily_value: float | None,
+) -> float | None:
+    source = getattr(result, "evaluation_price_source", "daily_close")
+    if source in {"intraday_5m", "provisional_close"}:
+        value = _as_float(result.vwap_snapshot.get(key))
+        if value is not None:
+            return value
+    return daily_value
+
+
+def _evaluation_dev25_pct(result: TechnicalAnalysisResult) -> float | None:
+    return _pct_change(_evaluation_price(result), result.snapshot.moving_average.ma25)
+
+
+def _evaluation_ma25_distance_atr(result: TechnicalAnalysisResult) -> float | None:
+    latest = _evaluation_price(result)
+    ma25 = result.snapshot.moving_average.ma25
+    distance = latest - ma25 if latest is not None and ma25 is not None else None
+    return _safe_div(distance, result.snapshot.range.atr14)
+
+
+def _price_change(result: TechnicalAnalysisResult) -> float | None:
+    latest = _evaluation_price(result)
+    previous = result.snapshot.price.prev_close
+    return latest - previous if latest is not None and previous is not None else None
+
+
+def _price_change_pct(result: TechnicalAnalysisResult) -> float | None:
+    return _pct_change(_evaluation_price(result), result.snapshot.price.prev_close)
 
 
 def _as_float(value: object) -> float | None:
@@ -478,7 +531,7 @@ def _fmt_text(value: object) -> str:
 def _format_vwap_supply_marks(result: TechnicalAnalysisResult) -> str:
     current = result.vwap_snapshot
     previous = result.previous_intraday_snapshot
-    latest = result.snapshot.price.latest
+    latest = _evaluation_price(result)
     session = current.get("current_intraday_session")
 
     if current.get("vwap_source") != "本日5分足":
@@ -527,7 +580,7 @@ def _fmt_vwap_mark(latest: float | None, vwap: float | None) -> str:
 
 def _format_previous_high_evaluation(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
-    latest = snapshot.price.latest
+    latest = _evaluation_price(result)
     prev_high = snapshot.previous_session.prev_high
     prev_low = snapshot.previous_session.prev_low
     if latest is None or prev_high is None or prev_low is None:

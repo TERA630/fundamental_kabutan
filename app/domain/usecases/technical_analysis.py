@@ -17,6 +17,7 @@ from app.domain.policies.market_history import (
     build_previous_session_intraday_snapshot,
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
+    normalize_history_frame,
 )
 from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
 
@@ -51,8 +52,11 @@ class TechnicalAnalysisResult:
     snapshot: TechnicalSnapshot
     intraday_price_timestamp: str | None
     three_session_momentum: TechnicalThreeSessionMomentum
-    vwap_snapshot: dict[str, float | str | None]
+    vwap_snapshot: dict[str, float | str | bool | int | None]
     previous_intraday_snapshot: dict[str, float | str | bool | None]
+    evaluation_price: float | None
+    evaluation_price_source: str
+    evaluation_price_timestamp: str | None
 
 
 def dataframe_to_cache_payload(frame: pd.DataFrame) -> dict[str, Any]:
@@ -127,6 +131,12 @@ class TechnicalAnalysisService:
             else build_daily_reference_vwap_snapshot(daily_history)
         )
         previous_intraday_snapshot = build_previous_session_intraday_snapshot(daily_history, intraday_history)
+        evaluation_price, evaluation_price_source, evaluation_price_timestamp = _build_evaluation_price(
+            daily_history=daily_history,
+            intraday_history=intraday_history,
+            snapshot=snapshot,
+            vwap_snapshot=vwap_snapshot,
+        )
         return TechnicalAnalysisResult(
             name=name,
             code4=code4,
@@ -135,6 +145,9 @@ class TechnicalAnalysisService:
             three_session_momentum=build_three_session_momentum(daily_history),
             vwap_snapshot=vwap_snapshot,
             previous_intraday_snapshot=previous_intraday_snapshot,
+            evaluation_price=evaluation_price,
+            evaluation_price_source=evaluation_price_source,
+            evaluation_price_timestamp=evaluation_price_timestamp,
         )
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:
@@ -158,6 +171,41 @@ class TechnicalAnalysisService:
 
 def _as_optional_str(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _build_evaluation_price(
+    *,
+    daily_history: pd.DataFrame,
+    intraday_history: pd.DataFrame,
+    snapshot: TechnicalSnapshot,
+    vwap_snapshot: dict[str, Any],
+) -> tuple[float | None, str, str | None]:
+    daily = normalize_history_frame(daily_history)
+    intraday = normalize_history_frame(intraday_history)
+    intraday = intraday[intraday["Volume"] > 0]
+    if not daily.empty and not intraday.empty:
+        daily_date = pd.Timestamp(daily.index[-1]).date()
+        latest_intraday_timestamp = pd.Timestamp(intraday.index[-1])
+        intraday_date = latest_intraday_timestamp.date()
+        market_closed = latest_intraday_timestamp.time() >= pd.Timestamp("15:25").time()
+        intraday_price = _as_float(vwap_snapshot.get("latest"))
+        if daily_date == intraday_date:
+            if intraday_price is not None and not market_closed:
+                return (
+                    intraday_price,
+                    "intraday_5m",
+                    _as_optional_str(vwap_snapshot.get("latest_price_timestamp")),
+                )
+        elif intraday_date > daily_date and intraday_price is not None:
+            return (
+                intraday_price,
+                "provisional_close" if market_closed else "intraday_5m",
+                _as_optional_str(vwap_snapshot.get("latest_price_timestamp")),
+            )
+    daily_timestamp = None
+    if not daily.empty:
+        daily_timestamp = f"{pd.Timestamp(daily.index[-1]).date().isoformat()} 終値"
+    return snapshot.price.close, "daily_close", daily_timestamp
 
 
 def build_three_session_momentum(history: pd.DataFrame) -> TechnicalThreeSessionMomentum:

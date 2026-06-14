@@ -64,10 +64,10 @@ def test_build_technical_output_contains_summary_and_sections():
 
     output = build_technical_output(result)
 
-    assert output.startswith("取得時刻：2026-04-07 14:55\n【銘柄】Sample (1234)")
+    assert output.startswith("取得時刻：2026-04-08 終値\n【銘柄】Sample (1234)")
     assert "株価：" in output
     assert "終端位置" in output
-    assert "取得時刻：2026-04-07 14:55" in output
+    assert "取得時刻：2026-04-08 終値" in output
     assert "位置：25日線" in output
     assert "傾き：" not in output
     assert "VWAP" in output
@@ -203,10 +203,15 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
         ma25_distance_atr=0.2,
     )
     result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+    result = replace(
+        result,
+        vwap_snapshot={**result.vwap_snapshot, "vwap_maintained_15m": True},
+    )
 
     output = build_technical_output(result)
 
     assert "短評：D3 底打ち初動" in output
+    assert "詳細：D3強い｜VWAP維持・出来高伴う｜25日線奪回接近" in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
     assert "戦略判定：\nN/A（判定基準未設定）" in output

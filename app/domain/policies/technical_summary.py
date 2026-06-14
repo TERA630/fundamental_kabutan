@@ -31,9 +31,9 @@ HEADLINE_COMMENTS: dict[TechnicalSummaryRank, str] = {
     "B2": "新規買い非推奨。利確優先。",
     "C1": "支持線反発待ち。",
     "C2": "25日線割れ警戒。買いは待ち。",
-    "D1": "25日線回復待ち。",
-    "D2": "支持線確認中。買いは待ち。",
-    "D3": "反転初動。25日線突破確認。",
+    "D1": "25日線奪回待ち。上値確認中。",
+    "D2": "支持線反発待ち。",
+    "D3": "VWAP回復。安値切り上げ・反転確認。",
     "E": "買い見送り。反転確認待ち。",
 }
 
@@ -44,9 +44,9 @@ NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
     "B2": "短期監視のみ。追加買い不可。",
     "C1": "VWAP回復まで買い待ち。",
     "C2": "VWAP回復後も15分維持を確認。追加買い不可。",
-    "D1": "後場VWAP維持なら監視継続。追加買いは25日線回復後。",
-    "D2": "買い急がず。補助指標の確認待ち。",
-    "D3": "深押し、VWAP回復は可。追加買いは25日線回復後。",
+    "D1": "25日線接近時の利確圧に注意。追加買いは25日線奪回後。",
+    "D2": "まだ入らない。VWAP回復待ち。",
+    "D3": "小さく入れる候補。通常サイズは25日線奪回後。",
     "E": "監視のみ。新規買い不可。",
 }
 
@@ -138,6 +138,8 @@ def classify_technical_summary_rank(
     recent20_low: float | None = None,
     ma75: float | None = None,
     recent60_low: float | None = None,
+    vwap_maintained_15m: bool | None = None,
+    low_highers: tuple[bool | None, ...] = (),
 ) -> TechnicalSummaryRank:
     del focus_theme
     vwap_up = latest > vwap
@@ -166,7 +168,7 @@ def classify_technical_summary_rank(
             _gte(low_higher_count, 2)
             and _gte(high_breakout_count, 1)
             and _gte(close_position_pct, 60)
-            and dev25_pct >= -8
+            and vwap_maintained_15m is True
         ):
             return "D3"
         return "D1"
@@ -181,15 +183,15 @@ def classify_technical_summary_rank(
         atr14=atr14,
         volume_vs_avg20_pct=volume_vs_avg20_pct,
         rsi14=rsi14,
-        low_higher_count=low_higher_count,
         previous_low=previous_low,
         recent20_low=recent20_low,
         ma75=ma75,
         recent60_low=recent60_low,
+        low_highers=low_highers,
     )
     if d2_evaluation == "exclude":
         return "E"
-    if dev25_pct >= -12 and d2_evaluation in {"strong", "weak"}:
+    if d2_evaluation in {"strong", "weak"}:
         return "D2"
     return "E"
 
@@ -218,6 +220,8 @@ def build_technical_headline_summary(
     recent20_low: float | None = None,
     ma75: float | None = None,
     recent60_low: float | None = None,
+    vwap_maintained_15m: bool | None = None,
+    low_highers: tuple[bool | None, ...] = (),
 ) -> TechnicalHeadlineSummary:
     rank = classify_technical_summary_rank(
         dev25_pct=dev25_pct,
@@ -242,32 +246,11 @@ def build_technical_headline_summary(
         recent20_low=recent20_low,
         ma75=ma75,
         recent60_low=recent60_low,
+        vwap_maintained_15m=vwap_maintained_15m,
+        low_highers=low_highers,
     )
     comment = HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
-    if rank == "D2":
-        d2_evaluation = _evaluate_d2_bottoming_candidate(
-            latest=latest,
-            vwap=vwap,
-            day_open=day_open,
-            day_high=day_high,
-            day_low=day_low,
-            day_close_position=day_close_position,
-            atr14=atr14,
-            volume_vs_avg20_pct=volume_vs_avg20_pct,
-            rsi14=rsi14,
-            low_higher_count=low_higher_count,
-            previous_low=previous_low,
-            recent20_low=recent20_low,
-            ma75=ma75,
-            recent60_low=recent60_low,
-        )
-        if d2_evaluation == "strong":
-            comment = "底打ち候補強。"
-            next_action = "VWAP回復待ち(補助指標2つ以上)。"
-        else:
-            comment = "底打ち候補。"
-            next_action = "買い急がず(補助指標1つ以下)。"
     return TechnicalHeadlineSummary(
         rank=rank,
         rank_label=RANK_LABELS[rank],
@@ -455,18 +438,26 @@ def _evaluate_d2_bottoming_candidate(
     atr14: float | None,
     volume_vs_avg20_pct: float | None,
     rsi14: float | None,
-    low_higher_count: int | None,
     previous_low: float | None,
     recent20_low: float | None,
     ma75: float | None,
     recent60_low: float | None,
+    low_highers: tuple[bool | None, ...],
 ) -> str:
     if atr14 in (None, 0) or day_low is None or day_high is None or day_open is None:
         return "none"
+    supports = (previous_low, recent20_low, ma75, recent60_low)
+    if _has_clearly_broken_support(
+        latest=latest,
+        day_low=day_low,
+        atr14=atr14,
+        supports=supports,
+    ):
+        return "exclude"
     support = _nearest_d2_support(
         day_low=day_low,
         atr14=atr14,
-        supports=(previous_low, recent20_low, ma75, recent60_low),
+        supports=supports,
     )
     if support is None:
         return "none"
@@ -475,6 +466,8 @@ def _evaluate_d2_bottoming_candidate(
         return "none"
     if latest <= support:
         return "none"
+    if not _has_direct_support(latest=latest, atr14=atr14, supports=supports):
+        return "exclude"
     if latest < vwap - atr14 or latest > vwap:
         return "exclude" if latest < vwap - atr14 else "none"
     if _is_volume_surge_big_bearish(
@@ -485,7 +478,7 @@ def _evaluate_d2_bottoming_candidate(
         volume_vs_avg20_pct=volume_vs_avg20_pct,
     ):
         return "exclude"
-    if low_higher_count == 0 and close_position_pct <= 50:
+    if _all_false(low_highers):
         return "exclude"
 
     score = _d2_auxiliary_score(
@@ -514,6 +507,72 @@ def _nearest_d2_support(
     if not candidates:
         return None
     return min(candidates, key=lambda support: abs(day_low - support))
+
+
+def _has_clearly_broken_support(
+    *,
+    latest: float,
+    day_low: float,
+    atr14: float,
+    supports: tuple[float | None, ...],
+) -> bool:
+    return any(
+        support is not None
+        and day_low < support - 0.35 * atr14
+        and latest < support
+        for support in supports
+    )
+
+
+def _has_direct_support(
+    *,
+    latest: float,
+    atr14: float,
+    supports: tuple[float | None, ...],
+) -> bool:
+    return any(
+        support is not None
+        and support < latest
+        and latest - support <= atr14
+        for support in supports
+    )
+
+
+def build_d1_detail(*, ma25_distance_atr: float | None) -> tuple[str, str]:
+    if ma25_distance_atr is None:
+        return "D1", "判定保留"
+    distance = abs(ma25_distance_atr)
+    if distance <= 2.0:
+        return "D1a", "戻り途中・25日線接近"
+    return "D1b", "戻り途中・25日線遠い"
+
+
+def build_d3_detail(*, volume_vs_avg20_pct: float | None) -> tuple[str, str]:
+    if volume_vs_avg20_pct is None:
+        return "D3", "VWAP維持・出来高N/A"
+    if volume_vs_avg20_pct >= 80:
+        return "D3強", "VWAP維持・出来高伴う"
+    if volume_vs_avg20_pct >= 60:
+        return "D3", "VWAP維持・出来高やや不足"
+    return "D3弱", "反転形あるも出来高不足"
+
+
+def build_dev25_risk_label(rank: TechnicalSummaryRank, dev25_pct: float) -> str | None:
+    if rank == "D2":
+        if dev25_pct >= -8:
+            return "浅押し反発候補"
+        if dev25_pct >= -15:
+            return "底打ち候補"
+        return "深掘れ反発候補・リスク大"
+    if rank == "D3":
+        if dev25_pct >= -4:
+            return "25日線奪回接近"
+        if dev25_pct >= -8:
+            return "反転初動"
+        if dev25_pct >= -15:
+            return "深押し反転"
+        return "急落リバ・戻り売り警戒"
+    return None
 
 
 def _d2_auxiliary_score(
@@ -608,6 +667,9 @@ def _is_upper_price_stalling(
 __all__ = [
     "RANK_LABELS",
     "RANK_ORDER",
+    "build_d1_detail",
+    "build_d3_detail",
+    "build_dev25_risk_label",
     "build_technical_headline_summary",
     "build_technical_position_assessment",
     "build_technical_strategy_lines",
