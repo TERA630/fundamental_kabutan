@@ -50,6 +50,16 @@ NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
     "E": "監視のみ。新規買い不可。",
 }
 
+D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
+    "D1a": "監視優先。D3化なら小さく可",
+    "D1b": "監視優先。深指値は原則不可",
+    "D1": "判定保留。新規不可",
+    "D2": "支持線反発候補。原則VWAP回復待ち",
+    "D3強": "小さく可。D3内で最有力",
+    "D3": "小さく可。出来高確認",
+    "D3弱": "監視寄り。出来高不足",
+}
+
 STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
     "A1": (
         "前場深押し○：支持線付近 {support_range}円で検討。約定後はVWAP回復・維持を確認。",
@@ -104,13 +114,137 @@ def build_technical_strategy_lines(
     *,
     support_range: str = "N/A",
     nearest_support: str = "N/A",
+    detail_code: str | None = None,
+    support_entry_range: str = "N/A",
+    support_pullback_range: str = "N/A",
+    vwap_recovery_range: str = "N/A",
+    vwap_pullback_range: str = "N/A",
+    risk_reward: str = "RR算出不可",
 ) -> tuple[str, ...]:
+    if rank == "D1":
+        return _build_d1_strategy_lines(
+            detail_code=detail_code or "D1",
+            support_entry_range=support_entry_range,
+            nearest_support=nearest_support,
+            risk_reward=risk_reward,
+        )
+    if rank == "D2":
+        return (
+            f"前場深押し△：地合い良好時のみ {support_entry_range}。RR1.5以上なら試し可（{risk_reward}）。安全重視ならVWAP回復確認。",
+            f"前場VWAP回復△：VWAP15分維持なら試し玉候補 {vwap_recovery_range}。安値切り上げ・高値更新・終端60%以上が揃いD3化すれば○。出来高60%以上が望ましい。",
+            "後場VWAP回復△〜○：後場VWAP上維持かつ終端60%以上なら小さく可。当日高値圏でなければ持ち越しは弱い。",
+        )
+    if rank == "D3":
+        return _build_d3_strategy_lines(
+            detail_code=detail_code or "D3",
+            support_pullback_range=support_pullback_range,
+            vwap_recovery_range=vwap_recovery_range,
+            vwap_pullback_range=vwap_pullback_range,
+            nearest_support=nearest_support,
+            risk_reward=risk_reward,
+        )
     templates = STRATEGY_LINES[rank]
     if templates is None:
         return ("N/A（判定基準未設定）",)
     return tuple(
         template.format(support_range=support_range, nearest_support=nearest_support)
         for template in templates
+    )
+
+
+def build_d_detail_headline(
+    rank: TechnicalSummaryRank,
+    *,
+    ma25_distance_atr: float | None = None,
+    volume_vs_avg20_pct: float | None = None,
+    dev25_pct: float | None = None,
+) -> str | None:
+    if rank == "D1":
+        code, label = build_d1_detail(ma25_distance_atr=ma25_distance_atr)
+        return f"{code} {label}｜{D_DETAIL_MAIN_JUDGEMENTS[code]}"
+    if rank == "D2":
+        text = f"D2 底打ち候補｜支持線反発待ち｜{D_DETAIL_MAIN_JUDGEMENTS['D2']}"
+        return _append_dev25_risk_label(text, rank=rank, dev25_pct=dev25_pct)
+    if rank == "D3":
+        code, label = build_d3_detail(volume_vs_avg20_pct=volume_vs_avg20_pct)
+        text = f"{code}｜{label}｜{D_DETAIL_MAIN_JUDGEMENTS[code]}"
+        return _append_dev25_risk_label(text, rank=rank, dev25_pct=dev25_pct)
+    return None
+
+
+def _append_dev25_risk_label(
+    text: str,
+    *,
+    rank: TechnicalSummaryRank,
+    dev25_pct: float | None,
+) -> str:
+    if dev25_pct is None:
+        return text
+    risk_label = build_dev25_risk_label(rank, dev25_pct)
+    return text if risk_label is None else f"{text}｜{risk_label}"
+
+
+def _build_d1_strategy_lines(
+    *,
+    detail_code: str,
+    support_entry_range: str,
+    nearest_support: str,
+    risk_reward: str,
+) -> tuple[str, ...]:
+    if detail_code == "D1a":
+        rr_text = "RR算出不可" if risk_reward == "RR算出不可" else f"{risk_reward}で判定"
+        return (
+            f"前場深押し△：地合い良好なら {support_entry_range}。25日線または直近抵抗線までの{rr_text}。安全重視ならVWAP再回復確認。",
+            "前場VWAP回復△：VWAP回復だけでは不可。VWAP15分維持＋安値切り上げ＋高値更新でD3化なら小さく可。",
+            "後場VWAP回復△：後場VWAP上維持なら小さく可。25日線接近時は利確圧に注意し、持ち越しは25日線手前で評価。",
+        )
+    if detail_code == "D1b":
+        if nearest_support == "N/A":
+            deep_order = "前場深押し×：支持線不明のため深指値不可。"
+        else:
+            deep_order = f"前場深押し×〜△：基本は危険。支持線 {nearest_support}円が明確でRR2.0以上なら最小ロットのみ（{risk_reward}）。25日線まで遠く戻り確認不足。"
+        return (
+            deep_order,
+            "前場VWAP回復△：VWAP上でもD3未達なら監視。入るならD3条件成立後。",
+            "後場VWAP回復△〜×：回復だけでは持ち越しは弱い。出来高60%以上かつ終端60%以上がなければ見送り。",
+        )
+    return (
+        "前場深押し×：ATR距離不明のため指値算出不可。",
+        "前場VWAP回復△：D3条件を満たせば小さく可。ただし25日線距離不明のため通常サイズ不可。",
+        "後場VWAP回復△〜×：判定材料不足。後場エントリーは原則見送り。",
+    )
+
+
+def _build_d3_strategy_lines(
+    *,
+    detail_code: str,
+    support_pullback_range: str,
+    vwap_recovery_range: str,
+    vwap_pullback_range: str,
+    nearest_support: str,
+    risk_reward: str,
+) -> tuple[str, ...]:
+    if detail_code == "D3強":
+        rr_text = "RR算出不可" if risk_reward == "RR算出不可" else f"{risk_reward}が良好なら可"
+        return (
+            f"前場深押し○：押し目待ちは {vwap_pullback_range} または {support_pullback_range}。{rr_text}。",
+            "前場VWAP回復◎：最有力。VWAP15分維持＋出来高80%以上で小さく可。通常サイズは25日線奪回後。",
+            "後場VWAP回復◎：後場VWAP上維持なら持ち越し候補。25日線未満のためサイズは抑える。",
+        )
+    if detail_code == "D3弱":
+        if nearest_support == "N/A":
+            deep_order = "前場深押し×：支持線不明のため深指値不可。"
+        else:
+            deep_order = f"前場深押し△：支持線 {nearest_support}円近辺のみ。上に飛びつかず、RR2.0以上で最小ロット（{risk_reward}）。"
+        return (
+            deep_order,
+            "前場VWAP回復△：形はあるが出来高不足。前日高値試しまたは終端70%以上なら小さく可。",
+            "後場VWAP回復△〜×：持ち越しは弱い。後場VWAP維持でも出来高が戻らなければ監視継続。",
+        )
+    return (
+        f"前場深押し○〜△：押し目は {support_pullback_range}。出来高不足で継続力は弱く、RR1.5未満なら見送り（{risk_reward}）。",
+        f"前場VWAP回復○：小さく可 {vwap_recovery_range}。出来高増加または前日高値試しで信頼度を上げる。",
+        "後場VWAP回復○〜△：後場VWAP上維持なら可。出来高不足またはN/Aなら持ち越しは慎重。",
     )
 
 
@@ -669,6 +803,7 @@ __all__ = [
     "RANK_ORDER",
     "build_d1_detail",
     "build_d3_detail",
+    "build_d_detail_headline",
     "build_dev25_risk_label",
     "build_technical_headline_summary",
     "build_technical_position_assessment",

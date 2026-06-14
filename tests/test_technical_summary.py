@@ -5,6 +5,7 @@ from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalS
 from app.domain.policies.technical_summary import (
     build_d1_detail,
     build_d3_detail,
+    build_d_detail_headline,
     build_dev25_risk_label,
     build_technical_headline_summary,
     build_nearby_resistance_lines,
@@ -23,7 +24,81 @@ def test_build_technical_strategy_lines_uses_rank_criteria_and_support_prices():
     assert build_technical_strategy_lines("B1", nearest_support="98")[0] == (
         "前場深押し△：支持線付近 98円でのみ小さく検討。VWAP未回復なら撤退。"
     )
-    assert build_technical_strategy_lines("D3") == ("N/A（判定基準未設定）",)
+    assert build_technical_strategy_lines(
+        "D3",
+        detail_code="D3強",
+        support_pullback_range="97〜98円",
+        vwap_pullback_range="99〜100円",
+        risk_reward="RR2.40",
+    )[0] == (
+        "前場深押し○：押し目待ちは 99〜100円 または 97〜98円。RR2.40が良好なら可。"
+    )
+
+
+def test_build_d_detail_headline_uses_detail_specific_main_judgement():
+    assert build_d_detail_headline("D1", ma25_distance_atr=2.0) == (
+        "D1a 戻り途中・25日線接近｜監視優先。D3化なら小さく可"
+    )
+    assert build_d_detail_headline("D1", ma25_distance_atr=2.01) == (
+        "D1b 戻り途中・25日線遠い｜監視優先。深指値は原則不可"
+    )
+    assert build_d_detail_headline("D1", ma25_distance_atr=None) == (
+        "D1 判定保留｜判定保留。新規不可"
+    )
+    assert build_d_detail_headline("D2") == (
+        "D2 底打ち候補｜支持線反発待ち｜支持線反発候補。原則VWAP回復待ち"
+    )
+    assert build_d_detail_headline("D3", volume_vs_avg20_pct=80) == (
+        "D3強｜VWAP維持・出来高伴う｜小さく可。D3内で最有力"
+    )
+    assert build_d_detail_headline("D3", volume_vs_avg20_pct=60) == (
+        "D3｜VWAP維持・出来高やや不足｜小さく可。出来高確認"
+    )
+    assert build_d_detail_headline("D3", volume_vs_avg20_pct=59.9) == (
+        "D3弱｜反転形あるも出来高不足｜監視寄り。出来高不足"
+    )
+    assert build_d_detail_headline("D3", volume_vs_avg20_pct=80, dev25_pct=-3.0).endswith(
+        "｜25日線奪回接近"
+    )
+
+
+def test_build_d_strategy_lines_cover_detail_classifications():
+    d1a = build_technical_strategy_lines(
+        "D1",
+        detail_code="D1a",
+        support_entry_range="97〜97.75円",
+        risk_reward="RR1.80",
+    )
+    assert d1a[0].startswith("前場深押し△：地合い良好なら 97〜97.75円")
+    assert "D3化なら小さく可" in d1a[1]
+
+    d1b = build_technical_strategy_lines(
+        "D1",
+        detail_code="D1b",
+        nearest_support="97",
+        risk_reward="RR2.10",
+    )
+    assert "RR2.0以上なら最小ロットのみ（RR2.10）" in d1b[0]
+
+    d1_hold = build_technical_strategy_lines("D1", detail_code="D1")
+    assert d1_hold[0] == "前場深押し×：ATR距離不明のため指値算出不可。"
+
+    d2 = build_technical_strategy_lines(
+        "D2",
+        support_entry_range="97〜97.75円",
+        vwap_recovery_range="100〜101円",
+        risk_reward="RR1.60",
+    )
+    assert d2[1].startswith("前場VWAP回復△：")
+    assert "D3化すれば○" in d2[1]
+
+    d3_weak = build_technical_strategy_lines(
+        "D3",
+        detail_code="D3弱",
+        nearest_support="97",
+        risk_reward="RR2.20",
+    )
+    assert "RR2.0以上で最小ロット（RR2.20）" in d3_weak[0]
 
 
 def test_classify_technical_summary_rank_uses_focus_theme_thresholds():

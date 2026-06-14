@@ -210,11 +210,52 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
 
     output = build_technical_output(result)
 
-    assert "短評：D3 底打ち初動" in output
-    assert "詳細：D3強い｜VWAP維持・出来高伴う｜25日線奪回接近" in output
+    assert "短評：D3強｜VWAP維持・出来高伴う｜小さく可。D3内で最有力" in output
+    assert "詳細：" not in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
-    assert "戦略判定：\nN/A（判定基準未設定）" in output
+    assert "戦略判定：\n前場深押し○：押し目待ちは" in output
+    assert "前場VWAP回復◎：最有力。VWAP15分維持＋出来高80%以上で小さく可。" in output
+    assert "後場VWAP回復◎：後場VWAP上維持なら持ち越し候補。" in output
+
+
+def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(result.snapshot.moving_average, ma25=174.0)
+    result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+    result = replace(
+        result,
+        vwap_snapshot={**result.vwap_snapshot, "vwap_maintained_15m": False},
+    )
+
+    output = build_technical_output(result)
+
+    assert "短評：D1a 戻り途中・25日線接近｜監視優先。D3化なら小さく可" in output
+    assert "前場深押し△：地合い良好なら" in output
+    assert "前場VWAP回復△：VWAP回復だけでは不可。" in output
+
+
+def test_build_technical_output_uses_d2_headline_and_recovery_stage():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(result.snapshot.moving_average, ma25=180.0)
+    result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+    result = replace(result, vwap_snapshot={**result.vwap_snapshot, "vwap": 170.0})
+
+    output = build_technical_output(result)
+
+    assert "短評：D2 底打ち候補｜支持線反発待ち｜支持線反発候補。原則VWAP回復待ち" in output
+    assert "前場VWAP回復△：VWAP15分維持なら試し玉候補" in output
+    assert "D3化すれば○" in output
 
 
 def test_build_technical_output_marks_previous_session_intraday_na_when_missing():

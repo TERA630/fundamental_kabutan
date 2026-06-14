@@ -6,7 +6,7 @@ from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
     build_d1_detail,
     build_d3_detail,
-    build_dev25_risk_label,
+    build_d_detail_headline,
     build_technical_headline_summary,
     build_technical_position_assessment,
     build_technical_strategy_lines,
@@ -155,8 +155,16 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
     headline = _build_headline(result)
     if headline is None:
         return "短評：N/A"
-    detail = _format_rank_detail(result, headline.rank)
-    return f"短評：{headline.text}" if detail is None else f"短評：{headline.text}\n詳細：{detail}"
+    detail_headline = build_d_detail_headline(
+        headline.rank,
+        ma25_distance_atr=_evaluation_ma25_distance_atr(result),
+        volume_vs_avg20_pct=_ratio_pct(
+            _evaluation_volume(result),
+            result.snapshot.price.volume_avg20,
+        ),
+        dev25_pct=_evaluation_dev25_pct(result),
+    )
+    return f"短評：{detail_headline or headline.text}"
 
 
 def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
@@ -221,12 +229,89 @@ def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:
     support_prices = sorted(line.price for line in supports)
     support_range = "〜".join(_fmt_price_compact(price) for price in support_prices) or "N/A"
     nearest_support = _fmt_price_compact(supports[0].price) if supports else "N/A"
+    detail_code = _strategy_detail_code(result, headline.rank)
+    atr14 = snapshot.range.atr14
+    support_price = supports[0].price if supports else None
+    support_entry_range = _fmt_strategy_band(
+        support_price,
+        _offset_price(support_price, atr14, 0.15),
+    )
+    support_pullback_range = _fmt_strategy_band(
+        support_price,
+        _offset_price(support_price, atr14, 0.25),
+    )
+    vwap_recovery_range = _fmt_strategy_band(vwap, _offset_price(vwap, atr14, 0.20))
+    vwap_pullback_range = _fmt_strategy_band(_offset_price(vwap, atr14, -0.25), vwap)
+    rr_entry_offset = 0.25 if headline.rank == "D3" else 0.15
+    rr_entry = _offset_price(support_price, atr14, rr_entry_offset)
+    rr_stop = _offset_price(support_price, atr14, -0.35)
+    rr_target = _nearest_target_above(rr_entry, _build_resistance_lines(result))
+    risk_reward = _fmt_risk_reward(_calculate_risk_reward(rr_entry, rr_stop, rr_target))
     strategy_lines = build_technical_strategy_lines(
         headline.rank,
         support_range=support_range,
         nearest_support=nearest_support,
+        detail_code=detail_code,
+        support_entry_range=support_entry_range,
+        support_pullback_range=support_pullback_range,
+        vwap_recovery_range=vwap_recovery_range,
+        vwap_pullback_range=vwap_pullback_range,
+        risk_reward=risk_reward,
     )
     return "\n".join(("戦略判定：", *strategy_lines))
+
+
+def _strategy_detail_code(result: TechnicalAnalysisResult, rank: str) -> str | None:
+    if rank == "D1":
+        return build_d1_detail(ma25_distance_atr=_evaluation_ma25_distance_atr(result))[0]
+    if rank == "D3":
+        return build_d3_detail(
+            volume_vs_avg20_pct=_ratio_pct(
+                _evaluation_volume(result),
+                result.snapshot.price.volume_avg20,
+            )
+        )[0]
+    return rank if rank == "D2" else None
+
+
+def _offset_price(price: float | None, atr14: float | None, multiple: float) -> float | None:
+    if price is None or atr14 is None:
+        return None
+    return price + atr14 * multiple
+
+
+def _fmt_strategy_band(low: float | None, high: float | None) -> str:
+    if low is None or high is None:
+        return "指値算出不可"
+    return f"{_fmt_price_compact(low)}〜{_fmt_price_compact(high)}円"
+
+
+def _nearest_target_above(
+    entry: float | None,
+    lines: tuple[TechnicalSummaryLine, ...],
+) -> float | None:
+    if entry is None:
+        return None
+    targets = [line.price for line in lines if line.price > entry]
+    return min(targets) if targets else None
+
+
+def _calculate_risk_reward(
+    entry: float | None,
+    stop: float | None,
+    target: float | None,
+) -> float | None:
+    if entry is None or stop is None or target is None:
+        return None
+    risk = entry - stop
+    reward = target - entry
+    if risk <= 0 or reward <= 0:
+        return None
+    return reward / risk
+
+
+def _fmt_risk_reward(value: float | None) -> str:
+    return "RR算出不可" if value is None else f"RR{value:.2f}"
 
 
 def _format_momentum(result: TechnicalAnalysisResult) -> str:
@@ -306,27 +391,6 @@ def _build_headline(result: TechnicalAnalysisResult):
         vwap_maintained_15m=_as_bool(result.vwap_snapshot.get("vwap_maintained_15m")),
         low_highers=tuple(session.low_higher for session in sessions),
     )
-
-
-def _format_rank_detail(result: TechnicalAnalysisResult, rank: str) -> str | None:
-    dev25_pct = _evaluation_dev25_pct(result)
-    risk_label = None if dev25_pct is None else build_dev25_risk_label(rank, dev25_pct)
-    if rank == "D1":
-        code, label = build_d1_detail(ma25_distance_atr=_evaluation_ma25_distance_atr(result))
-        return f"{code} {label}"
-    if rank == "D3":
-        code, label = build_d3_detail(
-            volume_vs_avg20_pct=_ratio_pct(
-                _evaluation_volume(result),
-                result.snapshot.price.volume_avg20,
-            )
-        )
-        prefix = "D3強い" if code == "D3強" else code
-        text = f"{prefix}｜{label}"
-        return text if risk_label is None else f"{text}｜{risk_label}"
-    if rank == "D2" and risk_label is not None:
-        return risk_label
-    return None
 
 
 def _evaluation_price(result: TechnicalAnalysisResult) -> float | None:
