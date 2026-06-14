@@ -289,7 +289,7 @@ def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path:
     technical_result = SimpleNamespace(
         snapshot=SimpleNamespace(
             price=SimpleNamespace(close=2000.0, volume=10_000_000.0, volume_avg20=8_000_000.0, latest=2000.0),
-            moving_average=SimpleNamespace(ma5=1900.0, ma25=2100.0),
+            moving_average=SimpleNamespace(ma25=2100.0),
         ),
         vwap_snapshot={"vwap": 1950.0, "vwap_source": "本日5分足"},
     )
@@ -324,4 +324,4 @@ def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path:
     assert "売買代金 200.0億円" in text
     assert "機関投資スコア：10/20点" in text
     assert "Fundamental Score：N/A" in text
-    assert "Technical：VWAP ○ / 5日線 ○ / 25日線 ×" in text
+    assert "Technical：VWAP ○ / 25日線 ×" in text

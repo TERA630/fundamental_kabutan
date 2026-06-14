@@ -66,7 +66,6 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.price.day_change_price == 1.0
     assert snapshot.price.day_change_pct == pytest.approx(0.595238)
     assert snapshot.price.volume_vs_previous_pct == pytest.approx((1069 / 1068 - 1) * 100)
-    assert snapshot.moving_average.ma5 == pytest.approx(167.0)
     assert snapshot.moving_average.ma25 == pytest.approx(157.0)
     assert snapshot.moving_average.ma25_prev5 == pytest.approx(152.0)
     assert snapshot.moving_average.dev25_pct == pytest.approx(((169 / 157) - 1) * 100)
@@ -165,10 +164,10 @@ def test_candle_wick_trend_and_pullback_labels():
     assert label_low_higher(99, 100) is False
     assert label_low_higher(100, None) is None
 
-    assert label_trend(110, 105, 100, 99) == "上昇トレンド"
-    assert label_trend(90, 95, 100, 101) == "下落トレンド"
-    assert label_trend(100, 99, 101, 100) == "もみ合い / 戻り局面"
-    assert label_trend(None, 99, 101, 100) == "N/A"
+    assert label_trend(110, 100, 99) == "上昇トレンド"
+    assert label_trend(90, 100, 101) == "下落トレンド"
+    assert label_trend(100, 101, 100) == "もみ合い / 戻り局面"
+    assert label_trend(None, 101, 100) == "N/A"
 
     assert label_pullback(None, 0.5, 0) == "判定不可"
     assert label_pullback(1.3, 0.3, 20) == "崩れ"

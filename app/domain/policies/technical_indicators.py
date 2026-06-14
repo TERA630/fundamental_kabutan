@@ -58,11 +58,9 @@ def normalize_daily_history(history: pd.DataFrame) -> pd.DataFrame:
 def calc_moving_averages(history: pd.DataFrame) -> pd.DataFrame:
     out = history.copy()
     close = out["Close"]
-    out["ma5"] = close.rolling(5).mean()
     out["ma25"] = close.rolling(25).mean()
     out["ma75"] = close.rolling(75).mean()
     out["ma25_prev5"] = out["ma25"].shift(5)
-    out["dev5_pct"] = ((close / out["ma5"]) - 1) * 100
     out["dev25_pct"] = ((close / out["ma25"]) - 1) * 100
     return out
 
@@ -156,12 +154,12 @@ def label_recent60_range_position_detail(value: float | None) -> str:
     return "高値更新 / 飛びつき警戒"
 
 
-def label_trend(latest: float | None, ma5: float | None, ma25: float | None, ma25_prev5: float | None) -> TrendLabel:
-    if latest is None or ma5 is None or ma25 is None:
+def label_trend(latest: float | None, ma25: float | None, ma25_prev5: float | None) -> TrendLabel:
+    if latest is None or ma25 is None or ma25_prev5 is None:
         return "N/A"
-    if ma25_prev5 is not None and latest > ma5 > ma25 and ma25 > ma25_prev5:
+    if latest > ma25 and ma25 > ma25_prev5:
         return "上昇トレンド"
-    if latest < ma5 < ma25:
+    if latest < ma25 and ma25 < ma25_prev5:
         return "下落トレンド"
     return "もみ合い / 戻り局面"
 
@@ -278,7 +276,6 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     volume_avg20 = _none_if_nan(latest_row["volume_avg20"])
     prev_close = _none_if_nan(prev_row["Close"])
     atr14 = _none_if_nan(latest_row["atr14"])
-    ma5 = _none_if_nan(latest_row["ma5"])
     ma25 = _none_if_nan(latest_row["ma25"])
     ma75 = _none_if_nan(latest_row["ma75"])
     ma25_prev5 = _none_if_nan(latest_row["ma25_prev5"])
@@ -325,11 +322,9 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         day_change_pct=_pct_change(latest, prev_close),
     )
     moving_average = TechnicalMovingAverageSnapshot(
-        ma5=ma5,
         ma25=ma25,
         ma75=ma75,
         ma25_prev5=ma25_prev5,
-        dev5_pct=_none_if_nan(latest_row["dev5_pct"]),
         dev25_pct=_none_if_nan(latest_row["dev25_pct"]),
         ma25_distance=ma25_distance,
         ma25_distance_atr=_safe_div(ma25_distance, atr14),
@@ -388,7 +383,7 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         previous_session=previous_session,
         breakline=breakline,
         rsi14=_none_if_nan(latest_row["rsi14"]),
-        trend=label_trend(latest, ma5, ma25, ma25_prev5),
+        trend=label_trend(latest, ma25, ma25_prev5),
     )
 
 

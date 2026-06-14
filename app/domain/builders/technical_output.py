@@ -32,10 +32,9 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         f"O {_fmt_price(_evaluation_open(result))}　H {_fmt_price(_evaluation_high(result))}　L {_fmt_price(_evaluation_low(result))}　C {_fmt_price(_evaluation_price(result))}",
         f"当日値幅：{_fmt_price(_evaluation_day_range(result))}（ATR比 {_fmt_multiple(_safe_div(_evaluation_day_range(result), snapshot.range.atr14))} / {snapshot.range.day_range_label}）",
         "",
-        "■移動平均・Vwap",
+        "■重要価格",
         *_format_current_session_vwap_price_lines(result.vwap_snapshot),
-        f"5日線：{_fmt_price(snapshot.moving_average.ma5)}（乖離 {_fmt_pct(snapshot.moving_average.dev5_pct)}）",
-        f"25日線：{_fmt_price(snapshot.moving_average.ma25)}（乖離 {_fmt_pct(snapshot.moving_average.dev25_pct)} / ATR比 {_fmt_multiple(snapshot.moving_average.ma25_distance_atr)}）",
+        f"25日線：{_fmt_price(snapshot.moving_average.ma25)}",
         f"14日ATR：{_fmt_price(snapshot.range.atr14)}",
         "",
         _format_previous_session(result),
@@ -335,20 +334,15 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
     prev_close = snapshot.price.prev_close
     prev_vwap = _as_float(intraday.get("prev_vwap"))
     prev_vwap_diff = prev_close - prev_vwap if prev_close is not None and prev_vwap is not None else None
-    prev_vwap_diff_pct = ((prev_close / prev_vwap) - 1) * 100 if prev_close is not None and prev_vwap not in (None, 0) else None
-    prev_vwap_diff_atr = _safe_div(prev_vwap_diff, snapshot.range.atr14)
     pm_evaluation = intraday.get("previous_pm_evaluation")
     return "\n".join(
         [
             "■前日評価",
-            f"終値 {_fmt_price_compact(prev_close)}（VWAP {_fmt_price_signed_compact(prev_vwap_diff)}円 / {_fmt_pct(prev_vwap_diff_pct)} / {_fmt_atr_unsigned(prev_vwap_diff_atr)}）騰落率{_fmt_pct(previous.prev_change_pct)}",
-            "",
-            f"前日出来高：　20日平均比　{_fmt_pct_unsigned(previous.prev_volume_vs_avg20_pct)}(前々日比　{_fmt_pct(previous.prev_volume_change_pct)})",
-            "",
-            f"後場評価 {_fmt_text(pm_evaluation)}",
-            "",
-            f"前日レンジ {_fmt_price_compact(previous.prev_low)}-{_fmt_price_compact(previous.prev_high)}（{_fmt_atr_unsigned(previous.prev_range_atr)}）　終位置 {_fmt_position_pct(previous.prev_close_position)}",
-            f"前日ローソク足型：　{_format_previous_candle(previous.candle_body_label, previous.wick_label)}",
+            f"前日終値：{_fmt_price_compact(prev_close)}円（VWAP{_fmt_price_signed_compact(prev_vwap_diff)}円／騰落率{_fmt_pct(previous.prev_change_pct)}）"
+            f"　終端位置：{_fmt_position_pct(previous.prev_close_position)}　{_format_previous_candle(previous.candle_body_label, previous.wick_label)}"
+            f"（レンジ{_fmt_price_compact(previous.prev_low)}－{_fmt_price_compact(previous.prev_high)}）",
+            f"前日出来高：20日平均比　{_fmt_pct_unsigned(previous.prev_volume_vs_avg20_pct)}",
+            f"後場評価：{_fmt_text(pm_evaluation)}",
         ]
     )
 

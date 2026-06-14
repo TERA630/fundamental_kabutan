@@ -84,7 +84,7 @@
 機関投資サマリ
 時価総額：{market_cap_oku}億円（{market_cap_class}）
 流動性：出来高 {volume}（20日平均比 {volume_vs_avg20_pct}） 売買代金 {trading_value_oku}億円
-機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）　Technical：VWAP {○/×} / 5日線 {○/×} / 25日線 {○/×}
+機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）　Technical：VWAP {○/×} / 25日線 {○/×}
 ```
 
 VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` を付ける。

@@ -132,7 +132,7 @@ Technical 出力は `app/domain/builders/technical_output.py` が組み立てる
 5. 戦略判定
 6. `■モメンタム`
 7. `■当日位置・レンジ`
-8. `■移動平均・Vwap`
+8. `■重要価格`
 9. `■前日評価`
 
 先頭サマリは、取得時刻、銘柄名と銘柄コード、現在値、前日比、終端位置、出来高比、25日線乖離、VWAP差分、60日レンジ位置、下値目安、抵抗線、当日前後場VWAP判定を7行に圧縮して表示する。下値目安は前日安値、25日線、20日安値、60日安値、75日線のうち現在値未満の価格を近い順に最大3価格表示する。下値目安と抵抗線は同価格のラベルを `/` で併記し、現在値に近い順に `→` で連結する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻はスクリプト起動時刻ではなく、取得した日中値に紐づく日時を使う。
@@ -165,7 +165,7 @@ D1 / D2 / D3は詳細分類、状態、主判定を1行にまとめる。詳細�
 
 25日線以上の場合は `底打ち初動判定` 行を出力しない。主要値が欠損して判定できない場合は、該当値を `N/A` と表示する。
 
-日中5分足が取得できる場合、先頭サマリの `需給（VWAP）` 行には、現在株価が当日前場・後場それぞれのVWAP以上なら `◯`、未満なら `×`、判定不能なら `N/A` を表示する。同じ行へ前日前場・後場のVWAP維持判定も表示する。前後場VWAPの価格は `■移動平均・Vwap` に表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
+日中5分足が取得できる場合、先頭サマリの `需給（VWAP）` 行には、現在株価が当日前場・後場それぞれのVWAP以上なら `◯`、未満なら `×`、判定不能なら `N/A` を表示する。同じ行へ前日前場・後場のVWAP維持判定も表示する。前後場VWAPの価格は `■重要価格` に表示する。現在が前場か後場かの判定は、PC時刻ではなく取得済み5分足の最新バー時刻で行う。既存の前日VWAP分割と同じく、`12:30` 未満を前場、`12:30` 以降を後場とする。
 
 - 最新バーが前場の場合: 当日前場のみ表示し、当日後場は表示しない。前日前場・後場は両方表示する。
 - 最新バーが後場の場合: 当日前場・後場と前日前場・後場を表示する。
@@ -206,22 +206,16 @@ Technicalタブの表示例は次の通り。
 終値：{close}
 当日値幅：{day_range}（ATR比 {day_range_atr} / {day_range_label}）
 
-■移動平均・Vwap
+■重要価格
 前場Vwap：{am_vwap}
 後場Vwap：{pm_vwap}
-5日線：{ma5}（乖離 {dev5_pct}）
-25日線：{ma25}（乖離 {dev25_pct} / ATR比 {ma25_distance_atr}）
+25日線：{ma25}
 14日ATR：{atr14}
 
 ■前日評価
-終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
-
-前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
-
-後場評価 {previous_pm_evaluation}
-
-前日レンジ {prev_low}-{prev_high}（{prev_range_atr}）　終位置 {prev_close_position}
-前日ローソク足型：　{prev_candle_body_label}
+前日終値：{prev_close}円（VWAP{prev_vwap_diff_price}円／騰落率{prev_change_pct}）　終端位置：{prev_close_position}　{prev_candle_body_label}{prev_wick_label}（レンジ{prev_low}－{prev_high}）
+前日出来高：20日平均比　{prev_volume_vs_avg20_pct}
+後場評価：{previous_pm_evaluation}
 
 ```
 
@@ -235,7 +229,7 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 
 後場に入った直後など、後場の出来高付き5分足がまだ存在しない場合、後場VWAPは `N/A` とする。前場のみの時間帯では後場VWAP行を表示しない。
 
-当日出来高の20日平均比は、当日出来高を当日時点の20日平均出来高で割った比率として表示する。あわせて、当日出来高を前営業日出来高で割った騰落率を `前日比` として表示する。`■移動平均・Vwap` ブロックでは当日出来高の実数は表示しない。
+当日出来高の20日平均比は、当日出来高を当日時点の20日平均出来高で割った比率として表示する。あわせて、当日出来高を前営業日出来高で割った騰落率を `前日比` として表示する。`■重要価格` ブロックでは当日出来高の実数は表示しない。
 
 当日出来高の20日平均比には次の評価コメントを付ける。
 
@@ -278,14 +272,9 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 
 ```text
 ■前日評価
-終値 {prev_close}（VWAP {prev_vwap_diff_price}円 / {prev_vwap_diff_pct} / {prev_vwap_diff_atr}）騰落率{prev_change_pct}
-
-前日出来高：　20日平均比　{prev_volume_vs_avg20_pct}(前々日比　{prev_volume_change_pct})
-
-後場評価 {previous_pm_evaluation}
-
-前日レンジ {prev_low}-{prev_high}（{prev_range_atr}）　終位置 {prev_close_position}
-前日ローソク足型：　{prev_candle_body_label}
+前日終値：{prev_close}円（VWAP{prev_vwap_diff_price}円／騰落率{prev_change_pct}）　終端位置：{prev_close_position}　{prev_candle_body_label}{prev_wick_label}（レンジ{prev_low}－{prev_high}）
+前日出来高：20日平均比　{prev_volume_vs_avg20_pct}
+後場評価：{previous_pm_evaluation}
 ```
 
 ヒゲありの場合のみ、ローソク足型へ `＋上髭` または `＋下髭` を付ける。ヒゲなしの場合は追記しない。
@@ -305,7 +294,7 @@ VWAP が日足参考値の場合、`Vwap` 行の末尾に `(日足参考値)` �
 機関投資サマリ
 時価総額：{market_cap_oku}億円（{market_cap_class}）
 流動性：出来高 {volume}（20日平均比 {volume_vs_avg20_pct}） 売買代金 {trading_value_oku}億円
-機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）　Technical：VWAP {○/×} / 5日線 {○/×} / 25日線 {○/×}
+機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）　Technical：VWAP {○/×} / 25日線 {○/×}
 ```
 
 VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` を付ける。

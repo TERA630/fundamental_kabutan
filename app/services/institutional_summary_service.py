@@ -76,7 +76,6 @@ class InstitutionalSummaryService:
             fundamental_rank=scoring_result.total.judgement if scoring_result is not None else None,
             latest=technical_result.snapshot.price.latest,
             vwap=_number_or_none(technical_result.vwap_snapshot.get("vwap")),
-            ma5=technical_result.snapshot.moving_average.ma5,
             ma25=technical_result.snapshot.moving_average.ma25,
             vwap_is_daily_reference=technical_result.vwap_snapshot.get("vwap_source") == "日足参考値",
         )

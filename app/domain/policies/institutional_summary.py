@@ -117,13 +117,11 @@ def build_technical_condition_summary(
     *,
     latest: float | int | None,
     vwap: float | int | None,
-    ma5: float | int | None,
     ma25: float | int | None,
     vwap_is_daily_reference: bool = False,
 ) -> TechnicalConditionSummary:
     return TechnicalConditionSummary(
         vwap=build_technical_signal(latest, vwap),
-        ma5=build_technical_signal(latest, ma5),
         ma25=build_technical_signal(latest, ma25),
         vwap_is_daily_reference=vwap_is_daily_reference,
     )
@@ -156,7 +154,6 @@ def build_institutional_summary(
     fundamental_rank: str | None,
     latest: float | int | None,
     vwap: float | int | None,
-    ma5: float | int | None,
     ma25: float | int | None,
     vwap_is_daily_reference: bool = False,
 ) -> InstitutionalSummary:
@@ -179,7 +176,6 @@ def build_institutional_summary(
         technical=build_technical_condition_summary(
             latest=latest,
             vwap=vwap,
-            ma5=ma5,
             ma25=ma25,
             vwap_is_daily_reference=vwap_is_daily_reference,
         ),

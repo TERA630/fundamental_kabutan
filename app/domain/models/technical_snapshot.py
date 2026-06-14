@@ -33,11 +33,9 @@ class TechnicalPriceSnapshot:
 
 @dataclass(frozen=True)
 class TechnicalMovingAverageSnapshot:
-    ma5: float | None
     ma25: float | None
     ma75: float | None
     ma25_prev5: float | None
-    dev5_pct: float | None
     dev25_pct: float | None
     ma25_distance: float | None
     ma25_distance_atr: float | None

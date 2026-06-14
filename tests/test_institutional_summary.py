@@ -72,13 +72,11 @@ def test_build_technical_condition_summary():
     summary = build_technical_condition_summary(
         latest=101,
         vwap=100,
-        ma5=102,
         ma25=None,
         vwap_is_daily_reference=True,
     )
 
     assert summary.vwap == "○"
-    assert summary.ma5 == "×"
     assert summary.ma25 == "N/A"
     assert summary.vwap_is_daily_reference is True
 
@@ -95,7 +93,6 @@ def test_build_institutional_summary_keeps_fundamental_and_technical_out_of_scor
         fundamental_rank="S",
         latest=2100,
         vwap=2000,
-        ma5=2050,
         ma25=2150,
     )
 
@@ -106,5 +103,4 @@ def test_build_institutional_summary_keeps_fundamental_and_technical_out_of_scor
     assert summary.fundamental_score == 80
     assert summary.fundamental_rank == "S"
     assert summary.technical.vwap == "○"
-    assert summary.technical.ma5 == "○"
     assert summary.technical.ma25 == "×"

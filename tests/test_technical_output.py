@@ -100,27 +100,28 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "\n高値：" not in output
     assert "\n安値：" not in output
     assert "\n終値：" not in output
-    assert "■移動平均・Vwap" in output
+    assert "■重要価格" in output
+    assert "\n5日線：" not in output
+    assert "25日線：157.00" in output
+    assert "25日線：157.00（" not in output
     assert "前場Vwap：167.17" in output
     assert "後場Vwap：167.78" in output
     assert "■移動平均・出来高" not in output
     assert "出来高：1,069株" not in output
     assert "■抵抗線" not in output
     assert "■前日評価" in output
-    assert "終値 168（VWAP +0.47円 / +0.3% / 0.09ATR）騰落率+0.6%" in output
+    assert "前日終値：168円（VWAP+0.47円／騰落率+0.6%）　終端位置：60.0%　小陽線（レンジ165－170）" in output
     assert "前日Vwap(前・後場)" not in output
     assert "高値更新 〇 / 安値維持 〇" not in output
-    assert "前日出来高：　20日平均比　100.9%(前々日比　+0.1%)" in output
-    assert "後場評価 高値維持" in output
-    assert "後場評価 高値維持 / VWAP上" not in output
-    assert "前日レンジ 165-170（1.00ATR）　終位置 60.0%" in output
-    assert "前日ローソク足型：　小陽線" in output
-    assert "前日ローソク足型：　小陽線＋" not in output
+    assert "前日出来高：20日平均比　100.9%" in output
+    assert "前々日比" not in output
+    assert "後場評価：高値維持" in output
+    assert "後場評価：高値維持 / VWAP上" not in output
     assert "■支持線" not in output
     assert "■節目・ブレイクライン" not in output
     assert "■流れ" not in output
     assert "トレンド：" not in output
-    assert output.index("■移動平均・Vwap") < output.index("■前日評価")
+    assert output.index("■重要価格") < output.index("■前日評価")
 
 
 def test_build_technical_output_marks_daily_reference_vwap():
@@ -268,11 +269,11 @@ def test_build_technical_output_marks_previous_session_intraday_na_when_missing(
 
     output = build_technical_output(result)
 
-    assert "終値 168（VWAP N/A円 / N/A / N/A）騰落率+0.6%" in output
+    assert "前日終値：168円（VWAPN/A円／騰落率+0.6%）" in output
     assert "需給（VWAP）：当日 N/A　前日前場／後場　N/A／N/A" in output
     assert "前日Vwap(前・後場)" not in output
     assert "高値更新 〇 / 安値維持 〇" not in output
-    assert "後場評価 N/A" in output
+    assert "後場評価：N/A" in output
     assert "/ VWAPN/A" not in output
 
 

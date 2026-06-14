@@ -24,7 +24,6 @@ class InstitutionalScoreBreakdown:
 @dataclass(frozen=True)
 class TechnicalConditionSummary:
     vwap: TechnicalSignal
-    ma5: TechnicalSignal
     ma25: TechnicalSignal
     vwap_is_daily_reference: bool = False
 
