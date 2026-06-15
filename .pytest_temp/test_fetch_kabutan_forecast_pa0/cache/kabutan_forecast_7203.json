@@ -1,0 +1,40 @@
+{
+  "saved_at": 1781442224.6567311,
+  "data": {
+    "rows": [
+      {
+        "fiscal_year": "2025/03",
+        "forecast_type": "実績",
+        "period_type": "通期",
+        "sales": 1000,
+        "op_income": 100,
+        "ordinary_income": 90,
+        "np": 80,
+        "eps": null,
+        "div": null
+      },
+      {
+        "fiscal_year": "2026/03",
+        "forecast_type": "予想",
+        "period_type": "通期",
+        "sales": 1200,
+        "op_income": 130,
+        "ordinary_income": 120,
+        "np": 110,
+        "eps": null,
+        "div": null
+      },
+      {
+        "fiscal_year": "2027/03",
+        "forecast_type": "予想",
+        "period_type": "通期",
+        "sales": 1350,
+        "op_income": 150,
+        "ordinary_income": 140,
+        "np": 120,
+        "eps": null,
+        "div": null
+      }
+    ]
+  }
+}

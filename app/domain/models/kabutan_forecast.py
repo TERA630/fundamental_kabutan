@@ -1,0 +1,38 @@
+"""Domain models for Kabutan annual forecast rows."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class KabutanForecastRow:
+    period_label: str
+    year: int
+    month: int
+    section: str
+    sales: int | None
+    operating_profit: int | None
+    ordinary_profit: int | None
+    final_profit: int | None
+    revised_eps: float | None = None
+    dividend: float | None = None
+
+
+@dataclass(frozen=True)
+class KabutanForecastSnapshot:
+    actual_rows: tuple[KabutanForecastRow, ...]
+    forecast_rows: tuple[KabutanForecastRow, ...]
+
+
+@dataclass(frozen=True)
+class KabutanForecastPair:
+    previous2_actual: KabutanForecastRow | None
+    previous_actual: KabutanForecastRow | None
+    current_actual: KabutanForecastRow | None
+    current_forecast: KabutanForecastRow
+    next_forecast: KabutanForecastRow | None
+    all_rows: tuple[KabutanForecastRow, ...] = ()
+
+
+__all__ = ["KabutanForecastRow", "KabutanForecastPair", "KabutanForecastSnapshot"]

@@ -1,0 +1,89 @@
+"""Domain models for quarterly actuals and year-over-year growth metrics."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+
+class Quarter(str, Enum):
+    Q1 = "Q1"
+    Q2 = "Q2"
+    Q3 = "Q3"
+    Q4 = "Q4"
+
+
+class YoYStatus(str, Enum):
+    OK = "ok"
+    NA = "na"
+    TURNAROUND_TO_PROFIT = "turnaround_to_profit"
+
+
+class GrowthMetricKind(str, Enum):
+    SALES = "sales"
+    OPERATING_PROFIT = "operating_profit"
+    OPERATING_MARGIN = "operating_margin"
+    REVISED_EPS = "revised_eps"
+
+
+@dataclass(frozen=True)
+class QuarterlyActual:
+    ticker: str
+    fiscal_year: int
+    quarter: Quarter | None
+    quarter_end_month: int | None
+    sales: int | None
+    ordinary_profit: int | None
+    operating_profit: int | None
+    final_profit: int | None
+    revised_eps: float | None
+    operating_margin: float | None
+
+
+@dataclass(frozen=True)
+class YoYMetric:
+    status: YoYStatus
+    value_pct: float | None
+
+
+@dataclass(frozen=True)
+class QuarterlyGrowthMetrics:
+    sales_yoy: YoYMetric
+    operating_profit_yoy: YoYMetric
+    operating_margin_yoy: YoYMetric
+    revised_eps_yoy: YoYMetric
+
+
+@dataclass(frozen=True)
+class QuarterlyMetricRow:
+    fiscal_year: int
+    quarter: Quarter
+    quarter_end_month: int | None
+    sales: int | None
+    operating_profit: int | None
+    ordinary_profit: int | None
+    final_profit: int | None
+    revised_eps: float | None
+    operating_profit_yoy_pct: float | None
+    revised_eps_yoy_pct: float | None
+    operating_margin_pct: float | None
+    sales_yoy_pct: float | None = None
+
+
+@dataclass(frozen=True)
+class QuarterlyActualWithGrowth:
+    current: QuarterlyActual
+    prior_same_quarter: QuarterlyActual | None
+    growth: QuarterlyGrowthMetrics
+
+
+__all__ = [
+    "GrowthMetricKind",
+    "Quarter",
+    "QuarterlyActual",
+    "QuarterlyActualWithGrowth",
+    "QuarterlyMetricRow",
+    "QuarterlyGrowthMetrics",
+    "YoYMetric",
+    "YoYStatus",
+]

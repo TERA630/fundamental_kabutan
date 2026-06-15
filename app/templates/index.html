@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fundamental Kabutan Web UI</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='web.css') }}">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <h1>Fundamental Kabutan</h1>
+      <p>{{ state.status }}</p>
+    </header>
+
+    <section class="control-band" aria-label="入力">
+      <form action="/watchlist" method="post" enctype="multipart/form-data" class="control-grid">
+        <label>
+          <span>WatchList upload</span>
+          <input type="file" name="watchlist_file" accept=".md,.txt,text/plain,text/markdown">
+        </label>
+        <label>
+          <span>WatchList path</span>
+          <input type="text" name="watchlist_path" value="{{ state.watchlist_path or '' }}">
+        </label>
+        <button type="submit">WatchList読込</button>
+      </form>
+
+      <form action="/kabutan-dir" method="post" enctype="multipart/form-data" class="control-grid">
+        <label>
+          <span>Kabutan HTML folder</span>
+          <input type="file" name="kabutan_html_files" accept=".html,.htm,text/html" webkitdirectory directory multiple>
+        </label>
+        <label>
+          <span>Kabutan_html_dir</span>
+          <input type="text" name="kabutan_html_dir" value="{{ state.kabutan_html_dir or '' }}" placeholder="/workspaces/project/kabutan_html">
+        </label>
+        <button type="submit">フォルダ設定</button>
+      </form>
+
+      <form action="/kabutan-package/import" method="post" enctype="multipart/form-data" class="control-grid">
+        <label>
+          <span>Kabutan HTML package zip</span>
+          <input type="file" name="kabutan_package_zip" accept=".zip,application/zip">
+        </label>
+        <label>
+          <span>Uploaded package</span>
+          <input type="text" value="{{ state.kabutan_package_zip_path or '' }}" readonly>
+        </label>
+        <label>
+          <span>Package html dir</span>
+          <input type="text" value="{{ state.kabutan_html_dir or '' }}" readonly>
+        </label>
+        <button id="kabutan-package-import-button" type="submit">Zipをアップロード</button>
+      </form>
+    </section>
+
+    <form method="post" class="work-area">
+      <section class="toolbar" aria-label="操作">
+        <label>
+          <span>銘柄</span>
+          <select name="selected_stock">
+            {% for choice in state.stock_choices %}
+              <option value="{{ choice }}" {% if choice == state.selected_label %}selected{% endif %}>{{ choice }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <div class="segmented" role="radiogroup" aria-label="mode">
+          <label>
+            <input type="radio" name="mode" value="fundamental" {% if state.mode != 'technical' %}checked{% endif %}>
+            <span>Fundamental</span>
+          </label>
+          <label>
+            <input type="radio" name="mode" value="technical" {% if state.mode == 'technical' %}checked{% endif %}>
+            <span>Technical</span>
+          </label>
+        </div>
+
+        <button formaction="/fetch" type="submit">取得</button>
+        <button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>
+        <button id="copy-button" type="button">コピー</button>
+        <a class="button-link" href="/download">保存</a>
+      </section>
+    </form>
+
+    <section class="summary-panel" aria-label="機関投資サマリ">
+      <pre>{{ state.institutional_summary }}</pre>
+    </section>
+
+    {% if summary_html %}
+    <section class="summary-panel summary-html-panel" aria-label="サマリ">
+      {{ summary_html | safe }}
+    </section>
+    {% endif %}
+
+    <section class="output-panel" aria-label="出力">
+      <div class="rich-output">
+        {% for block in output_blocks %}
+          {% if block.kind == "table" %}
+            <section class="output-block">
+              <h2>{{ block.title }}</h2>
+              {% if block.note %}
+                <p class="table-note">{{ block.note }}</p>
+              {% endif %}
+              <div class="table-scroll">
+                <table class="fundamental-table">
+                  <thead>
+                    <tr>
+                      {% for header in block.headers %}
+                        <th scope="col">{{ header }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in block.rows %}
+                      <tr>
+                        {% for cell in row %}
+                          {% if loop.first %}
+                            <th scope="row">{{ cell }}</th>
+                          {% else %}
+                            <td>{{ cell }}</td>
+                          {% endif %}
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          {% else %}
+            <pre class="text-block">{{ block.text }}</pre>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+
+  <textarea id="copy-source" class="copy-source">{{ copy_text }}</textarea>
+  <script>
+    const copyButton = document.getElementById("copy-button");
+    const copySource = document.getElementById("copy-source");
+    const summaryButton = document.getElementById("summary-button");
+    const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
+    const modeInputs = document.querySelectorAll('input[name="mode"]');
+
+    function updateSummaryButton() {
+      const technicalSelected = Array.from(modeInputs).some(
+        (input) => input.checked && input.value === "technical"
+      );
+      if (kabutanPackageImportButton) {
+        kabutanPackageImportButton.disabled = technicalSelected;
+      }
+    }
+
+    modeInputs.forEach((input) => input.addEventListener("change", updateSummaryButton));
+    updateSummaryButton();
+
+    function setCopyButtonText(text) {
+      copyButton.textContent = text;
+      window.setTimeout(() => { copyButton.textContent = "コピー"; }, 1200);
+    }
+
+    function copyWithTextareaFallback() {
+      copySource.focus();
+      copySource.select();
+      copySource.setSelectionRange(0, copySource.value.length);
+      return document.execCommand("copy");
+    }
+
+    copyButton.addEventListener("click", async () => {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(copySource.value);
+        } else if (!copyWithTextareaFallback()) {
+          throw new Error("copy command failed");
+        }
+        setCopyButtonText("コピー済");
+      } catch (_error) {
+        if (copyWithTextareaFallback()) {
+          setCopyButtonText("コピー済");
+          return;
+        }
+        setCopyButtonText("コピー失敗");
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+"""Formatter: convert domain display DTOs into plain-text sections."""
+from __future__ import annotations
+
+import logging
+from typing import List
+
+from app.domain.builders.analyst_estimates_output import build_analyst_estimates_lines
+from app.domain.models.cf_scoring_result import MetricScore
+from app.domain.models.display_sections import (
+    AnalystEstimatesSection,
+    CashflowTimelineSection,
+    DisplaySections,
+    FinancialMetricsSection,
+    ForecastTableSection,
+    GrowthTimelineSection,
+    OpeningSummarySection,
+    QuarterlyMetricsSection,
+    RuleNotesSection,
+    ScoreBreakdownSection,
+    ScoreCategorySection,
+    ScoreSummarySection,
+    SummarySection,
+    ValuationTableSection,
+)
+from app.domain.models.kabutan_cashflow import KabutanCashflowRow
+from app.domain.models.kabutan_forecast import KabutanForecastRow
+
+
+logger = logging.getLogger(__name__)
+
+METRIC_LABELS = {
+    "roic": "ROIC",
+    "cash_conversion_np": "Cash Conversion(OCF/純利益)",
+    "ocf_margin": "営業CFマージン",
+    "op_margin": "営業利益率",
+    "fcf_ratio": "FCF Ratio(FCF/OCF)",
+    "eps_cagr_3y": "EPS CAGR(3y)",
+    "sales_cagr_3y": "売上CAGR(3y)",
+    "operating_profit_cagr_3y": "営業利益CAGR(3y)",
+    "fcf_yield": "FCF Yield",
+    "per": "PER",
+}
+
+RULE_NOTE_JA_MAP = {
+    "high_growth_bonus": "高グロース株加点",
+    "growth_floor": "高成長考慮による下限補正",
+    "growth_exemption": "成長投資免責によるランク引き上げ",
+    "quality_filter": "品質フィルター適用（OCF/営業利益）",
+    "invalid_per": "PER算出値不正",
+}
+
+RULE_NOTE_EXACT_MAP = {
+    "invalid_sign: net_income <= 0": "純利益符号不正",
+    "invalid_sign: ocf <= 0": "営業CF符号不正",
+    "invalid_sign: ocf == 0": "営業CFゼロ",
+    "invalid_sign: ocf < 0": "営業CFマイナス",
+}
+
+
+def _fmt_oku(value: int | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value / 100:,.1f}億"
+
+
+def _fmt_million_yen(value: int | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,}"
+
+
+def _fmt_yen(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,.1f}円"
+
+
+def _fmt_percent(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.1f}%"
+
+
+def _fmt_multiplier(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.2f}倍"
+
+
+def _fmt_ratio_or_blank(value: float | None) -> str:
+    if value is None:
+        return ""
+    return f"{value:+.1f}%"
+
+
+def _fmt_yoy_percent_or_blank(value: float | None) -> str:
+    if value is None:
+        return ""
+    if float(value).is_integer():
+        return f"{value:.0f}%"
+    return f"{value:.1f}%"
+
+
+def _format_market_cap_rank(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    oku = value / 100_000_000
+    if oku >= 100_000:
+        return "超大型"
+    if oku >= 10_000:
+        return "大型主役"
+    if oku >= 3_000:
+        return "中型主役"
+    if oku >= 1_000:
+        return "小〜中型"
+    return "小型"
+
+
+def _fmt_opening_price(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:,.0f}円"
+
+
+def _fmt_opening_market_cap(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value / 100_000_000:,.0f}億円"
+
+
+def format_opening_summary(section: OpeningSummarySection) -> List[str]:
+    market_cap_text = _fmt_opening_market_cap(section.market_cap)
+    market_cap_class = section.market_cap_class
+    if market_cap_class is None and section.market_cap is not None:
+        market_cap_class = _format_market_cap_rank(section.market_cap)
+    if market_cap_class is not None:
+        market_cap_text = f"{market_cap_text}（{market_cap_class}）"
+
+    if section.judgement is None or section.total_points is None or section.max_points is None:
+        score_line = "総合評価 N/A"
+    else:
+        score_line = f"総合評価 {section.judgement}（{section.total_points}/{section.max_points}）"
+
+    return [
+        f"【{section.company_name} ({section.code4})】",
+        f"株価 {_fmt_opening_price(section.price)}　時価総額 {market_cap_text}",
+        "",
+        score_line,
+        f"{section.growth_phase or 'N/A'} / {section.per_level or 'N/A'} / {section.roic_level or 'N/A'}",
+    ]
+
+
+def format_summary(section: SummarySection) -> List[str]:
+    lines: List[str] = []
+    lines.append(f"【銘柄】{section.company_name} ({section.code4})")
+    price = "N/A" if section.price is None else f"{section.price:,.0f}"
+    lines.append(f"株価：{price}円")
+    cap_text = "N/A" if section.market_cap is None else f"{section.market_cap/100_000_000:,.1f}億円"
+    lines.append(f"時価総額：{cap_text}({_format_market_cap_rank(section.market_cap)})")
+    return lines
+
+
+def format_valuation(section: ValuationTableSection) -> List[str]:
+    if not section.year_labels:
+        logger.info("取得不可: バリュエーション年度 (値欠損)")
+    if not section.per_values or section.per_values == ["N/A"]:
+        logger.info("取得不可: PER (値欠損)")
+    if not section.dividend_values or section.dividend_values == ["N/A"]:
+        logger.info("取得不可: 配当利回り (値欠損)")
+    header = "年度|" + "|".join(section.year_labels) if section.year_labels else "年度|N/A"
+    per_line = f"PER|{'|'.join(section.per_values) if section.per_values else 'N/A'}"
+    div_line = f"配当利回り|{'|'.join(section.dividend_values) if section.dividend_values else 'N/A'}"
+    lines = ["", "■株価評価・資本効率", header, per_line]
+    if section.pbr_values is not None:
+        lines.append(f"PBR|{'|'.join(section.pbr_values)}")
+    if section.roe_values is not None:
+        lines.append(f"ROE|{'|'.join(section.roe_values)}")
+    if section.roic_values is not None:
+        lines.append(f"ROIC|{'|'.join(section.roic_values)}")
+    lines.append(div_line)
+    if section.fcf_yield_values is not None:
+        lines.append(f"FCF Yield|{'|'.join(section.fcf_yield_values)}")
+    return lines
+
+
+def format_score_summary(section: ScoreSummarySection) -> List[str]:
+    as_of = section.as_of[:7] if section.as_of and len(section.as_of) >= 7 else section.as_of
+    return [
+        f"総合評価：　{section.judgement} ({section.total_points}/{section.max_points}点) バージョン: {section.version}",
+        f"投資分類： {section.investment_category}",
+        f"算出基準： {as_of or 'N/A'}",
+    ]
+
+
+def _format_rule_note(note: str) -> str:
+    if note in RULE_NOTE_EXACT_MAP:
+        return RULE_NOTE_EXACT_MAP[note]
+    key = note.split(":", 1)[0].strip()
+    if key in RULE_NOTE_JA_MAP:
+        return RULE_NOTE_JA_MAP[key]
+    return f"未定義ルール: {note}"
+
+
+def _format_metric_raw_value(metric: MetricScore) -> str:
+    if metric.raw_value is None:
+        return "N/A"
+    if metric.metric_id == "per":
+        return f"{metric.raw_value:.1f}倍"
+    if metric.metric_id in {"roic", "ocf_margin", "op_margin", "fcf_ratio", "eps_cagr_3y", "sales_cagr_3y", "operating_profit_cagr_3y", "fcf_yield"}:
+        return f"{metric.raw_value:.2f}%"
+    return f"{metric.raw_value:.2f}"
+
+
+def _format_metric_score(metric: MetricScore, label_width: int) -> str | None:
+    label = METRIC_LABELS.get(metric.metric_id, metric.metric_id)
+    if metric.raw_value is None:
+        reason = "値欠損"
+        logger.info("取得不可: %s (%s)", label, reason)
+        logger.debug(
+            "N/A項目を表示省略: metric_id=%s rank=%s points=%s/%s rule_notes=%s reason=%s",
+            metric.metric_id,
+            metric.rank,
+            metric.points,
+            metric.max_points,
+            metric.rule_notes,
+            reason,
+        )
+        return None
+
+    return f"{label:<{label_width}} {_format_metric_raw_value(metric)}({metric.rank})"
+
+
+def format_score_breakdown(section: ScoreBreakdownSection) -> List[str]:
+    return [f"Quality {section.quality_points}点 Growth {section.growth_points}点 Valuation {section.valuation_points}点"]
+
+
+def format_score_category(section: ScoreCategorySection) -> List[str]:
+    labels = [METRIC_LABELS.get(metric.metric_id, metric.metric_id) for metric in section.metrics if metric.raw_value is not None]
+    label_width = max([len(label) for label in labels] + [12])
+    lines = [f"[{section.title}]"]
+    for metric in section.metrics:
+        formatted = _format_metric_score(metric, label_width)
+        if formatted is not None:
+            lines.append(formatted)
+    return lines
+
+
+def format_rule_notes(section: RuleNotesSection) -> List[str]:
+    lines = ["ルール注記:"]
+    if section.notes:
+        lines.extend(f"- {_format_rule_note(note)}" for note in section.notes)
+    else:
+        lines.append("- なし")
+    return lines
+
+
+def _build_kabutan_source_label(source: str, message: str | None) -> str:
+    source_label = {"html": "HTML", "none": "取得不可"}.get(source, "取得不可")
+    return f"株探ソース: {source_label}" if not message else f"株探ソース: {source_label} ({message})"
+
+
+def _build_profit_with_margin_text(profit: int | None, margin: float | None) -> str:
+    return f"{_fmt_oku(profit)}({_fmt_percent(margin)})"
+
+
+def _calc_operating_margin(sales: int | None, operating_profit: int | None) -> float | None:
+    if sales is None or operating_profit is None or sales == 0:
+        return None
+    return (operating_profit / sales) * 100
+
+
+def _calc_ordinary_margin(sales: int | None, ordinary_profit: int | None) -> float | None:
+    if sales is None or ordinary_profit is None or sales == 0:
+        return None
+    return (ordinary_profit / sales) * 100
+
+
+def _build_kabutan_row_line(row: KabutanForecastRow) -> str:
+    year_label = f"{row.year}/{row.month:02d}(予)" if row.section == "予想" else f"{row.year}/{row.month:02d}"
+    operating_margin = _calc_operating_margin(row.sales, row.operating_profit)
+    ordinary_margin = _calc_ordinary_margin(row.sales, row.ordinary_profit)
+    return (
+        f"{year_label:<10}"
+        f"{_fmt_oku(row.sales):>10}"
+        f"{_build_profit_with_margin_text(row.operating_profit, operating_margin):>20}"
+        f"{_build_profit_with_margin_text(row.ordinary_profit, ordinary_margin):>20}"
+        f"{_fmt_oku(row.final_profit):>10}"
+        f"{_fmt_yen(row.revised_eps):>10}"
+        f"{_fmt_yen(row.dividend):>10}"
+    )
+
+
+def format_forecast_table(section: ForecastTableSection) -> List[str]:
+    header = "　　　　　　売上　営業益(営業利益率)　経常益(経常利益率)　最終益　1株益　1株配当"
+    if not section.rows:
+        logger.info("取得不可: 株探通期業績推移 (値欠損)")
+    row_lines = [_build_kabutan_row_line(row) for row in section.rows] if section.rows else ["データーが取得できません"]
+    return [
+        "",
+        "■株探 通期業績推移",
+        _build_kabutan_source_label(section.source, section.source_message),
+        header,
+        *row_lines,
+    ]
+
+
+def _build_cagr_line(title: str, start_year: int | None, end_year: int | None, value: float | None) -> str:
+    if start_year is None or end_year is None:
+        return f"{title} N/A"
+    return f"{title} {start_year}→{end_year} {_fmt_percent(value)}"
+
+
+def format_growth_timeline(section: GrowthTimelineSection) -> List[str]:
+    if not section.rows:
+        logger.info("取得不可: 成長性経時ブロック (値欠損)")
+    return [
+        "■成長性",
+        _build_cagr_line("売上CAGR", section.cagr_start_year, section.cagr_end_year, section.sales_cagr),
+        _build_cagr_line("営業利益CAGR", section.cagr_start_year, section.cagr_end_year, section.operating_cagr),
+        _build_cagr_line("EPS CAGR", section.cagr_start_year, section.cagr_end_year, section.eps_cagr),
+    ]
+
+
+def _resolve_fcf_million_yen(row: KabutanCashflowRow) -> int | None:
+    if row.free_cf is not None:
+        return row.free_cf
+    if row.operating_cf is None or row.investing_cf is None:
+        return None
+    return row.operating_cf + row.investing_cf
+
+
+def format_cashflow_timeline(section: CashflowTimelineSection) -> List[str]:
+    if not section.actual_rows:
+        logger.info("取得不可: キャッシュフロー (値欠損)")
+        return ["■キャッシュフロー", "N/A"]
+
+    metric_by_year = {row.year: row for row in section.metric_rows}
+    lines = [
+        "■キャッシュフロー",
+        "年度 | 営業CF | FCF | 投資積極性 | 現金残高",
+    ]
+    for row in section.actual_rows:
+        metric_row = metric_by_year.get(row.year)
+        investment_aggressiveness_pct = metric_row.investment_aggressiveness_pct if metric_row else None
+        lines.append(
+            f"{row.year} | {_fmt_million_yen(row.operating_cf)} | {_fmt_million_yen(_resolve_fcf_million_yen(row))} | {_fmt_percent(investment_aggressiveness_pct)} | {_fmt_million_yen(row.cash_stock)}"
+        )
+    return lines
+
+
+def format_financial_metrics(section: FinancialMetricsSection) -> List[str]:
+    lines = ["■財務ブロック", "　　　ROE(%)|ROIC(%)|PBR|"]
+    if not section.rows:
+        logger.info("取得不可: 財務ブロック (値欠損)")
+        lines.append("N/A")
+        return lines
+    for row in section.rows:
+        lines.append(f"{row.year}年　{_fmt_percent(row.roe_pct)}|{_fmt_percent(row.roic_pct)}|{_fmt_multiplier(row.pbr)}")
+    return lines
+
+
+def _format_quarterly_metrics_detail(section: QuarterlyMetricsSection) -> List[str]:
+    header = "　　　売上高|営業益(前年同期比%)|経常益|最終益|修正1株益(前年同期比%)|売上損益率|"
+    if not section.rows:
+        logger.info("取得不可: 四半期業績推移 (値欠損)")
+        detail = f"N/A ({section.message})" if section.message else "N/A"
+        return ["■四半期業績推移", header, detail]
+
+    lines = ["■四半期業績推移", header]
+    for row in section.rows:
+        label = f"{row.fiscal_year}.{row.quarter_end_month}" if row.quarter_end_month is not None else str(row.fiscal_year)
+        op = _fmt_oku(row.operating_profit)
+        op_yoy = _fmt_ratio_or_blank(row.operating_profit_yoy_pct)
+        eps = _fmt_yen(row.revised_eps)
+        eps_yoy = _fmt_ratio_or_blank(row.revised_eps_yoy_pct)
+        margin = _fmt_percent(row.operating_margin_pct) if row.operating_margin_pct is not None else "N/A"
+        lines.append(f"{label}　{_fmt_oku(row.sales)}|{op}({op_yoy})|{_fmt_oku(row.ordinary_profit)}|{_fmt_oku(row.final_profit)}|{eps}({eps_yoy})|{margin}|")
+    return lines
+
+
+def format_quarterly_metrics(section: QuarterlyMetricsSection) -> List[str]:
+    header = "　　　売上|営業利益率|昨年同期比|修正一株益"
+    if not section.rows:
+        logger.info("取得不可: 四半期トレンド (値欠損)")
+        detail = f"N/A ({section.message})" if section.message else "N/A"
+        return ["■四半期トレンド", header, detail]
+
+    lines = ["■四半期トレンド", header]
+    for row in section.rows:
+        label = f"{row.fiscal_year}.{row.quarter_end_month}" if row.quarter_end_month is not None else str(row.fiscal_year)
+        lines.append(
+            f"{label}　{_fmt_oku(row.sales)}|{_fmt_percent(row.operating_margin_pct)}|{_fmt_yoy_percent_or_blank(row.sales_yoy_pct)}|{_fmt_yen(row.revised_eps)}"
+        )
+    return lines
+
+
+def format_sections(sections: DisplaySections) -> str:
+    lines: List[str] = []
+    for s in sections.sections:
+        if isinstance(s, OpeningSummarySection):
+            lines.extend(format_opening_summary(s))
+        elif isinstance(s, SummarySection):
+            lines.extend(format_summary(s))
+        elif isinstance(s, ScoreSummarySection):
+            lines.extend(format_score_summary(s))
+        elif isinstance(s, ScoreBreakdownSection):
+            lines.extend(format_score_breakdown(s))
+        elif isinstance(s, ValuationTableSection):
+            lines.extend(format_valuation(s))
+        elif isinstance(s, AnalystEstimatesSection):
+            lines.extend(build_analyst_estimates_lines(s.estimates, price=s.price))
+        elif isinstance(s, ScoreCategorySection):
+            lines.extend(format_score_category(s))
+        elif isinstance(s, RuleNotesSection):
+            lines.extend(format_rule_notes(s))
+        elif isinstance(s, ForecastTableSection):
+            lines.extend(format_forecast_table(s))
+        elif isinstance(s, GrowthTimelineSection):
+            lines.extend(format_growth_timeline(s))
+        elif isinstance(s, CashflowTimelineSection):
+            lines.extend(format_cashflow_timeline(s))
+        elif isinstance(s, FinancialMetricsSection):
+            lines.extend(format_financial_metrics(s))
+        elif isinstance(s, QuarterlyMetricsSection):
+            lines.extend(format_quarterly_metrics(s))
+    return "\n".join(lines)
