@@ -80,9 +80,6 @@ def test_web_ui_defaults_to_technical_mode():
 
 def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeypatch):
     class FakeController:
-        def fetch_output_cache_for_today(self):
-            return {}
-
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
 
@@ -153,9 +150,6 @@ def test_set_kabutan_dir_accepts_uploaded_html_folder(tmp_path: Path):
             self.saved_dir = None
             self.cleared_zip = False
 
-        def fetch_output_cache_for_today(self):
-            return {}
-
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
 
@@ -205,9 +199,6 @@ def test_upload_kabutan_package_zip_keeps_zip_without_extracting(tmp_path: Path)
             self.inspected_zip = None
             self.import_called = False
 
-        def fetch_output_cache_for_today(self):
-            return {"7203|-": "cached"}
-
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
 
@@ -242,7 +233,6 @@ def test_upload_kabutan_package_zip_keeps_zip_without_extracting(tmp_path: Path)
 
     controller = FakeController()
     state = WebUiState(controller=controller)
-    state.output_cache = {"7203|-": "cached"}
     client = create_app(state).test_client()
 
     html = client.post(
@@ -259,7 +249,6 @@ def test_upload_kabutan_package_zip_keeps_zip_without_extracting(tmp_path: Path)
     assert state.kabutan_html_dir is None
     assert not (tmp_path / "web_imported_kabutan_html_package").exists()
     assert controller.import_called is False
-    assert state.output_cache == {}
     assert "株探HTMLパッケージZipをアップロードしました" in html
     assert "HTML: 2件" in html
 
@@ -271,9 +260,6 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
             self.import_count = 0
             self.saved_dir = None
             self.analysis_dirs = []
-
-        def fetch_output_cache_for_today(self):
-            return {}
 
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
@@ -312,22 +298,16 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
             self.analysis_dirs.append(kwargs["kabutan_html_dir"])
             return "Fundamental output"
 
-        def save_output_cache_for_today(self, _output_cache):
-            return None
-
         def fetch_institutional_summary_text(self, **_kwargs):
             return "機関投資サマリ\n時価総額：N/A"
 
-        def fetch_output_for_mode(self, *, name, code4, mode, output_cache, kabutan_html_dir=None, output_cache_key=None):
+        def fetch_output_for_mode(self, *, name, code4, mode, kabutan_html_dir=None):
             assert mode == "fundamental"
             output = self.fetch_analysis_output(
                 name=name,
                 code4=code4,
-                output_cache=output_cache,
-                output_cache_key=output_cache_key,
                 kabutan_html_dir=kabutan_html_dir,
             )
-            self.save_output_cache_for_today(output_cache)
             return SimpleNamespace(
                 output=output,
                 institutional_summary=self.fetch_institutional_summary_text(
@@ -378,9 +358,6 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
             self.file_cache = SimpleNamespace(base_dir=tmp_path)
             self.import_count = 0
             self.summary_dir = None
-
-        def fetch_output_cache_for_today(self):
-            return {}
 
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
@@ -459,9 +436,6 @@ def test_create_app_restores_cached_watchlist_kabutan_dir_and_package_zip(tmp_pa
             self.watchlist_path.write_text("トヨタ (7203)\n", encoding="utf-8")
             self.kabutan_dir.mkdir()
             self.package_zip.write_bytes(b"zip")
-
-        def fetch_output_cache_for_today(self):
-            return {}
 
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="ok", file_path=self.watchlist_path)

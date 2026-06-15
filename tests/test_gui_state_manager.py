@@ -11,16 +11,8 @@ class FakeController:
     def __init__(self):
         self.saved_watchlist_path = None
         self.saved_kabutan_dir = None
-        self.saved_output_cache = None
         self.watchlist_path = None
         self.kabutan_dir = None
-        self.output_cache = {"old": "output"}
-
-    def fetch_output_cache_for_today(self):
-        return dict(self.output_cache)
-
-    def save_output_cache_for_today(self, output_cache):
-        self.saved_output_cache = dict(output_cache)
 
     def fetch_watchlist_entries(self, _path):
         return [("トヨタ", "7203"), ("任天堂", "7974")]
@@ -50,9 +42,9 @@ def build_manager(controller: FakeController, state: GuiState | None = None) -> 
     )
 
 
-def test_load_watchlist_updates_state_choices_and_clears_cache(tmp_path: Path):
+def test_load_watchlist_updates_state_choices(tmp_path: Path):
     controller = FakeController()
-    state = GuiState(output_cache={"7203": "cached"})
+    state = GuiState()
     manager = build_manager(controller, state)
     watchlist_path = tmp_path / "watchlist.md"
 
@@ -61,9 +53,7 @@ def test_load_watchlist_updates_state_choices_and_clears_cache(tmp_path: Path):
     assert choices == ["トヨタ (7203)", "任天堂 (7974)"]
     assert state.watchlist_path == watchlist_path
     assert state.display_to_code["トヨタ (7203)"] == ("トヨタ", "7203")
-    assert state.output_cache == {}
     assert controller.saved_watchlist_path == watchlist_path
-    assert controller.saved_output_cache == {}
 
 
 def test_restore_kabutan_html_dir_updates_state(tmp_path: Path):

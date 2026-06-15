@@ -39,12 +39,11 @@ def test_load_watchlist_updates_state_and_selects_first(tmp_path: Path):
     assert "2" in state.status
 
 
-def test_set_kabutan_html_dir_clears_package_and_output_cache(tmp_path: Path):
+def test_set_kabutan_html_dir_clears_package_cache(tmp_path: Path):
     controller = FakeController()
     state = WebUiState(controller=controller)
     state.kabutan_package_zip_path = tmp_path / "package.zip"
     state.kabutan_package_zip_signature = (1, "abc")
-    state.output_cache = {"cached": "output"}
     manager = WebUiStateManager(state)
     html_dir = tmp_path / "html"
 
@@ -53,7 +52,6 @@ def test_set_kabutan_html_dir_clears_package_and_output_cache(tmp_path: Path):
     assert state.kabutan_html_dir == html_dir
     assert state.kabutan_package_zip_path is None
     assert state.kabutan_package_zip_signature is None
-    assert state.output_cache == {}
     assert controller.saved_kabutan_dir == html_dir
     assert controller.cleared_zip_cache is True
 

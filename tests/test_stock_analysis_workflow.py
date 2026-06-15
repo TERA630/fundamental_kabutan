@@ -13,7 +13,7 @@ class TechnicalService:
         return {"name": name, "code4": code4}
 
 
-def test_fetch_analysis_output_uses_cache_before_building_service(tmp_path):
+def test_fetch_analysis_output_always_builds_fundamental_output(tmp_path):
     calls = {"fundamental": 0}
 
     def build_fundamental_service(_file_cache):
@@ -29,18 +29,8 @@ def test_fetch_analysis_output_uses_cache_before_building_service(tmp_path):
         fetch_market_data_bundle=lambda _code4: None,
         build_fundamental_service_with_market_bundle=lambda _bundle: LegacyFundamentalService(),
     )
-    output_cache = {"7203|cached": "CACHED"}
-
-    assert (
-        workflow.fetch_analysis_output(
-            name="トヨタ",
-            code4="7203",
-            output_cache=output_cache,
-            output_cache_key="7203|cached",
-        )
-        == "CACHED"
-    )
-    assert calls["fundamental"] == 0
+    assert workflow.fetch_analysis_output(name="トヨタ", code4="7203") == "FUND:トヨタ:7203:None"
+    assert calls["fundamental"] == 1
 
 
 def test_fetch_technical_output_builds_from_injected_service(tmp_path, monkeypatch):

@@ -52,7 +52,7 @@ class DummyService:
         return f"OUT:{name}:{code4}:{kabutan_html_dir}"
 
 
-def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
+def test_fetch_analysis_output_rebuilds_output_each_time(tmp_path: Path):
     dummy_service = DummyService()
 
     def build_service(_cache):
@@ -62,26 +62,19 @@ def test_fetch_analysis_output_uses_injected_service_factory(tmp_path: Path):
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_fundamental_service=build_service,
     )
-    output_cache = {}
-    cache_key = "k1"
-
     out1 = controller.fetch_analysis_output(
         name="トヨタ",
         code4="7203",
-        output_cache=output_cache,
-        output_cache_key=cache_key,
         kabutan_html_dir=tmp_path,
     )
     out2 = controller.fetch_analysis_output(
         name="トヨタ",
         code4="7203",
-        output_cache=output_cache,
-        output_cache_key=cache_key,
         kabutan_html_dir=tmp_path,
     )
 
     assert out1 == out2
-    assert len(dummy_service.calls) == 1
+    assert len(dummy_service.calls) == 2
 
 
 def test_fetch_resolved_kabutan_html_dir_uses_cache(tmp_path: Path):

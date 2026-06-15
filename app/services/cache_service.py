@@ -31,4 +31,3 @@ class CacheService:
 
     def save_watchlist_path(self, path: Path) -> None:
         self.file_cache.save_watchlist_path_cache(path)
-
