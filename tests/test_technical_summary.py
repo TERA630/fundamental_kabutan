@@ -3,14 +3,6 @@ from types import SimpleNamespace
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.policies.technical_summary import (
-<<<<<<< HEAD
-    build_previous_low_support_comment,
-    build_technical_headline_summary,
-    build_nearby_resistance_lines,
-    build_nearby_support_lines,
-    build_primary_support_line,
-    build_support_line_comment,
-=======
     build_d1_detail,
     build_d3_detail,
     build_d_detail_headline,
@@ -20,7 +12,6 @@ from app.domain.policies.technical_summary import (
     build_nearby_support_lines,
     build_technical_position_assessment,
     build_technical_strategy_lines,
->>>>>>> refs/remotes/origin/main
     classify_technical_summary_rank,
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
@@ -321,102 +312,6 @@ def test_build_nearby_support_and_resistance_lines_select_two_nearest():
     assert resistance == (TechnicalSummaryLine("PrevH", 103), TechnicalSummaryLine("60D-H", 105))
 
 
-<<<<<<< HEAD
-def test_build_primary_support_line_excludes_previous_low_and_uses_day_low_proximity():
-    support = build_primary_support_line(
-        day_low=97.8,
-        ma25=101.0,
-        recent20_low=98.0,
-        ma75=96.0,
-        recent60_low=92.0,
-    )
-
-    assert support == TechnicalSummaryLine("20日安値", 98.0)
-
-
-def test_build_support_line_comment_uses_rebound_break_contact_and_check_priority():
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=99.4,
-            latest=101.0,
-            previous_low=103.0,
-            previous_close=103.5,
-            atr14=2.0,
-        )
-        == "当日支持線割れ戻し"
-    )
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=101.0,
-            latest=101.0,
-            previous_low=99.4,
-            previous_close=100.5,
-            atr14=2.0,
-        )
-        == "前日支持線割れ戻し"
-    )
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=101.0,
-            latest=101.0,
-            previous_low=99.4,
-            previous_close=99.8,
-            atr14=2.0,
-        )
-        == "当日支持線割れ戻し"
-    )
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=99.4,
-            latest=99.8,
-            previous_low=103.0,
-            previous_close=103.5,
-            atr14=2.0,
-        )
-        == "支持線割れ"
-    )
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=100.4,
-            latest=101.0,
-            previous_low=103.0,
-            previous_close=103.5,
-            atr14=2.0,
-        )
-        == "支持線接触"
-    )
-    assert (
-        build_support_line_comment(
-            support=100.0,
-            day_low=100.6,
-            latest=101.0,
-            previous_low=103.0,
-            previous_close=103.5,
-            atr14=2.0,
-        )
-        == "支持線確認中"
-    )
-
-
-def test_build_previous_low_support_comment_uses_day_low_against_previous_low():
-    assert (
-        build_previous_low_support_comment(previous_low=100.0, day_low=99.4, latest=101.0, atr14=2.0)
-        == "前日安値 割れ戻し"
-    )
-    assert (
-        build_previous_low_support_comment(previous_low=100.0, day_low=99.4, latest=99.8, atr14=2.0)
-        == "前日安値 割れ"
-    )
-    assert (
-        build_previous_low_support_comment(previous_low=100.0, day_low=100.4, latest=101.0, atr14=2.0)
-        == "前日安値 接触"
-    )
-=======
 def test_position_assessment_scores_all_collapse_risk_conditions():
     assessment = build_technical_position_assessment(
         latest=90.0,
@@ -514,7 +409,6 @@ def test_position_assessment_marks_d3_below_ma25_as_bottoming_start():
 
     assert assessment.bottoming_start_established is True
     assert assessment.hold_judgement == "△"
->>>>>>> refs/remotes/origin/main
 
 
 def test_technical_summary_service_builds_row_and_markdown():

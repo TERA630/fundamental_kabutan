@@ -23,7 +23,6 @@ class KabutanPackageResolution:
     html_dir: Path
     signature: tuple[int, str]
     imported: bool
-    output_cache_should_clear: bool
 
 
 class KabutanPackageWorkflow:
@@ -100,7 +99,6 @@ class KabutanPackageWorkflow:
                 html_dir=current_html_dir,
                 signature=signature,
                 imported=False,
-                output_cache_should_clear=False,
             )
 
         output_dir = self.import_output_dir_for_signature(signature)
@@ -111,7 +109,6 @@ class KabutanPackageWorkflow:
                 html_dir=html_dir,
                 signature=signature,
                 imported=False,
-                output_cache_should_clear=False,
             )
 
         result = self.import_package(zip_path=zip_path, output_dir=output_dir)
@@ -120,7 +117,6 @@ class KabutanPackageWorkflow:
             html_dir=result.html_dir,
             signature=signature,
             imported=True,
-            output_cache_should_clear=True,
         )
 
 

@@ -1,4 +1,4 @@
- # Summary Display Specification
+# Summary Display Specification
 
 ## 1. 概要
 
@@ -104,9 +104,9 @@ Web UI では以下の構造を想定する。
 
 ### 5.3 Technical Summary 表示構造
 
-Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、60日レンジ判定、前日評価の仕様は `docs/Technical_ranking_spec.md` を正とする。
+Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、60日レンジ判定、前日評価の仕様は `docs/technical_summary_ranking_spec.md` を正とする。
 
-表示順は `docs/Technical_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、初期実装では WatchList の順序を維持する。
+表示順は `docs/technical_summary_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、初期実装では WatchList の順序を維持する。
 
 Technical Summary の列は次の通り。
 
@@ -213,7 +213,7 @@ D1 戻り途中｜25日線回復待ち。｜後場VWAP維持なら監視継続
 C1 押し目候補｜支持線反発待ち。｜VWAP回復まで買い待ち
 ```
 
-短評は Technical ランク判定の結果から生成する。判定ロジックと文言は `docs/Technical_ranking_spec.md` を正とし、domain 層の純粋関数で行う。Markdown / HTML への整形は builder / presentation 層で行い、GUI層には判定ロジックを書かない。
+短評は Technical ランク判定の結果から生成する。判定ロジックと文言は `docs/technical_summary_ranking_spec.md` を正とし、domain 層の純粋関数で行う。Markdown / HTML への整形は builder / presentation 層で行い、GUI層には判定ロジックを書かない。
 
 ランキング分類条件、判定優先順位、D1 / D2 / D3 の売買行動、補助ラベルは
 `docs/technical_summary_ranking_spec.md` を正とする。
@@ -224,17 +224,7 @@ Markdown / HTML / 単一銘柄出力で共有する。
 
 #### 5.7.1 表示位置
 
-Markdown では US Market セクションの後、ランク別テーブルの前に `## 冒頭短評` セクションを表示する。
-
-```markdown
-## 冒頭短評
-
-| 銘柄 | 短評 |
-|---|---|
-| 安川電機(6506) | D1 戻り途中｜25日線回復待ち。｜後場VWAP維持なら監視継続 |
-```
-
-Web UI では同じ内容を HTML テーブルとして表示する。ランク別テーブルとは別セクションにし、既存の画面レイアウトを壊さない。
+Technical Summary 一覧の Markdown / Web UI には短評専用テーブルを表示しない。短評は単一銘柄 Technical 出力だけに表示する。
 
 #### 5.7.2 単一銘柄 Technical 出力
 

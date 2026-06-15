@@ -3,14 +3,6 @@
 from __future__ import annotations
 
 from app.domain.models.technical_summary import TechnicalSummaryLine
-<<<<<<< HEAD
-from app.domain.policies.technical_indicators import label_recent60_range_position_detail, label_volume_vs_avg20
-from app.domain.policies.technical_summary import (
-    build_previous_low_support_comment,
-    build_primary_support_line,
-    build_support_line_comment,
-    build_technical_headline_summary,
-=======
 from app.domain.policies.technical_summary import (
     build_d1_detail,
     build_d3_detail,
@@ -19,7 +11,6 @@ from app.domain.policies.technical_summary import (
     build_technical_position_assessment,
     build_technical_strategy_lines,
     build_nearby_support_lines,
->>>>>>> refs/remotes/origin/main
     is_focus_theme,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
@@ -46,51 +37,9 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
         f"25日線：{_fmt_price(snapshot.moving_average.ma25)}",
         f"14日ATR：{_fmt_price(snapshot.range.atr14)}",
         "",
-<<<<<<< HEAD
-        "■支持線",
-        *_format_support_lines(result),
-        "",
-        "■抵抗線",
-        *_format_resistance_lines(result),
-        "",
-=======
->>>>>>> refs/remotes/origin/main
         _format_previous_session(result),
     ]
     return "\n".join(lines) + "\n"
-
-
-def _format_support_lines(result: TechnicalAnalysisResult) -> list[str]:
-    snapshot = result.snapshot
-    primary = build_primary_support_line(
-        day_low=snapshot.price.low,
-        ma25=snapshot.moving_average.ma25,
-        recent20_low=snapshot.breakline.recent20_low,
-        ma75=snapshot.moving_average.ma75,
-        recent60_low=snapshot.breakline.recent60_low,
-    )
-    primary_comment = build_support_line_comment(
-        support=primary.price if primary is not None else None,
-        day_low=snapshot.price.low,
-        latest=snapshot.price.latest,
-        previous_low=snapshot.previous_session.prev_low,
-        previous_close=snapshot.price.prev_close,
-        atr14=snapshot.range.atr14,
-    )
-    previous_comment = build_previous_low_support_comment(
-        previous_low=snapshot.previous_session.prev_low,
-        day_low=snapshot.price.low,
-        latest=snapshot.price.latest,
-        atr14=snapshot.range.atr14,
-    )
-    primary_text = "N/A" if primary is None else f"{primary.label} {_fmt_price(primary.price)}"
-    return [
-        f"主要支持線：{primary_text}（{primary_comment}）",
-        f"前日安値：{_fmt_price(snapshot.previous_session.prev_low)}（{previous_comment}）",
-        f"20日安値：{_fmt_price(snapshot.breakline.recent20_low)}",
-        f"75日線：{_fmt_price(snapshot.moving_average.ma75)}",
-        f"60日安値：{_fmt_price(snapshot.breakline.recent60_low)}",
-    ]
 
 
 def _format_resistance_lines(result: TechnicalAnalysisResult) -> list[str]:

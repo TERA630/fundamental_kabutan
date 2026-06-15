@@ -25,13 +25,6 @@ def build_technical_summary_html(table: TechnicalSummaryTable) -> str:
         '<section class="output-block summary-output technical-summary-output">',
         "<h2>Technical Summary</h2>",
     ]
-    if table.rows:
-        sections.append("<h3>冒頭短評</h3>")
-        sections.append('<div class="table-scroll">')
-        sections.append('<table class="fundamental-table summary-table technical-summary-headline-table">')
-        sections.append("<thead><tr><th>銘柄</th><th>短評</th></tr></thead><tbody>")
-        sections.extend(_build_headline_row_html(row) for row in table.rows)
-        sections.append("</tbody></table></div>")
     for rank in RANK_ORDER:
         rows = [row for row in table.rows if row.rank == rank]
         if not rows:
@@ -66,15 +59,6 @@ def _build_row_html(row: TechnicalSummaryRow) -> str:
         _fmt_lines(row.support_lines),
         _fmt_lines(row.resistance_lines),
         _fmt_position(row.recent60_range_position),
-    )
-    cells = "".join(f"<td>{escape(value)}</td>" for value in values)
-    return f"<tr>{cells}</tr>"
-
-
-def _build_headline_row_html(row: TechnicalSummaryRow) -> str:
-    values = (
-        f"{row.name}({row.code4})",
-        f"{row.rank} {row.rank_label}｜{row.headline_comment or 'N/A'}｜{row.next_action or 'N/A'}",
     )
     cells = "".join(f"<td>{escape(value)}</td>" for value in values)
     return f"<tr>{cells}</tr>"

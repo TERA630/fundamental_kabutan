@@ -284,14 +284,12 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
                 return SimpleNamespace(
                     html_dir=html_dir,
                     signature=signature,
-                    output_cache_should_clear=False,
                 )
             result = self.import_kabutan_html_package(zip_path=zip_path, output_dir=html_dir.parent)
             self.save_kabutan_html_dir_cache(result.html_dir)
             return SimpleNamespace(
                 html_dir=result.html_dir,
                 signature=signature,
-                output_cache_should_clear=True,
             )
 
         def fetch_analysis_output(self, **kwargs):
@@ -382,14 +380,12 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
                 return SimpleNamespace(
                     html_dir=html_dir,
                     signature=signature,
-                    output_cache_should_clear=False,
                 )
             result = self.import_kabutan_html_package(zip_path=zip_path, output_dir=html_dir.parent)
             self.save_kabutan_html_dir_cache(result.html_dir)
             return SimpleNamespace(
                 html_dir=result.html_dir,
                 signature=signature,
-                output_cache_should_clear=True,
             )
 
         def build_fundamental_summary_table(self, *, watchlist_entries, kabutan_html_dir):

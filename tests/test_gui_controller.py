@@ -139,10 +139,8 @@ def test_resolve_imported_kabutan_package_imports_once_and_reuses_html_dir(tmp_p
     )
 
     assert first.imported is True
-    assert first.output_cache_should_clear is True
     assert first.html_dir.exists()
     assert second.imported is False
-    assert second.output_cache_should_clear is False
     assert second.html_dir == first.html_dir
 
 
