@@ -1,4 +1,4 @@
-# Summary Display Specification
+ # Summary Display Specification
 
 ## 1. 概要
 
@@ -104,9 +104,9 @@ Web UI では以下の構造を想定する。
 
 ### 5.3 Technical Summary 表示構造
 
-Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク仕様は `docs/current_implementation_spec.md` の `Technical Summary ランク` を正とする。
+Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、60日レンジ判定、前日評価の仕様は `docs/Technical_ranking_spec.md` を正とする。
 
-表示順は A1、A2、B1、B2、C1、C2、E とする。各セクション内の銘柄順は、初期実装では WatchList の順序を維持する。
+表示順は `docs/Technical_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、初期実装では WatchList の順序を維持する。
 
 Technical Summary の列は次の通り。
 
@@ -196,11 +196,11 @@ Technical Summary の冒頭には、夜間米国指標セクションを表示�
 
 `GRID` は ETF の `GRID` として扱う。日経先物と銅先物は yFinance で取得する。直近値は価格水準を表示し、取得時刻は日本時間で表示する。
 
-### 5.7 Technical Summary 冒頭短評
+### 5.7 単一銘柄 Technical 短評
 
-Technical Summary では、各銘柄のランク別テーブルより前に、判断を速くするための冒頭短評を表示する。
+Technical Summary 一覧では、冒頭短評のまとめテーブルは表示しない。ランク別テーブルの分類結果を使って確認する。
 
-冒頭短評は、1銘柄につき次の形式で表示する。
+単一銘柄 Technical 出力では、判断を速くするための短評を表示する。短評は1銘柄につき次の形式で表示する。
 
 ```text
 {区分} {表示名}｜{冒頭コメント}｜{次アクション}
@@ -213,7 +213,7 @@ D1 戻り途中｜25日線回復待ち。｜後場VWAP維持なら監視継続
 C1 押し目候補｜支持線反発待ち。｜VWAP回復まで買い待ち
 ```
 
-短評は Technical Summary ランク判定の結果から生成する。判定ロジックは domain 層の純粋関数で行い、Markdown / HTML への整形は builder / presentation 層で行う。GUI層には判定ロジックを書かない。
+短評は Technical ランク判定の結果から生成する。判定ロジックと文言は `docs/Technical_ranking_spec.md` を正とし、domain 層の純粋関数で行う。Markdown / HTML への整形は builder / presentation 層で行い、GUI層には判定ロジックを書かない。
 
 ランキング分類条件、判定優先順位、D1 / D2 / D3 の売買行動、補助ラベルは
 `docs/technical_summary_ranking_spec.md` を正とする。
@@ -329,9 +329,9 @@ RR定義、D2からD3への昇格条件、地合い条件の扱いは
 
 | 対象 | 実装内容 |
 |---|---|
-| `app/domain/models/technical_summary.py` | `TechnicalSummaryRow`、`TechnicalSummaryTable`、支持線/抵抗線候補モデル、冒頭短評用フィールドを追加 |
+| `app/domain/models/technical_summary.py` | `TechnicalSummaryRow`、`TechnicalSummaryTable`、支持線/抵抗線候補モデルを追加 |
 | `app/domain/usecases/technical_summary.py` | WatchList を順に解析し、ランク判定、列値計算、支持線/抵抗線抽出、ランク別グルーピングを行う |
-| `app/domain/policies/technical_summary.py` | A1/A2/B1/B2/C1/C2/D1/D2/D3/E のランク判定、冒頭短評、支持線/抵抗線抽出を純粋関数として実装 |
+| `app/domain/policies/technical_summary.py` | A1/A2/B1/B2/C1/C2/D1/D2/D3/E のランク判定、単一銘柄Technical短評、支持線/抵抗線抽出を純粋関数として実装 |
 | `app/domain/policies/technical_indicators.py` | 75日線を計算し、`TechnicalMovingAverageSnapshot` に追加 |
 | `app/domain/models/us_market_summary.py` | US Market 行モデルとテーブルモデルを追加 |
 | `app/domain/usecases/us_market_summary.py` | yFinance から対象指標を取得し、直近値、前日騰落、5日乖離、25日乖離、RSI14 を計算 |
