@@ -1,17 +1,12 @@
-# Technical Summary ランキング分類仕様（アーカイブ）
+# Technical Summary ランキング分類仕様
 
 ## 1. 目的
 
-**本書はアーカイブ版です。ランキング分類条件の正本は `docs/technical_ranking_spec.md` を参照してください。**
+本書は Technical Summary のランキング分類条件を一元管理する。
+表示形式は `docs/Summery_spec.md`、現行コードの実装状況は
+`docs/current_implementation_spec.md` を参照する。
 
-本書は Technical Summary のランキング分類条件の旧版であり、以下の参照先を更新しました：
-
-- **ランキング分類条件の正本：** `docs/technical_ranking_spec.md`
-- **表示形式：** `docs/Summery_spec.md`
-- **現行実装状況：** `docs/current_implementation_spec.md`
-
-`technical_ranking_spec.md` は、本書の内容にくわえて、Technical指標計算、VWAP定義、
-ローソク足型判定、陽線・陰線・上値失速の定義、US Market指標などを一元管理しています。
+本書の D1 / D2 / D3 は現行コードへ反映済みであり、ランキング分類の正とする。
 
 ## 2. 基本方針
 

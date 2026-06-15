@@ -10,7 +10,6 @@ from tkinter import filedialog, messagebox
 from app.gui_state import (
     GuiState,
     build_default_output_filename,
-    build_output_cache_key,
 )
 from app.gui_state_manager import GuiStateManager
 from app.gui_view import FundamentalView
@@ -60,7 +59,6 @@ class FundamentalApp:
             on_summary=self.generate_summary,
             on_tab_changed=self.on_tab_changed,
         )
-        self.state_manager.restore_output_cache()
         self._restore_watchlist()
         self._restore_kabutan_html_dir()
 
@@ -155,13 +153,11 @@ class FundamentalApp:
         self.set_busy(False, self.view_model.build_summary_failed_status())
         messagebox.showerror("サマリ作成失敗", message)
 
-    def _fetch_worker(self, name: str, code4: str, cache_key: str):
+    def _fetch_worker(self, name: str, code4: str):
         try:
             output = self.controller.fetch_analysis_output(
                 name=name,
                 code4=code4,
-                output_cache=self.state.output_cache,
-                output_cache_key=cache_key,
                 kabutan_html_dir=self.state.kabutan_html_dir,
             )
             summary = self.controller.fetch_institutional_summary_text(
@@ -169,7 +165,6 @@ class FundamentalApp:
                 code4=code4,
                 kabutan_html_dir=self.state.kabutan_html_dir,
             )
-            self.controller.save_output_cache_for_today(self.state.output_cache)
             self.master.after(0, lambda: self._render_output_with_summary(output, summary, self.view_model.build_generated_status(name, code4), "fundamental"))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
@@ -208,7 +203,6 @@ class FundamentalApp:
             result = self.controller.build_kabutan_html_package(source_dir=source_dir, output_dir=output_dir)
             self.state.kabutan_html_dir = result.html_dir
             self.controller.save_kabutan_html_dir_cache(result.html_dir)
-            self.state_manager.clear_output_cache()
 
             def done():
                 self.kabutan_dir_var.set(str(result.html_dir))
@@ -233,19 +227,9 @@ class FundamentalApp:
                 return False
         return True
 
-    def _render_cached_output(self, name: str, code4: str, cache_key: str) -> bool:
-        cached_output = self.state.output_cache.get(cache_key)
-        if cached_output is None:
-            return False
-        self._render_output(cached_output, self.view_model.build_cached_status(name, code4))
-        return True
-
-    def _rotate_output_cache_if_needed(self) -> None:
-        self.state_manager.rotate_output_cache_if_needed()
-
-    def _start_fetch_thread(self, name: str, code4: str, cache_key: str) -> None:
+    def _start_fetch_thread(self, name: str, code4: str) -> None:
         self.set_busy(True, self.view_model.build_fetching_status(name, code4))
-        thread = threading.Thread(target=self._fetch_worker, args=(name, code4, cache_key), daemon=True)
+        thread = threading.Thread(target=self._fetch_worker, args=(name, code4), daemon=True)
         thread.start()
 
     def _start_technical_fetch_thread(self, name: str, code4: str) -> None:
@@ -256,8 +240,6 @@ class FundamentalApp:
     def generate_text(self):
         if self.state.is_fetching:
             return
-
-        self._rotate_output_cache_if_needed()
 
         selected = self._require_selected_stock()
         if selected is None:
@@ -271,11 +253,7 @@ class FundamentalApp:
         if not self._require_kabutan_html_dir():
             return
 
-        cache_key = build_output_cache_key(code4, self.state.kabutan_html_dir)
-        if self._render_cached_output(name, code4, cache_key):
-            return
-
-        self._start_fetch_thread(name, code4, cache_key)
+        self._start_fetch_thread(name, code4)
 
     def generate_summary(self):
         if self.state.is_fetching:

@@ -42,28 +42,19 @@ class StockAnalysisWorkflow:
         *,
         name: str,
         code4: str,
-        output_cache: dict[str, str],
-        output_cache_key: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
-        cached_output = output_cache.get(output_cache_key)
-        if cached_output is not None:
-            return cached_output
-
         service = self._build_fundamental_service(code4)
         build_analysis_result = getattr(service, "build_analysis_result", None)
         if callable(build_analysis_result):
             result = build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
-            output = build_output_from_analysis_result(result, build_fundamental_output)
-        else:
-            output = service.build_analysis_output(
+            return build_output_from_analysis_result(result, build_fundamental_output)
+        return service.build_analysis_output(
                 name,
                 code4,
                 build_output_fn=build_fundamental_output,
                 kabutan_html_dir=kabutan_html_dir,
             )
-        output_cache[output_cache_key] = output
-        return output
 
     def build_technical_summary_result(self, name: str, code4: str):
         if self.uses_default_technical_service:

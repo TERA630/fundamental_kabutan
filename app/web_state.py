@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
-from app.ui_state_utils import build_output_cache_key, build_stock_choices, get_selected_stock
+from app.ui_state_utils import build_stock_choices, get_selected_stock
 
 DEFAULT_INSTITUTIONAL_SUMMARY = "機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A"
 
@@ -21,7 +21,6 @@ class WebUiState:
     kabutan_package_zip_path: Path | None = None
     kabutan_package_zip_signature: tuple[int, str] | tuple[int, int] | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
-    output_cache: dict[str, str] = field(default_factory=dict)
     selected_label: str = ""
     mode: str = "technical"
     output: str = ""
@@ -45,7 +44,6 @@ class WebUiStateManager:
 
     def restore_cached_state(self) -> None:
         state = self.state
-        state.output_cache = state.controller.fetch_output_cache_for_today()
         resolved_watchlist = state.controller.fetch_resolved_watchlist_path()
         if resolved_watchlist.status == "ok" and resolved_watchlist.file_path is not None:
             try:
@@ -101,7 +99,6 @@ class WebUiStateManager:
         self.state.kabutan_html_dir = path
         self.state.kabutan_package_zip_path = None
         self.state.kabutan_package_zip_signature = None
-        self.state.output_cache.clear()
         self.state.controller.save_kabutan_html_dir_cache(path)
         clear_kabutan_package_zip_cache = getattr(self.state.controller, "clear_kabutan_package_zip_cache", None)
         if callable(clear_kabutan_package_zip_cache):
@@ -120,7 +117,6 @@ class WebUiStateManager:
             if self.state.controller.html_dir_ready(uploaded_html_dir)
             else None
         )
-        self.state.output_cache.clear()
         self.state.controller.save_kabutan_package_zip_cache(zip_path)
         if self.state.kabutan_html_dir is not None:
             self.state.controller.save_kabutan_html_dir_cache(self.state.kabutan_html_dir)
@@ -138,8 +134,6 @@ class WebUiStateManager:
         )
         self.state.kabutan_html_dir = result.html_dir
         self.state.kabutan_package_zip_signature = result.signature
-        if result.output_cache_should_clear:
-            self.state.output_cache.clear()
 
     def fetch_output_for_current_selection(self) -> bool:
         self.state.fundamental_summary_html = ""
@@ -154,17 +148,10 @@ class WebUiStateManager:
                 return False
 
         name, code4 = selected
-        cache_key = (
-            None
-            if self.state.mode == "technical"
-            else build_output_cache_key(code4, self.state.kabutan_html_dir)
-        )
         result = self.state.controller.fetch_output_for_mode(
             name=name,
             code4=code4,
             mode=self.state.mode,
-            output_cache=self.state.output_cache,
-            output_cache_key=cache_key,
             kabutan_html_dir=self.state.kabutan_html_dir,
         )
         self.state.output = result.output

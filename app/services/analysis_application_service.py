@@ -30,7 +30,6 @@ from app.services.kabutan_package_workflow import (
     KabutanPackageResolution,
     KabutanPackageWorkflow,
 )
-from app.services.output_cache_service import OutputCacheService
 from app.services.summary_workflow import (
     FUNDAMENTAL_SUMMARY_FILENAME_PREFIX,
     TECHNICAL_SUMMARY_FILENAME_PREFIX,
@@ -58,7 +57,6 @@ class AnalysisApplicationService:
         self.watchlist_service = WatchlistService(self.cache_service)
         self.kabutan_html_dir_service = KabutanHtmlDirService(self.cache_service)
         self.kabutan_html_package_service = KabutanHtmlPackageService()
-        self.output_cache_service = OutputCacheService(self.cache_service)
         self._uses_default_fundamental_service = build_fundamental_service is None
         self._uses_default_technical_service = build_technical_service is None
         self.build_fundamental_service = build_fundamental_service or build_default_fundamental_service
@@ -87,7 +85,6 @@ class AnalysisApplicationService:
         self.analysis_output_workflow = AnalysisOutputWorkflow(
             fetch_technical_output=self.fetch_technical_output,
             fetch_analysis_output=self.fetch_analysis_output,
-            save_output_cache_for_today=self.save_output_cache_for_today,
             fetch_institutional_summary_text=self.fetch_institutional_summary_text,
         )
         self.summary_workflow = SummaryWorkflow(
@@ -178,12 +175,6 @@ class AnalysisApplicationService:
     def save_watchlist_path_cache(self, path: Path) -> None:
         self.ui_resource_workflow.save_watchlist_path_cache(path)
 
-    def fetch_output_cache_for_today(self) -> dict[str, str]:
-        return self.output_cache_service.fetch_for_today()
-
-    def save_output_cache_for_today(self, output_cache: dict[str, str]) -> None:
-        self.output_cache_service.save_for_today(output_cache)
-
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
         return self.ui_resource_workflow.fetch_watchlist_entries(path)
 
@@ -192,15 +183,11 @@ class AnalysisApplicationService:
         *,
         name: str,
         code4: str,
-        output_cache: dict[str, str],
-        output_cache_key: str,
         kabutan_html_dir: Path | None = None,
     ) -> str:
         return self.stock_analysis_workflow.fetch_analysis_output(
             name=name,
             code4=code4,
-            output_cache=output_cache,
-            output_cache_key=output_cache_key,
             kabutan_html_dir=kabutan_html_dir,
         )
 
@@ -210,16 +197,12 @@ class AnalysisApplicationService:
         name: str,
         code4: str,
         mode: str,
-        output_cache: dict[str, str],
         kabutan_html_dir: Path | None = None,
-        output_cache_key: str | None = None,
     ) -> AnalysisOutputResult:
         return self.analysis_output_workflow.fetch_output_for_mode(
             name=name,
             code4=code4,
             mode=mode,
-            output_cache=output_cache,
-            output_cache_key=output_cache_key,
             kabutan_html_dir=kabutan_html_dir,
         )
 
