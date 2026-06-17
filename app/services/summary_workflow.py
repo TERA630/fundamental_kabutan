@@ -34,10 +34,12 @@ class SummaryWorkflow:
         file_cache: FileCache,
         build_fundamental_service: Callable[[FileCache], FundamentalAnalysisService],
         build_technical_summary_result: Callable[[str, str], object],
+        build_us_market_summary: Callable[[], object] | None = None,
     ):
         self.file_cache = file_cache
         self.build_fundamental_service = build_fundamental_service
         self.build_technical_summary_result = build_technical_summary_result
+        self.build_us_market_summary = build_us_market_summary
 
     def build_fundamental_summary_table(
         self,
@@ -53,7 +55,10 @@ class SummaryWorkflow:
         *,
         watchlist_entries: list[tuple[str, str]],
     ):
-        service = TechnicalSummaryService(self.build_technical_summary_result)
+        service = TechnicalSummaryService(
+            self.build_technical_summary_result,
+            build_us_market_summary=self.build_us_market_summary,
+        )
         return service.build_summary_table(watchlist_entries)
 
     def build_summary_table_for_mode(

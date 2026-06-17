@@ -11,7 +11,7 @@ from app.domain.models.technical_summary import (
 
 RANK_LABELS: dict[TechnicalSummaryRank, str] = {
     "A1": "位置良好",
-    "A2": "やや過熱",
+    "A2": "上昇継続",
     "B1": "上昇後半",
     "B2": "過熱極大",
     "C1": "押し目候補",
@@ -398,6 +398,8 @@ def build_technical_position_assessment(
     latest: float,
     vwap: float,
     ma25: float,
+    ma5: float | None = None,
+    ma5_prev1: float | None = None,
     ma25_prev5: float | None = None,
     atr14: float | None,
     day_open: float | None,
@@ -434,8 +436,8 @@ def build_technical_position_assessment(
         day_low=day_low,
     )
 
-    # 追加: 25日線傾き低下フラグ（ma25_prev5 が与えられた場合）を加点対象とする
     ma25_slope = _ma25_slope(ma25, ma25_prev5)
+    ma5_slope_down = ma5 is not None and ma5_prev1 is not None and ma5 < ma5_prev1
 
     score = sum(
         (
@@ -447,6 +449,7 @@ def build_technical_position_assessment(
             volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 110 and bearish_or_stalling,
             support_is_far,
             ma25_slope in {"down", "flat"},
+            ma5_slope_down,
         )
     )
     level = "低" if score <= 1 else "中" if score <= 3 else "高"

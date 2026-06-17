@@ -128,6 +128,7 @@ Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を�
 
 日足ベースで次を計算する。
 
+- 5日移動平均、前日5日線
 - 25日移動平均
 - 25日線からの乖離率
 - RSI14

@@ -182,6 +182,8 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         latest=latest,
         vwap=vwap,
         ma25=ma25,
+        ma5=getattr(snapshot.moving_average, "ma5", None),
+        ma5_prev1=getattr(snapshot.moving_average, "ma5_prev1", None),
         ma25_prev5=snapshot.moving_average.ma25_prev5,
         atr14=snapshot.range.atr14,
         day_open=_evaluation_open(result),
@@ -198,7 +200,7 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         headline_rank=headline.rank,
     )
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/8：{assessment.collapse_risk_label}",
+        f"崩れ {assessment.collapse_risk_score}/9：{assessment.collapse_risk_label}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"

@@ -58,6 +58,8 @@ def normalize_daily_history(history: pd.DataFrame) -> pd.DataFrame:
 def calc_moving_averages(history: pd.DataFrame) -> pd.DataFrame:
     out = history.copy()
     close = out["Close"]
+    out["ma5"] = close.rolling(5).mean()
+    out["ma5_prev1"] = out["ma5"].shift(1)
     out["ma25"] = close.rolling(25).mean()
     out["ma75"] = close.rolling(75).mean()
     out["ma25_prev5"] = out["ma25"].shift(5)
@@ -276,6 +278,8 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     volume_avg20 = _none_if_nan(latest_row["volume_avg20"])
     prev_close = _none_if_nan(prev_row["Close"])
     atr14 = _none_if_nan(latest_row["atr14"])
+    ma5 = _none_if_nan(latest_row["ma5"])
+    ma5_prev1 = _none_if_nan(latest_row["ma5_prev1"])
     ma25 = _none_if_nan(latest_row["ma25"])
     ma75 = _none_if_nan(latest_row["ma75"])
     ma25_prev5 = _none_if_nan(latest_row["ma25_prev5"])
@@ -322,6 +326,8 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         day_change_pct=_pct_change(latest, prev_close),
     )
     moving_average = TechnicalMovingAverageSnapshot(
+        ma5=ma5,
+        ma5_prev1=ma5_prev1,
         ma25=ma25,
         ma75=ma75,
         ma25_prev5=ma25_prev5,

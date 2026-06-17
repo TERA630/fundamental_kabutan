@@ -66,6 +66,8 @@ def test_build_technical_snapshot_from_daily_history():
     assert snapshot.price.day_change_price == 1.0
     assert snapshot.price.day_change_pct == pytest.approx(0.595238)
     assert snapshot.price.volume_vs_previous_pct == pytest.approx((1069 / 1068 - 1) * 100)
+    assert snapshot.moving_average.ma5 == pytest.approx(167.0)
+    assert snapshot.moving_average.ma5_prev1 == pytest.approx(166.0)
     assert snapshot.moving_average.ma25 == pytest.approx(157.0)
     assert snapshot.moving_average.ma25_prev5 == pytest.approx(152.0)
     assert snapshot.moving_average.dev25_pct == pytest.approx(((169 / 157) - 1) * 100)

@@ -79,14 +79,14 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "\n　支持：" not in output
     assert "抵抗：170(preH/20dH/60dH)" in output
     assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
-    assert "崩れ 1/8：崩れ軽微" in output
+    assert "崩れ 1/9：崩れ軽微" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
     assert "戦略判定：\n前場深押し×：深押しに見えても崩れ初動の可能性が高い。" in output
     assert "前場VWAP回復×：VWAP回復だけでは新規不可。" in output
     assert "後場VWAP回復×：新規不可。保有中なら利確・逆指値管理を優先。" in output
     assert output.index("短評：B2 過熱極大") < output.index("■モメンタム")
-    assert output.index("崩れ 1/8：崩れ軽微") < output.index("■モメンタム")
+    assert output.index("崩れ 1/9：崩れ軽微") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output

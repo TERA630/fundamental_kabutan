@@ -25,8 +25,9 @@ def test_build_summary_table_for_mode_dispatches(monkeypatch, tmp_path: Path):
             return "FUND_TABLE"
 
     class DummyTechnicalSummaryService:
-        def __init__(self, build_result):
+        def __init__(self, build_result, build_us_market_summary=None):
             self.build_result = build_result
+            self.build_us_market_summary = build_us_market_summary
 
         def build_summary_table(self, watchlist_entries):
             assert watchlist_entries == [("トヨタ", "7203")]

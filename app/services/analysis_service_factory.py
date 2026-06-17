@@ -9,6 +9,7 @@ from app.data.market_data_provider import (
     fetch_yfinance_daily_history,
     fetch_yfinance_intraday_history,
     fetch_yfinance_market_snapshot,
+    fetch_yfinance_symbol_daily_history,
     fetch_yfinance_snapshot,
 )
 from app.domain.models.market_data import MarketDataBundle
@@ -16,6 +17,7 @@ from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.kabutan_forecast import FetchKabutanForecastUseCase
 from app.domain.usecases.market_data import MarketDataService
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
+from app.domain.usecases.us_market_summary import UsMarketSummaryService
 
 
 def build_default_fundamental_service(file_cache: FileCache) -> FundamentalAnalysisService:
@@ -36,6 +38,10 @@ def build_default_technical_service(file_cache: FileCache) -> TechnicalAnalysisS
         fetch_daily_history=fetch_yfinance_daily_history,
         fetch_intraday_history=fetch_yfinance_intraday_history,
     )
+
+
+def build_default_us_market_summary_service() -> UsMarketSummaryService:
+    return UsMarketSummaryService(fetch_yfinance_symbol_daily_history)
 
 
 def build_default_market_data_service(file_cache: FileCache) -> MarketDataService:
@@ -74,4 +80,5 @@ __all__ = [
     "build_default_fundamental_service_with_market_bundle",
     "build_default_market_data_service",
     "build_default_technical_service",
+    "build_default_us_market_summary_service",
 ]

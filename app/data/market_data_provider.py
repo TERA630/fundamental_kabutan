@@ -132,6 +132,17 @@ def fetch_yfinance_daily_history(code4: str, *, period: str = "4mo", interval: s
         return empty_history()
 
 
+def fetch_yfinance_symbol_daily_history(symbol: str, *, period: str = "4mo", interval: str = "1d") -> pd.DataFrame:
+    if yf is None:
+        return empty_history()
+    try:
+        ticker = yf.Ticker(symbol)
+        history = ticker.history(period=period, interval=interval, auto_adjust=False)
+        return normalize_history_frame(history)
+    except Exception:
+        return empty_history()
+
+
 def fetch_yfinance_intraday_history(code4: str, *, period: str = "5d", interval: str = "5m") -> pd.DataFrame:
     if yf is None:
         return empty_history()
@@ -162,6 +173,7 @@ __all__ = [
     "build_technical_daily_history_cache_key",
     "build_technical_intraday_history_cache_key",
     "fetch_yfinance_daily_history",
+    "fetch_yfinance_symbol_daily_history",
     "fetch_yfinance_intraday_history",
     "fetch_yfinance_analyst_estimates",
     "fetch_yfinance_market_snapshot",

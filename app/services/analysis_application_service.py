@@ -18,6 +18,7 @@ from app.services.analysis_service_factory import (
     build_default_fundamental_service_with_market_bundle,
     build_default_market_data_service,
     build_default_technical_service,
+    build_default_us_market_summary_service,
 )
 from app.services.cache_service import CacheService
 from app.services.analysis_output_workflow import AnalysisOutputResult, AnalysisOutputWorkflow
@@ -91,6 +92,7 @@ class AnalysisApplicationService:
             file_cache=self.file_cache,
             build_fundamental_service=self.build_fundamental_service,
             build_technical_summary_result=self.stock_analysis_workflow.build_technical_summary_result,
+            build_us_market_summary=build_default_us_market_summary_service().build_summary_table,
         )
 
     def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
@@ -296,6 +298,7 @@ __all__ = [
     "build_default_fundamental_service",
     "build_default_market_data_service",
     "build_default_technical_service",
+    "build_default_us_market_summary_service",
     "build_fundamental_summary_filename",
     "build_technical_summary_filename",
 ]

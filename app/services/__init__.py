@@ -4,6 +4,7 @@ from app.services.analysis_service_factory import (
     build_default_fundamental_service,
     build_default_market_data_service,
     build_default_technical_service,
+    build_default_us_market_summary_service,
 )
 from app.services.cache_service import CacheService
 from app.services.institutional_summary_service import InstitutionalSummaryService
@@ -34,4 +35,5 @@ __all__ = [
     "build_default_fundamental_service",
     "build_default_market_data_service",
     "build_default_technical_service",
+    "build_default_us_market_summary_service",
 ]

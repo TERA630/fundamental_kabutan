@@ -1,7 +1,11 @@
+from datetime import datetime
 from types import SimpleNamespace
+
+import pandas as pd
 
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
+from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
 from app.domain.policies.technical_summary import (
     build_d1_detail,
     build_d3_detail,
@@ -16,6 +20,22 @@ from app.domain.policies.technical_summary import (
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
 from app.domain.usecases.technical_summary import TechnicalSummaryService
+from app.domain.usecases.us_market_summary import UsMarketSummaryService
+
+
+def _daily_history(rows: int = 70) -> pd.DataFrame:
+    index = pd.date_range("2026-01-01", periods=rows, freq="B")
+    close = pd.Series(range(100, 100 + rows), index=index, dtype=float)
+    return pd.DataFrame(
+        {
+            "Open": close - 1,
+            "High": close + 2,
+            "Low": close - 3,
+            "Close": close,
+            "Volume": [1000 + i for i in range(rows)],
+        },
+        index=index,
+    )
 
 
 def test_build_technical_strategy_lines_uses_rank_criteria_and_support_prices():
@@ -116,6 +136,17 @@ def test_classify_technical_summary_rank_uses_focus_theme_thresholds():
         )
         == "B1"
     )
+
+
+def test_a2_label_describes_uptrend_continuation_not_overheat():
+    headline = build_technical_headline_summary(
+        dev25_pct=4.5,
+        latest=105.0,
+        vwap=100.0,
+    )
+
+    assert headline.rank == "A2"
+    assert headline.rank_label == "上昇継続"
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
@@ -317,6 +348,8 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         latest=90.0,
         vwap=92.0,
         ma25=95.0,
+        ma5=91.0,
+        ma5_prev1=92.0,
         atr14=5.0,
         day_open=91.0,
         day_high=93.0,
@@ -332,7 +365,7 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         headline_rank="E",
     )
 
-    assert assessment.collapse_risk_score == 7
+    assert assessment.collapse_risk_score == 8
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
@@ -361,6 +394,33 @@ def test_position_assessment_requires_all_three_momentum_marks_to_fail():
     assert assessment.collapse_risk_score == 0
     assert assessment.collapse_risk_level == "低"
     assert assessment.hold_judgement == "◎"
+
+
+def test_position_assessment_counts_declining_ma5_as_collapse_risk():
+    assessment = build_technical_position_assessment(
+        latest=101.0,
+        vwap=100.0,
+        ma25=100.0,
+        ma5=100.8,
+        ma5_prev1=101.0,
+        ma25_prev5=99.0,
+        atr14=2.0,
+        day_open=100.0,
+        day_high=102.0,
+        day_low=99.0,
+        day_close_position=0.6,
+        volume_vs_avg20_pct=90.0,
+        high_breakouts=(True, True, True),
+        low_highers=(True, True, True),
+        previous_low=100.0,
+        recent20_low=95.0,
+        ma75=90.0,
+        recent60_low=80.0,
+        headline_rank="A1",
+    )
+
+    assert assessment.collapse_risk_score == 1
+    assert assessment.collapse_risk_label == "崩れ軽微"
 
 
 def test_position_assessment_counts_volume_with_upper_price_stalling():
@@ -463,6 +523,47 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert "AIテスト(1234)" in markdown
 
 
+def test_us_market_summary_service_builds_rows_and_skips_failures():
+    service = UsMarketSummaryService(
+        lambda ticker: pd.DataFrame() if ticker == "^SOX" else _daily_history(),
+        clock=lambda: datetime(2026, 6, 17, 9, 0),
+    )
+
+    table = service.build_summary_table()
+
+    assert table.as_of == datetime(2026, 6, 17, 9, 0)
+    assert table.rows[0].name == "NASDAQ総合"
+    assert table.rows[0].ticker == "^IXIC"
+    assert table.rows[0].latest == 169.0
+    assert table.rows[0].dev5_pct is not None
+    assert table.skipped[0].name == "SOX指数"
+
+
+def test_technical_summary_markdown_renders_us_market_section():
+    table = TechnicalSummaryTable(
+        rows=(),
+        us_market=UsMarketSummaryTable(
+            as_of=datetime(2026, 6, 17, 9, 0),
+            rows=(
+                UsMarketSummaryRow(
+                    name="NASDAQ総合",
+                    ticker="^IXIC",
+                    latest=100.0,
+                    day_change_pct=1.2,
+                    dev5_pct=2.3,
+                    dev25_pct=4.5,
+                    rsi14=55.6,
+                ),
+            ),
+        ),
+    )
+
+    markdown = build_technical_summary_markdown(table)
+
+    assert "## US Market 2026-06-17 09:00" in markdown
+    assert "| NASDAQ総合 | 100.00 | +1.2% | +2.3% | +4.5% | 55.60 |" in markdown
+
+
 def test_technical_summary_html_does_not_render_headline_table():
     table = TechnicalSummaryTable(
         rows=(
@@ -500,3 +601,29 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "technical-summary-headline-table" not in html
     assert "A1 位置良好｜順張り可。過熱なし。" not in html
     assert "AIテスト(1234)" in html
+
+
+def test_technical_summary_html_renders_us_market_section():
+    table = TechnicalSummaryTable(
+        rows=(),
+        us_market=UsMarketSummaryTable(
+            as_of=datetime(2026, 6, 17, 9, 0),
+            rows=(
+                UsMarketSummaryRow(
+                    name="NASDAQ総合",
+                    ticker="^IXIC",
+                    latest=100.0,
+                    day_change_pct=1.2,
+                    dev5_pct=2.3,
+                    dev25_pct=4.5,
+                    rsi14=55.6,
+                ),
+            ),
+        ),
+    )
+
+    html = build_technical_summary_html(table)
+
+    assert "US Market 2026-06-17 09:00" in html
+    assert "NASDAQ総合" in html
+    assert "+4.5%" in html
