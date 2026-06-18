@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from app.data import market_data_provider as provider
+from app.domain.policies.market_history import build_intraday_evaluation_timestamps
 
 
 def _history() -> pd.DataFrame:
@@ -22,7 +23,7 @@ def test_technical_cache_keys_and_ttls():
     assert provider.TECH_DAILY_HISTORY_TTL_SEC == 12 * 60 * 60
     assert provider.TECH_INTRADAY_HISTORY_TTL_SEC == 5 * 60
     assert provider.build_technical_daily_history_cache_key("7203") == "tech_daily_7203_4mo_1d"
-    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_5m_jst"
+    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_60d_5m_jst"
 
 
 def test_fetch_yfinance_daily_history_uses_ticker_history(monkeypatch):
@@ -57,7 +58,7 @@ def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypa
         @staticmethod
         def download(symbol, *, period, interval, auto_adjust, progress):
             assert symbol == "7203.T"
-            assert period == "5d"
+            assert period == "60d"
             assert interval == "5m"
             assert auto_adjust is False
             assert progress is False
@@ -172,6 +173,15 @@ def test_build_intraday_vwap_snapshot_filters_zero_volume():
     assert snapshot["vwap_maintained_bars"] == 1
     assert snapshot["vwap_maintained_minutes"] == 5
     assert snapshot["vwap_maintained_15m"] is False
+
+
+def test_build_intraday_evaluation_timestamps_uses_existing_nonzero_volume_bars():
+    timestamps = build_intraday_evaluation_timestamps(_history())
+
+    assert [value.strftime("%Y-%m-%d %H:%M") for value in timestamps] == [
+        "2026-05-29 09:00",
+        "2026-05-29 09:10",
+    ]
 
 
 def test_build_intraday_vwap_snapshot_marks_three_trailing_bars_above_vwap():

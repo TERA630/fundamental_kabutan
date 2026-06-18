@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable, Protocol
 
 import pandas as pd
@@ -18,6 +19,7 @@ from app.domain.policies.market_history import (
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
     normalize_history_frame,
+    slice_technical_histories_for_evaluation,
 )
 from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
 
@@ -97,7 +99,13 @@ class TechnicalAnalysisService:
         self.fetch_daily_history = fetch_daily_history
         self.fetch_intraday_history = fetch_intraday_history
 
-    def build_analysis_result(self, *, name: str, code4: str) -> TechnicalAnalysisResult:
+    def build_analysis_result(
+        self,
+        *,
+        name: str,
+        code4: str,
+        evaluation_at: datetime | None = None,
+    ) -> TechnicalAnalysisResult:
         daily_history = self.fetch_daily_history_cached(code4)
         intraday_history = self.fetch_intraday_history_cached(code4)
         return self.build_analysis_result_from_histories(
@@ -105,15 +113,22 @@ class TechnicalAnalysisService:
             code4=code4,
             daily_history=daily_history,
             intraday_history=intraday_history,
+            evaluation_at=evaluation_at,
         )
 
     @staticmethod
-    def build_analysis_result_from_bundle(*, name: str, bundle: MarketDataBundle) -> TechnicalAnalysisResult:
+    def build_analysis_result_from_bundle(
+        *,
+        name: str,
+        bundle: MarketDataBundle,
+        evaluation_at: datetime | None = None,
+    ) -> TechnicalAnalysisResult:
         return TechnicalAnalysisService.build_analysis_result_from_histories(
             name=name,
             code4=bundle.code4,
             daily_history=bundle.daily_history,
             intraday_history=bundle.intraday_history,
+            evaluation_at=evaluation_at,
         )
 
     @staticmethod
@@ -123,7 +138,13 @@ class TechnicalAnalysisService:
         code4: str,
         daily_history: pd.DataFrame,
         intraday_history: pd.DataFrame,
+        evaluation_at: datetime | None = None,
     ) -> TechnicalAnalysisResult:
+        daily_history, intraday_history = slice_technical_histories_for_evaluation(
+            daily_history,
+            intraday_history,
+            evaluation_at,
+        )
         snapshot = build_technical_snapshot(daily_history)
         vwap_snapshot = (
             build_intraday_vwap_snapshot(intraday_history)

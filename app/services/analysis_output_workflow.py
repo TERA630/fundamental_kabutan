@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -32,9 +33,10 @@ class AnalysisOutputWorkflow:
         code4: str,
         mode: str,
         kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
     ) -> AnalysisOutputResult:
         if mode == "technical":
-            output = self.fetch_technical_output(name=name, code4=code4)
+            output = self.fetch_technical_output(name=name, code4=code4, evaluation_at=evaluation_at)
         else:
             output = self.fetch_analysis_output(
                 name=name,

@@ -143,7 +143,7 @@ def fetch_yfinance_symbol_daily_history(symbol: str, *, period: str = "4mo", int
         return empty_history()
 
 
-def fetch_yfinance_intraday_history(code4: str, *, period: str = "5d", interval: str = "5m") -> pd.DataFrame:
+def fetch_yfinance_intraday_history(code4: str, *, period: str = "60d", interval: str = "5m") -> pd.DataFrame:
     if yf is None:
         return empty_history()
     try:

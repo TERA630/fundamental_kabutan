@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from datetime import datetime
 
 from app.web_state import WebUiState, WebUiStateManager
 
@@ -23,6 +24,16 @@ class FakeController:
     def fetch_output_for_mode(self, **kwargs):
         self.fetch_call = kwargs
         return SimpleNamespace(output="OUTPUT", institutional_summary="SUMMARY")
+
+
+class FakeTechnicalTimestampController(FakeController):
+    def fetch_technical_evaluation_timestamps(self, code4):
+        assert code4 == "7203"
+        return (
+            datetime(2026, 5, 28, 9, 0),
+            datetime(2026, 5, 28, 9, 5),
+            datetime(2026, 5, 29, 9, 10),
+        )
 
 
 def test_load_watchlist_updates_state_and_selects_first(tmp_path: Path):
@@ -73,3 +84,48 @@ def test_fetch_output_for_current_selection_uses_screen_state(tmp_path: Path):
     assert controller.fetch_call["code4"] == "7203"
     assert controller.fetch_call["mode"] == "fundamental"
     assert controller.fetch_call["kabutan_html_dir"] == tmp_path / "html"
+
+
+def test_fetch_output_for_current_selection_passes_technical_evaluation_at():
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:10"
+    manager = WebUiStateManager(state)
+
+    assert manager.fetch_output_for_current_selection() is True
+
+    assert controller.fetch_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
+
+
+def test_refresh_technical_evaluation_choices_groups_times_by_date():
+    controller = FakeTechnicalTimestampController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-05-28"
+    manager = WebUiStateManager(state)
+
+    manager.refresh_technical_evaluation_choices()
+
+    assert state.technical_evaluation_date_choices == ["2026-05-29", "2026-05-28"]
+    assert state.technical_evaluation_time_choices == ["09:00", "09:05"]
+    assert state.technical_evaluation_time_choices_by_date == {
+        "2026-05-28": ["09:00", "09:05"],
+        "2026-05-29": ["09:10"],
+    }
+
+
+def test_technical_evaluation_at_rejects_time_missing_for_selected_date():
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:00"
+    state.technical_evaluation_time_choices_by_date = {"2026-05-29": ["09:10"]}
+    manager = WebUiStateManager(state)
+
+    assert manager.technical_evaluation_at() is None

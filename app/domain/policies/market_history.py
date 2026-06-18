@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
@@ -17,8 +18,8 @@ def build_technical_daily_history_cache_key(code4: str, *, period: str = "4mo", 
     return f"tech_daily_{code4}_{period}_{interval}"
 
 
-def build_technical_intraday_history_cache_key(code4: str, *, interval: str = "5m") -> str:
-    return f"tech_intraday_{code4}_{interval}_jst"
+def build_technical_intraday_history_cache_key(code4: str, *, period: str = "60d", interval: str = "5m") -> str:
+    return f"tech_intraday_{code4}_{period}_{interval}_jst"
 
 
 def empty_history() -> pd.DataFrame:
@@ -53,6 +54,59 @@ def normalize_history_frame(history: Any) -> pd.DataFrame:
     if hasattr(out.index, "tz") and out.index.tz is not None:
         out.index = out.index.tz_convert("Asia/Tokyo").tz_localize(None)
     return out
+
+
+def build_intraday_evaluation_timestamps(intraday_history: pd.DataFrame) -> tuple[datetime, ...]:
+    intraday = normalize_history_frame(intraday_history)
+    intraday = intraday[intraday["Volume"] > 0]
+    return tuple(pd.Timestamp(value).to_pydatetime() for value in intraday.index)
+
+
+def slice_technical_histories_for_evaluation(
+    daily_history: pd.DataFrame,
+    intraday_history: pd.DataFrame,
+    evaluation_at: datetime | None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if evaluation_at is None:
+        return daily_history, intraday_history
+
+    daily = normalize_history_frame(daily_history)
+    intraday = normalize_history_frame(intraday_history)
+    target = pd.Timestamp(evaluation_at).tz_localize(None)
+    intraday = intraday[intraday.index <= target]
+    intraday = intraday[intraday["Volume"] > 0]
+    if intraday.empty:
+        return daily[daily.index <= target.normalize()], intraday
+
+    target_date = target.date()
+    dates = pd.Series(intraday.index.date, index=intraday.index)
+    target_session = intraday[dates == target_date]
+    if target_session.empty:
+        latest_intraday_date = pd.Timestamp(intraday.index[-1]).date()
+        target_session = intraday[dates == latest_intraday_date]
+        target_date = latest_intraday_date
+
+    daily_before_target = daily[pd.Series(daily.index.date, index=daily.index) < target_date]
+    synthetic_daily = _build_synthetic_daily_row_from_intraday(target_session)
+    if synthetic_daily.empty:
+        return daily_before_target, intraday
+    return pd.concat([daily_before_target, synthetic_daily]), intraday
+
+
+def _build_synthetic_daily_row_from_intraday(intraday: pd.DataFrame) -> pd.DataFrame:
+    if intraday.empty:
+        return empty_history()
+    timestamp = pd.Timestamp(intraday.index[-1]).normalize()
+    return pd.DataFrame(
+        {
+            "Open": [_safe_float(intraday.iloc[0]["Open"])],
+            "High": [_safe_float(intraday["High"].max())],
+            "Low": [_safe_float(intraday["Low"].min())],
+            "Close": [_safe_float(intraday.iloc[-1]["Close"])],
+            "Volume": [_safe_float(intraday["Volume"].sum())],
+        },
+        index=pd.DatetimeIndex([timestamp]),
+    )
 
 
 def build_market_snapshot_from_daily_history(daily_history: pd.DataFrame | None) -> MarketSnapshot:
@@ -353,6 +407,7 @@ __all__ = [
     "TECH_DAILY_HISTORY_TTL_SEC",
     "TECH_INTRADAY_HISTORY_TTL_SEC",
     "build_daily_reference_vwap_snapshot",
+    "build_intraday_evaluation_timestamps",
     "build_intraday_vwap_snapshot",
     "build_market_snapshot_from_daily_history",
     "build_previous_session_intraday_snapshot",
@@ -360,4 +415,5 @@ __all__ = [
     "build_technical_intraday_history_cache_key",
     "empty_history",
     "normalize_history_frame",
+    "slice_technical_histories_for_evaluation",
 ]

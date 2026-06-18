@@ -54,9 +54,17 @@ class SummaryWorkflow:
         self,
         *,
         watchlist_entries: list[tuple[str, str]],
+        evaluation_at: datetime | None = None,
     ):
+        build_result = self.build_technical_summary_result
+        if evaluation_at is not None:
+            build_result = lambda name, code4: self.build_technical_summary_result(
+                name,
+                code4,
+                evaluation_at=evaluation_at,
+            )
         service = TechnicalSummaryService(
-            self.build_technical_summary_result,
+            build_result,
             build_us_market_summary=self.build_us_market_summary,
         )
         return service.build_summary_table(watchlist_entries)
@@ -67,9 +75,13 @@ class SummaryWorkflow:
         mode: str,
         watchlist_entries: list[tuple[str, str]],
         kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
     ):
         if mode == "technical":
-            return self.build_technical_summary_table(watchlist_entries=watchlist_entries)
+            return self.build_technical_summary_table(
+                watchlist_entries=watchlist_entries,
+                evaluation_at=evaluation_at,
+            )
         return self.build_fundamental_summary_table(
             watchlist_entries=watchlist_entries,
             kabutan_html_dir=kabutan_html_dir,

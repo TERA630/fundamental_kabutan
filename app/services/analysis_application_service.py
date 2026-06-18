@@ -8,6 +8,7 @@ from typing import Callable
 
 from app.data.file_cache import FileCache
 from app.domain.models.market_data import MarketDataBundle
+from app.domain.policies.market_history import build_intraday_evaluation_timestamps
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
 from app.domain.usecases.market_data import MarketDataService
@@ -200,12 +201,14 @@ class AnalysisApplicationService:
         code4: str,
         mode: str,
         kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
     ) -> AnalysisOutputResult:
         return self.analysis_output_workflow.fetch_output_for_mode(
             name=name,
             code4=code4,
             mode=mode,
             kabutan_html_dir=kabutan_html_dir,
+            evaluation_at=evaluation_at,
         )
 
     def build_fundamental_summary_table(
@@ -238,8 +241,12 @@ class AnalysisApplicationService:
         self,
         *,
         watchlist_entries: list[tuple[str, str]],
+        evaluation_at: datetime | None = None,
     ):
-        return self.summary_workflow.build_technical_summary_table(watchlist_entries=watchlist_entries)
+        return self.summary_workflow.build_technical_summary_table(
+            watchlist_entries=watchlist_entries,
+            evaluation_at=evaluation_at,
+        )
 
     def build_summary_table_for_mode(
         self,
@@ -247,11 +254,13 @@ class AnalysisApplicationService:
         mode: str,
         watchlist_entries: list[tuple[str, str]],
         kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
     ):
         return self.summary_workflow.build_summary_table_for_mode(
             mode=mode,
             watchlist_entries=watchlist_entries,
             kabutan_html_dir=kabutan_html_dir,
+            evaluation_at=evaluation_at,
         )
 
     def build_and_save_technical_summary(
@@ -272,8 +281,17 @@ class AnalysisApplicationService:
         *,
         name: str,
         code4: str,
+        evaluation_at: datetime | None = None,
     ) -> str:
-        return self.stock_analysis_workflow.fetch_technical_output(name=name, code4=code4)
+        return self.stock_analysis_workflow.fetch_technical_output(
+            name=name,
+            code4=code4,
+            evaluation_at=evaluation_at,
+        )
+
+    def fetch_technical_evaluation_timestamps(self, code4: str) -> tuple[datetime, ...]:
+        bundle = self.fetch_market_data_bundle(code4)
+        return build_intraday_evaluation_timestamps(bundle.intraday_history)
 
     def fetch_institutional_summary_text(
         self,

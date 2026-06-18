@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from app.gui_view_model import GuiViewModel
@@ -30,6 +31,11 @@ class WebUiState:
     summary_markdown: str = ""
     summary_html: str = ""
     summary_filename: str = ""
+    technical_evaluation_date: str = ""
+    technical_evaluation_time: str = ""
+    technical_evaluation_date_choices: list[str] = field(default_factory=list)
+    technical_evaluation_time_choices: list[str] = field(default_factory=list)
+    technical_evaluation_time_choices_by_date: dict[str, list[str]] = field(default_factory=dict)
     status: str = field(default_factory=GuiViewModel.build_initial_status)
 
     @property
@@ -77,11 +83,21 @@ class WebUiStateManager:
         if choices and self.state.selected_label not in choices:
             self.state.selected_label = choices[0]
 
-    def sync_form_selection(self, selected_stock_label: str | None, mode: str | None) -> None:
+    def sync_form_selection(
+        self,
+        selected_stock_label: str | None,
+        mode: str | None,
+        technical_evaluation_date: str | None = None,
+        technical_evaluation_time: str | None = None,
+    ) -> None:
         if selected_stock_label is not None:
             self.state.selected_label = selected_stock_label
         if mode is not None:
             self.state.mode = mode
+        if technical_evaluation_date is not None:
+            self.state.technical_evaluation_date = technical_evaluation_date
+        if technical_evaluation_time is not None:
+            self.state.technical_evaluation_time = technical_evaluation_time
 
     def selected_stock(self) -> tuple[str, str] | None:
         _, mapping = build_stock_choices(self.state.watchlist)
@@ -153,6 +169,7 @@ class WebUiStateManager:
             code4=code4,
             mode=self.state.mode,
             kabutan_html_dir=self.state.kabutan_html_dir,
+            evaluation_at=self.technical_evaluation_at(),
         )
         self.state.output = result.output
         self.state.institutional_summary = result.institutional_summary
@@ -175,4 +192,61 @@ class WebUiStateManager:
             mode=self.state.mode,
             watchlist_entries=self.state.watchlist,
             kabutan_html_dir=self.state.kabutan_html_dir,
+            evaluation_at=self.technical_evaluation_at(),
         )
+
+    def technical_evaluation_at(self) -> datetime | None:
+        if self.state.mode != "technical":
+            return None
+        date_text = self.state.technical_evaluation_date.strip()
+        time_text = self.state.technical_evaluation_time.strip()
+        if not date_text or not time_text:
+            return None
+        times_by_date = self.state.technical_evaluation_time_choices_by_date
+        if times_by_date and time_text not in times_by_date.get(date_text, []):
+            return None
+        try:
+            return datetime.fromisoformat(f"{date_text}T{time_text}")
+        except ValueError:
+            return None
+
+    def refresh_technical_evaluation_choices(self) -> None:
+        if self.state.mode != "technical":
+            return
+        selected = self.selected_stock()
+        if selected is None:
+            self.state.technical_evaluation_date_choices = []
+            self.state.technical_evaluation_time_choices = []
+            self.state.technical_evaluation_time_choices_by_date = {}
+            return
+        fetch_timestamps = getattr(self.state.controller, "fetch_technical_evaluation_timestamps", None)
+        if not callable(fetch_timestamps):
+            return
+        try:
+            timestamps = fetch_timestamps(selected[1])
+        except Exception:
+            return
+        times_by_date: dict[str, list[str]] = {}
+        for value in timestamps:
+            date_key = value.date().isoformat()
+            times_by_date.setdefault(date_key, []).append(value.strftime("%H:%M"))
+        times_by_date = {
+            date_key: sorted(set(times))
+            for date_key, times in times_by_date.items()
+        }
+        dates = sorted(times_by_date.keys(), reverse=True)
+        selected_date_times = times_by_date.get(self.state.technical_evaluation_date, [])
+        times = selected_date_times or sorted({time for values in times_by_date.values() for time in values})
+        self.state.technical_evaluation_date_choices = dates
+        self.state.technical_evaluation_time_choices = times
+        self.state.technical_evaluation_time_choices_by_date = times_by_date
+        if self.state.technical_evaluation_date and self.state.technical_evaluation_date not in dates:
+            self.state.technical_evaluation_date = ""
+            times = sorted({time for values in times_by_date.values() for time in values})
+            self.state.technical_evaluation_time_choices = times
+        if self.state.technical_evaluation_date:
+            valid_times = times_by_date.get(self.state.technical_evaluation_date, [])
+        else:
+            valid_times = times
+        if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in valid_times:
+            self.state.technical_evaluation_time = ""

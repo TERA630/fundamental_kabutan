@@ -1,5 +1,6 @@
 from io import BytesIO
 import hashlib
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 import zipfile
@@ -78,6 +79,84 @@ def test_web_ui_defaults_to_technical_mode():
     assert 'name="mode" value="technical" checked' in html
 
 
+def test_technical_evaluation_selects_use_existing_intraday_timestamps():
+    class FakeController:
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def fetch_technical_evaluation_timestamps(self, code4):
+            assert code4 == "7203"
+            return (
+                datetime(2026, 5, 28, 9, 0),
+                datetime(2026, 5, 29, 9, 0),
+                datetime(2026, 5, 29, 9, 10),
+            )
+
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    client = create_app(state).test_client()
+
+    html = client.get("/").data.decode("utf-8")
+
+    assert 'name="technical_evaluation_date"' in html
+    assert 'name="technical_evaluation_time"' in html
+    assert '<option value="2026-05-29"' in html
+    assert '<option value="2026-05-28"' in html
+    assert '<option value="09:00"' in html
+    assert '<option value="09:10"' in html
+    assert "technicalTimesByDate" in html
+    assert "rebuildTechnicalTimeOptions" in html
+
+
+def test_technical_fetch_rejects_time_that_does_not_exist_on_selected_date():
+    class FakeController:
+        def __init__(self):
+            self.fetch_call = None
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def fetch_technical_evaluation_timestamps(self, code4):
+            assert code4 == "7203"
+            return (
+                datetime(2026, 5, 28, 9, 0),
+                datetime(2026, 5, 29, 9, 10),
+            )
+
+        def fetch_output_for_mode(self, **kwargs):
+            self.fetch_call = kwargs
+            return SimpleNamespace(output="Technical output", institutional_summary="SUMMARY")
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/fetch",
+        data={
+            "selected_stock": "トヨタ (7203)",
+            "mode": "technical",
+            "technical_evaluation_date": "2026-05-29",
+            "technical_evaluation_time": "09:00",
+        },
+    ).data.decode("utf-8")
+
+    assert "Technical output" in html
+    assert controller.fetch_call["evaluation_at"] is None
+    assert state.technical_evaluation_time == ""
+
+
 def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeypatch):
     class FakeController:
         def fetch_resolved_watchlist_path(self):
@@ -90,9 +169,10 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
             assert watchlist_entries == [("トヨタ", "7203")]
             return "TECH_TABLE"
 
-        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None):
+        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None, evaluation_at=None):
             assert mode == "technical"
             assert kabutan_html_dir is None
+            assert evaluation_at is None
             return self.build_technical_summary_table(watchlist_entries=watchlist_entries)
 
     monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
@@ -299,8 +379,9 @@ def test_fetch_fundamental_extracts_uploaded_kabutan_package_once(tmp_path: Path
         def fetch_institutional_summary_text(self, **_kwargs):
             return "機関投資サマリ\n時価総額：N/A"
 
-        def fetch_output_for_mode(self, *, name, code4, mode, kabutan_html_dir=None):
+        def fetch_output_for_mode(self, *, name, code4, mode, kabutan_html_dir=None, evaluation_at=None):
             assert mode == "fundamental"
+            assert evaluation_at is None
             output = self.fetch_analysis_output(
                 name=name,
                 code4=code4,
@@ -393,8 +474,9 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
             self.summary_dir = kabutan_html_dir
             return "FUND_TABLE"
 
-        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None):
+        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None, evaluation_at=None):
             assert mode == "fundamental"
+            assert evaluation_at is None
             return self.build_fundamental_summary_table(
                 watchlist_entries=watchlist_entries,
                 kabutan_html_dir=kabutan_html_dir,

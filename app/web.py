@@ -108,7 +108,10 @@ def create_app(state: WebUiState | None = None) -> Flask:
         state_manager.sync_form_selection(
             request.form.get("selected_stock", ui_state.selected_label),
             request.form.get("mode", ui_state.mode),
+            request.form.get("technical_evaluation_date"),
+            request.form.get("technical_evaluation_time"),
         )
+        state_manager.refresh_technical_evaluation_choices()
         try:
             state_manager.fetch_output_for_current_selection()
         except Exception as exc:
@@ -120,7 +123,10 @@ def create_app(state: WebUiState | None = None) -> Flask:
         state_manager.sync_form_selection(
             request.form.get("selected_stock", ui_state.selected_label),
             request.form.get("mode", ui_state.mode),
+            request.form.get("technical_evaluation_date"),
+            request.form.get("technical_evaluation_time"),
         )
+        state_manager.refresh_technical_evaluation_choices()
         try:
             table = state_manager.build_summary_table_for_current_mode()
             if table is None:
@@ -149,6 +155,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
 
 def _render(state: WebUiState) -> str:
+    WebUiStateManager(state).refresh_technical_evaluation_choices()
     output_blocks = (
         [WebTextBlock(kind="text", text=state.output)]
         if state.mode == "technical"

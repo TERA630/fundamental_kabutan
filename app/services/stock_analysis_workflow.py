@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -56,20 +57,35 @@ class StockAnalysisWorkflow:
                 kabutan_html_dir=kabutan_html_dir,
             )
 
-    def build_technical_summary_result(self, name: str, code4: str):
+    def build_technical_summary_result(
+        self,
+        name: str,
+        code4: str,
+        *,
+        evaluation_at: datetime | None = None,
+    ):
         if self.uses_default_technical_service:
             bundle = self.fetch_market_data_bundle(code4)
-            return TechnicalAnalysisService.build_analysis_result_from_bundle(name=name, bundle=bundle)
+            return TechnicalAnalysisService.build_analysis_result_from_bundle(
+                name=name,
+                bundle=bundle,
+                evaluation_at=evaluation_at,
+            )
         service = self.build_technical_service(self.file_cache)
-        return service.build_analysis_result(name=name, code4=code4)
+        if evaluation_at is None:
+            return service.build_analysis_result(name=name, code4=code4)
+        return service.build_analysis_result(name=name, code4=code4, evaluation_at=evaluation_at)
 
     def fetch_technical_output(
         self,
         *,
         name: str,
         code4: str,
+        evaluation_at: datetime | None = None,
     ) -> str:
-        return build_technical_output(self.build_technical_summary_result(name=name, code4=code4))
+        return build_technical_output(
+            self.build_technical_summary_result(name=name, code4=code4, evaluation_at=evaluation_at)
+        )
 
     def fetch_institutional_summary_text(
         self,

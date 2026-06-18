@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from datetime import datetime
 
 from app.domain.usecases.technical_analysis import (
     TechnicalAnalysisService,
@@ -177,6 +178,46 @@ def test_build_analysis_result_uses_daily_close_after_market_close():
     assert result.evaluation_price == 169.0
     assert result.evaluation_price_source == "daily_close"
     assert result.evaluation_price_timestamp == "2026-04-08 終値"
+
+
+def test_build_analysis_result_uses_selected_intraday_evaluation_point_without_future_daily_close():
+    daily = _daily_history()
+    current_date = daily.index[-1].date().isoformat()
+    intraday = pd.DataFrame(
+        {
+            "Open": [168.0, 169.0, 170.0, 171.0],
+            "High": [169.0, 170.0, 171.0, 172.0],
+            "Low": [167.0, 168.0, 169.0, 170.0],
+            "Close": [168.5, 169.5, 170.5, 171.5],
+            "Volume": [1000.0, 1100.0, 1200.0, 1300.0],
+        },
+        index=pd.to_datetime(
+            [
+                f"{current_date} 09:00",
+                f"{current_date} 09:05",
+                f"{current_date} 09:10",
+                f"{current_date} 09:15",
+            ]
+        ),
+    )
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: daily,
+        fetch_intraday_history=lambda _code4: intraday,
+    )
+
+    result = service.build_analysis_result(
+        name="Sample",
+        code4="1234",
+        evaluation_at=datetime.fromisoformat(f"{current_date}T09:10"),
+    )
+
+    assert result.evaluation_price == 170.5
+    assert result.evaluation_price_source == "intraday_5m"
+    assert result.evaluation_price_timestamp == f"{current_date} 09:10"
+    assert result.snapshot.price.close == 170.5
+    assert result.snapshot.price.high == 171.0
+    assert result.snapshot.price.volume == 3300.0
 
 
 def test_build_analysis_result_from_market_data_bundle():
