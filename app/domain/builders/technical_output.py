@@ -11,7 +11,6 @@ from app.domain.policies.technical_summary import (
     build_technical_short_comment,
     build_technical_strategy_lines,
     build_nearby_support_lines,
-    is_focus_theme,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
@@ -151,14 +150,10 @@ def _format_grouped_price_levels(
 
 
 def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
-    assessment = _build_position_assessment(result)
-    if assessment is None:
+    headline = _build_headline(result)
+    if headline is None:
         return "短評：N/A"
-    return "短評：" + build_technical_short_comment(
-        dev25_pct=_evaluation_dev25_pct(result),
-        volume_vs_avg20_pct=_ratio_pct(_evaluation_volume(result), result.snapshot.price.volume_avg20),
-        collapse_assessment=assessment,
-    )
+    return "短評：" + build_technical_short_comment(rank=headline.rank)
 
 
 def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
@@ -370,8 +365,9 @@ def _build_headline(result: TechnicalAnalysisResult):
         dev25_pct=dev25_pct,
         latest=latest,
         vwap=vwap,
-        focus_theme=is_focus_theme(result.name),
         ma25_distance_atr=_evaluation_ma25_distance_atr(result),
+        ma5=getattr(snapshot.moving_average, "ma5", None),
+        ma5_prev1=getattr(snapshot.moving_average, "ma5_prev1", None),
         ma25=snapshot.moving_average.ma25,
         ma25_prev5=snapshot.moving_average.ma25_prev5,
         rsi14=snapshot.rsi14,
@@ -391,6 +387,7 @@ def _build_headline(result: TechnicalAnalysisResult):
         recent60_low=snapshot.breakline.recent60_low,
         vwap_maintained_15m=_as_bool(result.vwap_snapshot.get("vwap_maintained_15m")),
         low_highers=tuple(session.low_higher for session in sessions),
+        high_breakouts=tuple(session.high_breakout for session in sessions),
     )
 
 

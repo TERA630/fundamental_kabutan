@@ -10,40 +10,69 @@ from app.domain.models.technical_summary import (
 )
 
 RANK_LABELS: dict[TechnicalSummaryRank, str] = {
-    "A1": "位置良好",
-    "A2": "上昇継続",
-    "B1": "上昇後半",
     "B2": "過熱極大",
-    "C1": "押し目候補",
+    "B1": "過熱後半",
+    "A2": "やや過熱",
+    "A1": "位置良好",
+    "A1弱": "押し目候補",
     "C2": "崩れ警戒",
+    "C1": "25日線接近",
     "D1": "戻り途中",
     "D2": "底打ち候補",
     "D3": "底打ち初動",
     "E": "下落トレンド",
 }
 
-RANK_ORDER: tuple[TechnicalSummaryRank, ...] = ("A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2", "D3", "E")
+RANK_ORDER: tuple[TechnicalSummaryRank, ...] = (
+    "B2",
+    "B1",
+    "A2",
+    "A1",
+    "A1弱",
+    "C2",
+    "C1",
+    "D1",
+    "D2",
+    "D3",
+    "E",
+)
 
 HEADLINE_COMMENTS: dict[TechnicalSummaryRank, str] = {
-    "A1": "順張り可。過熱なし。",
-    "A2": "上昇継続中。ただし追いかけ注意。",
-    "B1": "値幅は残るが、押しを待つ位置。",
     "B2": "新規買い非推奨。利確優先。",
-    "C1": "支持線反発待ち。",
+    "B1": "過熱後半。高値追い注意。",
+    "A2": "やや過熱。追随は小さく。",
+    "A1": "順張り候補。位置良好。",
+    "A1弱": "良好だが、短期逆行も多い。",
     "C2": "25日線割れ警戒。買いは待ち。",
+    "C1": "方向未確定。",
     "D1": "25日線奪回待ち。上値確認中。",
     "D2": "支持線反発待ち。",
     "D3": "VWAP回復。安値切り上げ・反転確認。",
     "E": "買い見送り。反転確認待ち。",
 }
 
+SINGLE_STOCK_POSITION_DESCRIPTIONS: dict[TechnicalSummaryRank, str] = {
+    "B2": "上値余地より、逆行リスクが高い位置",
+    "B1": "上昇トレンドはのこるが、逆行率高い。",
+    "A2": "やや過熱。追随より押し目待ち。",
+    "A1": "リターン良好、買い候補",
+    "A1弱": "良好だが、短期逆行も多い。",
+    "C1": "方向未確定",
+    "C2": "監視のみ",
+    "D1": HEADLINE_COMMENTS["D1"],
+    "D2": HEADLINE_COMMENTS["D2"],
+    "D3": HEADLINE_COMMENTS["D3"],
+    "E": HEADLINE_COMMENTS["E"],
+}
+
 NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
-    "A1": "深押し、VWAP回復、後場VWAP維持は可。追加買いは条件付き可。",
-    "A2": "支持線待ち。追加買いは小さく。",
-    "B1": "新規は慎重。追加買い非推奨。",
     "B2": "短期監視のみ。追加買い不可。",
-    "C1": "VWAP回復まで買い待ち。",
+    "B1": "高値追い注意。深押し待ち。",
+    "A2": "追随は小さく、押し目待ち。",
+    "A1": "支持線・VWAP維持を確認。",
+    "A1弱": "VWAP回復・支持線維持を確認。",
     "C2": "VWAP回復後も15分維持を確認。追加買い不可。",
+    "C1": "過熱はないが方向確認。",
     "D1": "25日線接近時の利確圧に注意。追加買いは25日線奪回後。",
     "D2": "まだ入らない。VWAP回復待ち。",
     "D3": "小さく入れる候補。通常サイズは25日線奪回後。",
@@ -71,6 +100,11 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
         "前場VWAP回復○：VWAP近辺まで押した後、再回復＋維持ならエントリー可。",
         "後場VWAP回復○：後場VWAP上維持ならエントリー可。ただし高値追いは避ける。",
     ),
+    "A1弱": (
+        "前場深押し○：支持線付近 {support_range}円で検討。VWAP回復・維持を確認。",
+        "前場VWAP回復○：VWAP回復＋15分以上維持なら小さく検討可。",
+        "後場VWAP回復○：後場VWAP上維持ならエントリー候補。支持線割れは見送り。",
+    ),
     "B1": (
         "前場深押し△：支持線付近 {nearest_support}円でのみ小さく検討。VWAP未回復なら撤退。",
         "前場VWAP回復△：VWAP回復＋維持でも新規は慎重。高値追いは避ける。",
@@ -87,9 +121,9 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
         "後場VWAP回復○：後場VWAP回復＋上維持＋安値切り上げがあればエントリー可。",
     ),
     "C2": (
-        "前場深押し×：25日線下では深押し指値を避ける。戻り売りの中腹をつかみやすい。",
-        "前場VWAP回復×：VWAP回復だけでは根拠不足。25日線下ではだまし上げに注意。",
-        "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら25日線回復を待つ。",
+        "前場深押し×：崩れ条件あり。深押し指値は避け、支持線維持を確認する。",
+        "前場VWAP回復×：VWAP回復だけでは根拠不足。安値切り上げと高値更新を確認する。",
+        "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら崩れ条件の解消を待つ。",
     ),
     "D1": None,
     "D2": None,
@@ -100,14 +134,6 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
         "後場VWAP回復△：後場VWAP回復＋上維持＋安値切り上げ＋出来高増加が揃えば小さく検討可。原則は25日線回復待ち。",
     ),
 }
-
-FOCUS_THEME_KEYWORDS = ("半導体", "電線", "AI", "ＡＩ")
-
-
-def is_focus_theme(name: str) -> bool:
-    normalized = name.upper()
-    return any(keyword.upper() in normalized for keyword in FOCUS_THEME_KEYWORDS)
-
 
 def build_technical_strategy_lines(
     rank: TechnicalSummaryRank,
@@ -253,8 +279,9 @@ def classify_technical_summary_rank(
     dev25_pct: float,
     latest: float,
     vwap: float,
-    focus_theme: bool,
     ma25_distance_atr: float | None = None,
+    ma5: float | None = None,
+    ma5_prev1: float | None = None,
     ma25: float | None = None,
     ma25_prev5: float | None = None,
     rsi14: float | None = None,
@@ -274,25 +301,54 @@ def classify_technical_summary_rank(
     recent60_low: float | None = None,
     vwap_maintained_15m: bool | None = None,
     low_highers: tuple[bool | None, ...] = (),
+    high_breakouts: tuple[bool | None, ...] = (),
 ) -> TechnicalSummaryRank:
-    del focus_theme
     vwap_up = latest > vwap
-    ma25_slope = _ma25_slope(ma25, ma25_prev5)
-    range_position_pct = _position_pct(recent60_range_position)
     close_position_pct = _position_pct(day_close_position)
 
-    if dev25_pct >= 10 or _gte(ma25_distance_atr, 2.0):
+    if dev25_pct >= 12 or (dev25_pct >= 10 and _gt(ma25_distance_atr, 3.0)):
         return "B2"
 
+    overheated = _has_b1_overheat_condition(
+        three_session_change_pct=three_session_change_pct,
+        recent60_range_position=recent60_range_position,
+        rsi14=rsi14,
+        day_close_position=day_close_position,
+    )
+    if 10 <= dev25_pct < 12 or (8 <= dev25_pct < 10 and overheated):
+        return "B1"
+
     if dev25_pct >= 0:
-        if dev25_pct >= 7 and (_gte(three_session_change_pct, 6) or _gte(range_position_pct, 80) or vwap_up):
-            return "B1"
-        if vwap_up and dev25_pct >= 4:
-            return "A2"
-        if vwap_up:
-            return "A1"
-        if dev25_pct <= 3 and (ma25_slope in {"flat", "down"} or low_higher_count == 0):
+        collapse_condition = _has_above_ma25_collapse_condition(
+            latest=latest,
+            vwap=vwap,
+            ma5=ma5,
+            ma5_prev1=ma5_prev1,
+            ma25=ma25,
+            ma25_prev5=ma25_prev5,
+            atr14=atr14,
+            day_open=day_open,
+            day_high=day_high,
+            day_low=day_low,
+            day_close_position=day_close_position,
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
+            high_breakout_count=high_breakout_count,
+            low_higher_count=low_higher_count,
+            high_breakouts=high_breakouts,
+            low_highers=low_highers,
+            previous_low=previous_low,
+            recent20_low=recent20_low,
+            ma75=ma75,
+            recent60_low=recent60_low,
+        )
+        if collapse_condition:
             return "C2"
+        if dev25_pct >= 8:
+            return "A2"
+        if dev25_pct >= 6:
+            return "A1"
+        if dev25_pct >= 4:
+            return "A1弱"
         return "C1"
 
     if vwap_up:
@@ -333,8 +389,9 @@ def build_technical_headline_summary(
     dev25_pct: float,
     latest: float,
     vwap: float,
-    focus_theme: bool = False,
     ma25_distance_atr: float | None = None,
+    ma5: float | None = None,
+    ma5_prev1: float | None = None,
     ma25: float | None = None,
     ma25_prev5: float | None = None,
     rsi14: float | None = None,
@@ -354,13 +411,15 @@ def build_technical_headline_summary(
     recent60_low: float | None = None,
     vwap_maintained_15m: bool | None = None,
     low_highers: tuple[bool | None, ...] = (),
+    high_breakouts: tuple[bool | None, ...] = (),
 ) -> TechnicalHeadlineSummary:
     rank = classify_technical_summary_rank(
         dev25_pct=dev25_pct,
         latest=latest,
         vwap=vwap,
-        focus_theme=focus_theme,
         ma25_distance_atr=ma25_distance_atr,
+        ma5=ma5,
+        ma5_prev1=ma5_prev1,
         ma25=ma25,
         ma25_prev5=ma25_prev5,
         rsi14=rsi14,
@@ -380,6 +439,7 @@ def build_technical_headline_summary(
         recent60_low=recent60_low,
         vwap_maintained_15m=vwap_maintained_15m,
         low_highers=low_highers,
+        high_breakouts=high_breakouts,
     )
     comment = HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
@@ -472,7 +532,7 @@ def build_technical_position_assessment(
 
     # 表示ラベルをランク別に決定
     def _collapse_label_for(rank: TechnicalSummaryRank, s: int) -> str:
-        primary_set = {"A1", "A2", "B1", "B2", "D2", "D3", "E"}
+        primary_set = {"A1", "A1弱", "A2", "B1", "B2", "D2", "D3", "E"}
         if rank in primary_set:
             if s <= 2:
                 return "崩れ軽微"
@@ -521,29 +581,9 @@ def build_technical_position_assessment(
 
 def build_technical_short_comment(
     *,
-    dev25_pct: float | None,
-    volume_vs_avg20_pct: float | None,
-    collapse_assessment: TechnicalPositionAssessment,
+    rank: TechnicalSummaryRank,
 ) -> str:
-    return (
-        f"{build_ma25_position_comment(dev25_pct)}"
-        f"｜{build_volume_comment(volume_vs_avg20_pct)}"
-        f"｜崩れ {collapse_assessment.collapse_risk_score}/9：{collapse_assessment.collapse_risk_label}"
-    )
-
-
-def build_ma25_position_comment(dev25_pct: float | None) -> str:
-    if dev25_pct is None:
-        return "25日線位置N/A"
-    if dev25_pct >= 3:
-        return "25日線上・上方乖離"
-    if dev25_pct >= 0:
-        return "25日線上・支持維持"
-    if dev25_pct >= -4:
-        return "25日線下・奪回接近"
-    if dev25_pct >= -8:
-        return "25日線下・奪回待ち"
-    return "25日線下・深い位置"
+    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}"
 
 
 def build_volume_comment(volume_vs_avg20_pct: float | None) -> str:
@@ -647,6 +687,79 @@ def _position_pct(value: float | None) -> float | None:
 
 def _gte(value: float | int | None, threshold: float | int) -> bool:
     return value is not None and value >= threshold
+
+
+def _gt(value: float | int | None, threshold: float | int) -> bool:
+    return value is not None and value > threshold
+
+
+def _has_b1_overheat_condition(
+    *,
+    three_session_change_pct: float | None,
+    recent60_range_position: float | None,
+    rsi14: float | None,
+    day_close_position: float | None,
+) -> bool:
+    return any(
+        (
+            _gt(three_session_change_pct, 6),
+            _gte(_position_pct(recent60_range_position), 80),
+            _gte(rsi14, 70),
+            _gte(_position_pct(day_close_position), 85),
+        )
+    )
+
+
+def _has_above_ma25_collapse_condition(
+    *,
+    latest: float,
+    vwap: float,
+    ma5: float | None,
+    ma5_prev1: float | None,
+    ma25: float | None,
+    ma25_prev5: float | None,
+    atr14: float | None,
+    day_open: float | None,
+    day_high: float | None,
+    day_low: float | None,
+    day_close_position: float | None,
+    volume_vs_avg20_pct: float | None,
+    high_breakout_count: int | None,
+    low_higher_count: int | None,
+    high_breakouts: tuple[bool | None, ...],
+    low_highers: tuple[bool | None, ...],
+    previous_low: float | None,
+    recent20_low: float | None,
+    ma75: float | None,
+    recent60_low: float | None,
+) -> bool:
+    support_distance_atr = _nearest_support_distance_atr(
+        latest=latest,
+        atr14=atr14,
+        supports=(ma25, previous_low, recent20_low, ma75, recent60_low),
+    )
+    bearish_or_stalling = _is_significant_bearish(
+        latest=latest,
+        day_open=day_open,
+        atr14=atr14,
+    ) or _is_upper_price_stalling(
+        latest=latest,
+        day_open=day_open,
+        day_high=day_high,
+        day_low=day_low,
+    )
+    return any(
+        (
+            latest < vwap,
+            _all_false(low_highers) or (bool(low_highers) and low_higher_count == 0),
+            _all_false(high_breakouts) or (bool(high_breakouts) and high_breakout_count == 0),
+            day_close_position is not None and day_close_position < 0.4,
+            _gt(volume_vs_avg20_pct, 100) and bearish_or_stalling,
+            support_distance_atr is not None and support_distance_atr > 0.7,
+            _ma25_slope(ma25, ma25_prev5) in {"down", "flat"},
+            ma5 is not None and ma5_prev1 is not None and ma5 < ma5_prev1,
+        )
+    )
 
 
 def _evaluate_d2_bottoming_candidate(
@@ -889,11 +1002,11 @@ def _is_upper_price_stalling(
 __all__ = [
     "RANK_LABELS",
     "RANK_ORDER",
+    "SINGLE_STOCK_POSITION_DESCRIPTIONS",
     "build_d1_detail",
     "build_d3_detail",
     "build_d_detail_headline",
     "build_dev25_risk_label",
-    "build_ma25_position_comment",
     "build_technical_headline_summary",
     "build_technical_position_assessment",
     "build_technical_short_comment",
@@ -902,5 +1015,4 @@ __all__ = [
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",
     "classify_technical_summary_rank",
-    "is_focus_theme",
 ]

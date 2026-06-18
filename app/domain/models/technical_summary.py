@@ -7,7 +7,7 @@ from typing import Literal
 
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
-TechnicalSummaryRank = Literal["A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2", "D3", "E"]
+TechnicalSummaryRank = Literal["B2", "B1", "A2", "A1", "A1弱", "C2", "C1", "D1", "D2", "D3", "E"]
 CollapseRiskLevel = Literal["低", "中", "高"]
 HoldJudgement = Literal["◎", "○", "△", "×"]
 
