@@ -6,9 +6,9 @@ from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
     build_d1_detail,
     build_d3_detail,
-    build_d_detail_headline,
     build_technical_headline_summary,
     build_technical_position_assessment,
+    build_technical_short_comment,
     build_technical_strategy_lines,
     build_nearby_support_lines,
     is_focus_theme,
@@ -151,34 +151,46 @@ def _format_grouped_price_levels(
 
 
 def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
-    headline = _build_headline(result)
-    if headline is None:
+    assessment = _build_position_assessment(result)
+    if assessment is None:
         return "短評：N/A"
-    detail_headline = build_d_detail_headline(
-        headline.rank,
-        ma25_distance_atr=_evaluation_ma25_distance_atr(result),
-        volume_vs_avg20_pct=_ratio_pct(
-            _evaluation_volume(result),
-            result.snapshot.price.volume_avg20,
-        ),
+    return "短評：" + build_technical_short_comment(
         dev25_pct=_evaluation_dev25_pct(result),
+        volume_vs_avg20_pct=_ratio_pct(_evaluation_volume(result), result.snapshot.price.volume_avg20),
+        collapse_assessment=assessment,
     )
-    return f"短評：{detail_headline or headline.text}"
 
 
 def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
+    latest = _evaluation_price(result)
+    ma25 = result.snapshot.moving_average.ma25
+    assessment = _build_position_assessment(result)
+    if latest is None or ma25 is None or assessment is None:
+        return "崩れ警戒：N/A\nホールド判定：N/A"
+
+    lines = [
+        f"崩れ {assessment.collapse_risk_score}/9：{assessment.collapse_risk_label}",
+    ]
+    if latest < ma25:
+        established = "成立" if assessment.bottoming_start_established else "未成立"
+        lines.append(f"底打ち初動判定：{established}")
+    lines.append(f"ホールド判定：{assessment.hold_judgement}")
+    return "\n".join(lines)
+
+
+def _build_position_assessment(result: TechnicalAnalysisResult):
     snapshot = result.snapshot
     latest = _evaluation_price(result)
     vwap = _as_float(result.vwap_snapshot.get("vwap"))
     ma25 = snapshot.moving_average.ma25
     dev25_pct = _evaluation_dev25_pct(result)
     if latest is None or vwap is None or ma25 is None or dev25_pct is None:
-        return "崩れ警戒：N/A\nホールド判定：N/A"
+        return None
 
     headline = _build_headline(result)
     if headline is None:
-        return "崩れ警戒：N/A\nホールド判定：N/A"
-    assessment = build_technical_position_assessment(
+        return None
+    return build_technical_position_assessment(
         latest=latest,
         vwap=vwap,
         ma25=ma25,
@@ -199,14 +211,6 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         recent60_low=snapshot.breakline.recent60_low,
         headline_rank=headline.rank,
     )
-    lines = [
-        f"崩れ {assessment.collapse_risk_score}/9：{assessment.collapse_risk_label}",
-    ]
-    if latest < ma25:
-        established = "成立" if assessment.bottoming_start_established else "未成立"
-        lines.append(f"底打ち初動判定：{established}")
-    lines.append(f"ホールド判定：{assessment.hold_judgement}")
-    return "\n".join(lines)
 
 
 def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:

@@ -282,8 +282,6 @@ def classify_technical_summary_rank(
     close_position_pct = _position_pct(day_close_position)
 
     if dev25_pct >= 10 or _gte(ma25_distance_atr, 2.0):
-        if _gte(rsi14, 70) or _gte(three_session_change_pct, 10) or _gte(volume_vs_avg20_pct, 150):
-            return "B2"
         return "B2"
 
     if dev25_pct >= 0:
@@ -519,6 +517,47 @@ def build_technical_position_assessment(
         hold_judgement=hold,
         bottoming_start_established=latest < ma25 and headline_rank == "D3",
     )
+
+
+def build_technical_short_comment(
+    *,
+    dev25_pct: float | None,
+    volume_vs_avg20_pct: float | None,
+    collapse_assessment: TechnicalPositionAssessment,
+) -> str:
+    return (
+        f"{build_ma25_position_comment(dev25_pct)}"
+        f"｜{build_volume_comment(volume_vs_avg20_pct)}"
+        f"｜崩れ {collapse_assessment.collapse_risk_score}/9：{collapse_assessment.collapse_risk_label}"
+    )
+
+
+def build_ma25_position_comment(dev25_pct: float | None) -> str:
+    if dev25_pct is None:
+        return "25日線位置N/A"
+    if dev25_pct >= 3:
+        return "25日線上・上方乖離"
+    if dev25_pct >= 0:
+        return "25日線上・支持維持"
+    if dev25_pct >= -4:
+        return "25日線下・奪回接近"
+    if dev25_pct >= -8:
+        return "25日線下・奪回待ち"
+    return "25日線下・深い位置"
+
+
+def build_volume_comment(volume_vs_avg20_pct: float | None) -> str:
+    if volume_vs_avg20_pct is None:
+        return "出来高N/A"
+    if volume_vs_avg20_pct < 60:
+        return "出来高薄い"
+    if volume_vs_avg20_pct < 80:
+        return "出来高やや薄い"
+    if volume_vs_avg20_pct < 120:
+        return "出来高通常"
+    if volume_vs_avg20_pct < 180:
+        return "出来高伴う"
+    return "出来高急増"
 
 
 def build_nearby_support_lines(
@@ -854,8 +893,11 @@ __all__ = [
     "build_d3_detail",
     "build_d_detail_headline",
     "build_dev25_risk_label",
+    "build_ma25_position_comment",
     "build_technical_headline_summary",
     "build_technical_position_assessment",
+    "build_technical_short_comment",
+    "build_volume_comment",
     "build_technical_strategy_lines",
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",

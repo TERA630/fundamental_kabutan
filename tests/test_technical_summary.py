@@ -11,11 +11,13 @@ from app.domain.policies.technical_summary import (
     build_d3_detail,
     build_d_detail_headline,
     build_dev25_risk_label,
+    build_ma25_position_comment,
     build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     build_technical_position_assessment,
     build_technical_strategy_lines,
+    build_volume_comment,
     classify_technical_summary_rank,
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
@@ -147,6 +149,35 @@ def test_a2_label_describes_uptrend_continuation_not_overheat():
 
     assert headline.rank == "A2"
     assert headline.rank_label == "上昇継続"
+
+
+def test_b2_classification_does_not_require_volume_surge():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=10.0,
+            latest=110.0,
+            vwap=109.0,
+            focus_theme=False,
+            volume_vs_avg20_pct=40.0,
+        )
+        == "B2"
+    )
+
+
+def test_short_comment_parts_follow_boundaries():
+    assert build_ma25_position_comment(3.0) == "25日線上・上方乖離"
+    assert build_ma25_position_comment(0.0) == "25日線上・支持維持"
+    assert build_ma25_position_comment(-4.0) == "25日線下・奪回接近"
+    assert build_ma25_position_comment(-8.0) == "25日線下・奪回待ち"
+    assert build_ma25_position_comment(-8.1) == "25日線下・深い位置"
+    assert build_ma25_position_comment(None) == "25日線位置N/A"
+
+    assert build_volume_comment(59.9) == "出来高薄い"
+    assert build_volume_comment(60.0) == "出来高やや薄い"
+    assert build_volume_comment(80.0) == "出来高通常"
+    assert build_volume_comment(120.0) == "出来高伴う"
+    assert build_volume_comment(180.0) == "出来高急増"
+    assert build_volume_comment(None) == "出来高N/A"
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():

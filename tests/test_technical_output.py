@@ -78,14 +78,14 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
     assert "\n　支持：" not in output
     assert "抵抗：170(preH/20dH/60dH)" in output
-    assert "短評：B2 過熱極大｜新規買い非推奨。利確優先。｜短期監視のみ。追加買い不可。" in output
+    assert "短評：25日線上・上方乖離｜出来高通常｜崩れ 1/9：崩れ軽微" in output
     assert "崩れ 1/9：崩れ軽微" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
     assert "戦略判定：\n前場深押し×：深押しに見えても崩れ初動の可能性が高い。" in output
     assert "前場VWAP回復×：VWAP回復だけでは新規不可。" in output
     assert "後場VWAP回復×：新規不可。保有中なら利確・逆指値管理を優先。" in output
-    assert output.index("短評：B2 過熱極大") < output.index("■モメンタム")
+    assert output.index("短評：25日線上・上方乖離") < output.index("■モメンタム")
     assert output.index("崩れ 1/9：崩れ軽微") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
@@ -210,7 +210,7 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
 
     output = build_technical_output(result)
 
-    assert "短評：D3強｜VWAP維持・出来高伴う｜小さく可。D3内で最有力" in output
+    assert "短評：25日線下・奪回接近｜出来高通常｜崩れ 2/9：崩れ軽微" in output
     assert "詳細：" not in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
@@ -235,7 +235,7 @@ def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
 
     output = build_technical_output(result)
 
-    assert "短評：D1a 戻り途中・25日線接近｜監視優先。D3化なら小さく可" in output
+    assert "短評：25日線下・奪回接近｜出来高通常｜崩れ 2/9：戻り良好" in output
     assert "前場深押し△：地合い良好なら" in output
     assert "前場VWAP回復△：VWAP回復だけでは不可。" in output
 
@@ -253,7 +253,7 @@ def test_build_technical_output_uses_d2_headline_and_recovery_stage():
 
     output = build_technical_output(result)
 
-    assert "短評：D2 底打ち候補｜支持線反発待ち｜支持線反発候補。原則VWAP回復待ち" in output
+    assert "短評：25日線下・奪回待ち｜出来高通常｜崩れ 3/9：上値重い" in output
     assert "前場VWAP回復△：VWAP15分維持なら試し玉候補" in output
     assert "D3化すれば○" in output
 
