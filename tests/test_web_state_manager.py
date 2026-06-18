@@ -99,6 +99,7 @@ def test_fetch_output_for_current_selection_passes_technical_evaluation_at():
     assert manager.fetch_output_for_current_selection() is True
 
     assert controller.fetch_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
+    assert "評価時点=2026-05-29 09:10" in state.status
 
 
 def test_refresh_technical_evaluation_choices_groups_times_by_date():
@@ -129,3 +130,15 @@ def test_technical_evaluation_at_rejects_time_missing_for_selected_date():
     manager = WebUiStateManager(state)
 
     assert manager.technical_evaluation_at() is None
+    assert manager.technical_evaluation_label() == "最新"
+
+
+def test_technical_evaluation_label_formats_valid_selection():
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:10"
+    state.technical_evaluation_time_choices_by_date = {"2026-05-29": ["09:10"]}
+    manager = WebUiStateManager(state)
+
+    assert manager.technical_evaluation_label() == "2026-05-29 09:10"

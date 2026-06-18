@@ -173,7 +173,10 @@ class WebUiStateManager:
         )
         self.state.output = result.output
         self.state.institutional_summary = result.institutional_summary
-        self.state.status = self.state.view_model.build_generated_status(name, code4)
+        status = self.state.view_model.build_generated_status(name, code4)
+        if self.state.mode == "technical":
+            status = f"{status} / 評価時点={self.technical_evaluation_label()}"
+        self.state.status = status
         return True
 
     def build_summary_table_for_current_mode(self):
@@ -209,6 +212,12 @@ class WebUiStateManager:
             return datetime.fromisoformat(f"{date_text}T{time_text}")
         except ValueError:
             return None
+
+    def technical_evaluation_label(self) -> str:
+        value = self.technical_evaluation_at()
+        if value is None:
+            return "最新"
+        return value.strftime("%Y-%m-%d %H:%M")
 
     def refresh_technical_evaluation_choices(self) -> None:
         if self.state.mode != "technical":

@@ -189,7 +189,47 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
 
     assert "<section>TECH_TABLE</section>" in html
     assert state.fundamental_summary_html == "<section>TECH_TABLE</section>"
-    assert state.status == "Technicalサマリを表示しました。"
+    assert state.status == "Technicalサマリを表示しました。 / 評価時点=最新"
+
+
+def test_technical_summary_status_includes_selected_evaluation_at(monkeypatch):
+    class FakeController:
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def fetch_technical_evaluation_timestamps(self, code4):
+            assert code4 == "7203"
+            return (datetime(2026, 5, 29, 9, 10),)
+
+        def build_summary_table_for_mode(self, *, mode, watchlist_entries, kabutan_html_dir=None, evaluation_at=None):
+            assert mode == "technical"
+            assert watchlist_entries == [("トヨタ", "7203")]
+            assert evaluation_at == datetime(2026, 5, 29, 9, 10)
+            return "TECH_TABLE"
+
+    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
+
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/summary",
+        data={
+            "selected_stock": "トヨタ (7203)",
+            "mode": "technical",
+            "technical_evaluation_date": "2026-05-29",
+            "technical_evaluation_time": "09:10",
+        },
+    ).data.decode("utf-8")
+
+    assert "<section>TECH_TABLE</section>" in html
+    assert state.status == "Technicalサマリを表示しました。 / 評価時点=2026-05-29 09:10"
 
 
 def test_index_copy_button_has_textarea_fallback_for_insecure_contexts():

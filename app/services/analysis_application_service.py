@@ -269,11 +269,13 @@ class AnalysisApplicationService:
         watchlist_entries: list[tuple[str, str]],
         output_dir: Path,
         generated_at: datetime | None = None,
+        evaluation_at: datetime | None = None,
     ) -> Path:
         return self.summary_workflow.build_and_save_technical_summary(
             watchlist_entries=watchlist_entries,
             output_dir=output_dir,
             generated_at=generated_at,
+            evaluation_at=evaluation_at,
         )
 
     def fetch_technical_output(

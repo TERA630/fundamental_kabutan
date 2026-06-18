@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
 from app.domain.usecases.watchlist_path import ResolvedWatchlistPath
@@ -33,6 +34,14 @@ class FakeController:
             return ResolvedKabutanHtmlDir(status="missing", dir_path=None, message="")
         return ResolvedKabutanHtmlDir(status="ok", dir_path=self.kabutan_dir, message="restored")
 
+    def fetch_technical_evaluation_timestamps(self, code4):
+        assert code4 == "7203"
+        return (
+            datetime(2026, 5, 28, 9, 0),
+            datetime(2026, 5, 28, 9, 5),
+            datetime(2026, 5, 29, 9, 10),
+        )
+
 
 def build_manager(controller: FakeController, state: GuiState | None = None) -> GuiStateManager:
     return GuiStateManager(
@@ -65,3 +74,44 @@ def test_restore_kabutan_html_dir_updates_state(tmp_path: Path):
 
     assert restored == (controller.kabutan_dir, "restored")
     assert manager.state.kabutan_html_dir == controller.kabutan_dir
+
+
+def test_refresh_technical_evaluation_choices_groups_times_by_date(tmp_path: Path):
+    controller = FakeController()
+    state = GuiState()
+    manager = build_manager(controller, state)
+    manager.load_watchlist(tmp_path / "watchlist.md")
+    state.technical_evaluation_date = "2026-05-28"
+
+    manager.refresh_technical_evaluation_choices("トヨタ (7203)")
+
+    assert state.technical_evaluation_date_choices == ["2026-05-29", "2026-05-28"]
+    assert state.technical_evaluation_time_choices == ["09:00", "09:05"]
+    assert state.technical_evaluation_time_choices_by_date == {
+        "2026-05-28": ["09:00", "09:05"],
+        "2026-05-29": ["09:10"],
+    }
+
+
+def test_technical_evaluation_at_uses_valid_gui_selection(tmp_path: Path):
+    controller = FakeController()
+    state = GuiState()
+    manager = build_manager(controller, state)
+    manager.load_watchlist(tmp_path / "watchlist.md")
+    manager.refresh_technical_evaluation_choices("トヨタ (7203)")
+    manager.set_technical_evaluation_selection(date_text="2026-05-29", time_text="09:10")
+
+    assert manager.technical_evaluation_at() == datetime(2026, 5, 29, 9, 10)
+    assert manager.technical_evaluation_label() == "2026-05-29 09:10"
+
+
+def test_technical_evaluation_at_rejects_invalid_gui_date_time_pair():
+    state = GuiState(
+        technical_evaluation_date="2026-05-29",
+        technical_evaluation_time="09:00",
+        technical_evaluation_time_choices_by_date={"2026-05-29": ["09:10"]},
+    )
+    manager = build_manager(FakeController(), state)
+
+    assert manager.technical_evaluation_at() is None
+    assert manager.technical_evaluation_label() == "最新"

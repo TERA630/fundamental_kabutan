@@ -110,8 +110,12 @@ class SummaryWorkflow:
         watchlist_entries: list[tuple[str, str]],
         output_dir: Path,
         generated_at: datetime | None = None,
+        evaluation_at: datetime | None = None,
     ) -> Path:
-        table = self.build_technical_summary_table(watchlist_entries=watchlist_entries)
+        table = self.build_technical_summary_table(
+            watchlist_entries=watchlist_entries,
+            evaluation_at=evaluation_at,
+        )
         markdown = build_technical_summary_markdown(table)
         output_path = output_dir / build_technical_summary_filename(generated_at=generated_at)
         output_path.write_text(markdown, encoding="utf-8")

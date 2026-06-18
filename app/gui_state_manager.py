@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from app.gui_state import GuiState
@@ -59,5 +60,75 @@ class GuiStateManager:
 
     def selected_stock(self, selected_label: str) -> tuple[str, str] | None:
         return get_selected_stock(self.state.display_to_code, selected_label)
+
+    def refresh_technical_evaluation_choices(self, selected_label: str) -> None:
+        selected = self.selected_stock(selected_label)
+        if selected is None:
+            self.state.technical_evaluation_date_choices = []
+            self.state.technical_evaluation_time_choices = []
+            self.state.technical_evaluation_time_choices_by_date = {}
+            return
+        fetch_timestamps = getattr(self.controller, "fetch_technical_evaluation_timestamps", None)
+        if not callable(fetch_timestamps):
+            return
+        timestamps = fetch_timestamps(selected[1])
+        times_by_date: dict[str, list[str]] = {}
+        for value in timestamps:
+            date_key = value.date().isoformat()
+            times_by_date.setdefault(date_key, []).append(value.strftime("%H:%M"))
+        times_by_date = {
+            date_key: sorted(set(times))
+            for date_key, times in times_by_date.items()
+        }
+        dates = sorted(times_by_date.keys(), reverse=True)
+        selected_date_times = times_by_date.get(self.state.technical_evaluation_date, [])
+        times = selected_date_times or sorted({time for values in times_by_date.values() for time in values})
+        self.state.technical_evaluation_date_choices = dates
+        self.state.technical_evaluation_time_choices = times
+        self.state.technical_evaluation_time_choices_by_date = times_by_date
+        if self.state.technical_evaluation_date and self.state.technical_evaluation_date not in dates:
+            self.state.technical_evaluation_date = ""
+            times = sorted({time for values in times_by_date.values() for time in values})
+            self.state.technical_evaluation_time_choices = times
+        valid_times = (
+            times_by_date.get(self.state.technical_evaluation_date, [])
+            if self.state.technical_evaluation_date
+            else times
+        )
+        if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in valid_times:
+            self.state.technical_evaluation_time = ""
+
+    def set_technical_evaluation_selection(self, *, date_text: str, time_text: str) -> None:
+        self.state.technical_evaluation_date = "" if date_text == "最新" else date_text.strip()
+        self.state.technical_evaluation_time = "" if time_text == "最新" else time_text.strip()
+
+    def update_technical_time_choices_for_selected_date(self) -> None:
+        times_by_date = self.state.technical_evaluation_time_choices_by_date
+        if self.state.technical_evaluation_date:
+            times = times_by_date.get(self.state.technical_evaluation_date, [])
+        else:
+            times = sorted({time for values in times_by_date.values() for time in values})
+        self.state.technical_evaluation_time_choices = times
+        if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in times:
+            self.state.technical_evaluation_time = ""
+
+    def technical_evaluation_at(self) -> datetime | None:
+        date_text = self.state.technical_evaluation_date.strip()
+        time_text = self.state.technical_evaluation_time.strip()
+        if not date_text or not time_text:
+            return None
+        times_by_date = self.state.technical_evaluation_time_choices_by_date
+        if times_by_date and time_text not in times_by_date.get(date_text, []):
+            return None
+        try:
+            return datetime.fromisoformat(f"{date_text}T{time_text}")
+        except ValueError:
+            return None
+
+    def technical_evaluation_label(self) -> str:
+        value = self.technical_evaluation_at()
+        if value is None:
+            return "最新"
+        return value.strftime("%Y-%m-%d %H:%M")
 
 __all__ = ["GuiStateManager"]

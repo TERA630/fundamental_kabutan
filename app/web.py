@@ -133,7 +133,7 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 return _render(ui_state)
             if ui_state.mode == "technical":
                 ui_state.fundamental_summary_html = build_technical_summary_html(table)
-                ui_state.status = "Technicalサマリを表示しました。"
+                ui_state.status = f"Technicalサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label()}"
             else:
                 ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
                 ui_state.status = "Fundamentalサマリを表示しました。"

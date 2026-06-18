@@ -17,6 +17,8 @@ class FundamentalView:
         status_var: tk.StringVar,
         kabutan_dir_var: tk.StringVar,
         institutional_summary_var: tk.StringVar,
+        technical_evaluation_date_var: tk.StringVar,
+        technical_evaluation_time_var: tk.StringVar,
     ):
         self.master = master
         self.path_var = path_var
@@ -24,6 +26,8 @@ class FundamentalView:
         self.status_var = status_var
         self.kabutan_dir_var = kabutan_dir_var
         self.institutional_summary_var = institutional_summary_var
+        self.technical_evaluation_date_var = technical_evaluation_date_var
+        self.technical_evaluation_time_var = technical_evaluation_time_var
 
     def build_ui(
         self,
@@ -37,6 +41,8 @@ class FundamentalView:
         on_build_kabutan_package,
         on_summary,
         on_tab_changed,
+        on_refresh_technical_evaluation,
+        on_technical_evaluation_date_changed,
     ) -> None:
         root = ttk.Frame(self.master, padding=10)
         root.pack(fill="both", expand=True)
@@ -70,6 +76,34 @@ class FundamentalView:
         self.copy_button.pack(side="left", padx=(0, 6))
         self.save_button = ttk.Button(control, text="保存", command=on_save)
         self.save_button.pack(side="left")
+
+        technical_control = ttk.Frame(root)
+        technical_control.pack(fill="x", pady=(0, 8))
+        ttk.Label(technical_control, text="Technical評価").pack(side="left")
+        ttk.Label(technical_control, text="日付").pack(side="left", padx=(10, 4))
+        self.technical_evaluation_date_combo = ttk.Combobox(
+            technical_control,
+            textvariable=self.technical_evaluation_date_var,
+            state="readonly",
+            width=14,
+        )
+        self.technical_evaluation_date_combo.pack(side="left", padx=(0, 8))
+        self.technical_evaluation_date_combo.bind("<<ComboboxSelected>>", on_technical_evaluation_date_changed)
+        ttk.Label(technical_control, text="時刻").pack(side="left", padx=(0, 4))
+        self.technical_evaluation_time_combo = ttk.Combobox(
+            technical_control,
+            textvariable=self.technical_evaluation_time_var,
+            state="readonly",
+            width=8,
+        )
+        self.technical_evaluation_time_combo.pack(side="left", padx=(0, 8))
+        self.refresh_technical_evaluation_button = ttk.Button(
+            technical_control,
+            text="候補更新",
+            command=on_refresh_technical_evaluation,
+        )
+        self.refresh_technical_evaluation_button.pack(side="left")
+        ttk.Label(technical_control, text="未選択時は最新").pack(side="left", padx=(10, 0))
 
         ttk.Label(root, textvariable=self.status_var).pack(fill="x", pady=(0, 6))
 
@@ -114,9 +148,20 @@ class FundamentalView:
         self.copy_button.configure(state=state)
         self.save_button.configure(state=state)
         self.stock_combo.configure(state=readonly_state)
+        self.technical_evaluation_date_combo.configure(state=readonly_state)
+        self.technical_evaluation_time_combo.configure(state=readonly_state)
+        self.refresh_technical_evaluation_button.configure(state=state)
         if status is not None:
             self.status_var.set(status)
         self.master.update_idletasks()
+
+    def set_technical_evaluation_choices(self, *, dates: list[str], times: list[str]) -> None:
+        self.technical_evaluation_date_combo["values"] = ["最新", *dates]
+        self.technical_evaluation_time_combo["values"] = ["最新", *times]
+        if self.technical_evaluation_date_var.get() not in self.technical_evaluation_date_combo["values"]:
+            self.technical_evaluation_date_var.set("最新")
+        if self.technical_evaluation_time_var.get() not in self.technical_evaluation_time_combo["values"]:
+            self.technical_evaluation_time_var.set("最新")
 
     def clear_text(self) -> None:
         self.current_text_widget().delete("1.0", tk.END)

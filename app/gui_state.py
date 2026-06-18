@@ -22,6 +22,11 @@ class GuiState:
     display_to_code: dict[str, tuple[str, str]] = field(default_factory=dict)
     scoring_cache: dict[str, CfScoringResult] = field(default_factory=dict)
     is_fetching: bool = False
+    technical_evaluation_date: str = ""
+    technical_evaluation_time: str = ""
+    technical_evaluation_date_choices: list[str] = field(default_factory=list)
+    technical_evaluation_time_choices: list[str] = field(default_factory=list)
+    technical_evaluation_time_choices_by_date: dict[str, list[str]] = field(default_factory=dict)
 
 
 

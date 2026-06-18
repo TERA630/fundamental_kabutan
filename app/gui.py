@@ -39,6 +39,8 @@ class FundamentalApp:
         self.stock_var = tk.StringVar()
         self.status_var = tk.StringVar(value=GuiViewModel.build_initial_status())
         self.institutional_summary_var = tk.StringVar(value="機関投資サマリ\n時価総額：N/A\n流動性：N/A\n機関投資スコア：N/A")
+        self.technical_evaluation_date_var = tk.StringVar(value="最新")
+        self.technical_evaluation_time_var = tk.StringVar(value="最新")
 
         self.view = FundamentalView(
             self.master,
@@ -47,6 +49,8 @@ class FundamentalApp:
             self.status_var,
             self.kabutan_dir_var,
             self.institutional_summary_var,
+            self.technical_evaluation_date_var,
+            self.technical_evaluation_time_var,
         )
         self.view.build_ui(
             on_open=self.open_watchlist,
@@ -58,7 +62,10 @@ class FundamentalApp:
             on_build_kabutan_package=self.build_kabutan_html_package,
             on_summary=self.generate_summary,
             on_tab_changed=self.on_tab_changed,
+            on_refresh_technical_evaluation=self.refresh_technical_evaluation_choices,
+            on_technical_evaluation_date_changed=self.on_technical_evaluation_date_changed,
         )
+        self._apply_technical_evaluation_choices()
         self._restore_watchlist()
         self._restore_kabutan_html_dir()
 
@@ -116,6 +123,7 @@ class FundamentalApp:
         if choices:
             self.stock_var.set(choices[0])
             self.status_var.set(self.view_model.build_loaded_status(len(choices)))
+            self.refresh_technical_evaluation_choices()
         else:
             self.stock_var.set("")
             self.view.clear_all_text()
@@ -123,9 +131,12 @@ class FundamentalApp:
 
     def on_stock_selected(self, _event=None):
         self.status_var.set(self.view_model.build_selected_status())
+        self.refresh_technical_evaluation_choices()
 
     def on_tab_changed(self, _event=None):
         self.status_var.set(self.view_model.build_selected_status())
+        if self.view.current_mode() == "technical":
+            self.refresh_technical_evaluation_choices()
 
     def selected_stock(self) -> tuple[str, str] | None:
         return self.state_manager.selected_stock(self.stock_var.get())
@@ -144,6 +155,35 @@ class FundamentalApp:
     def _render_output_with_summary(self, output: str, summary: str, status: str, mode: str):
         self.institutional_summary_var.set(summary)
         self._render_output(output, status, mode=mode)
+
+    def _sync_technical_evaluation_selection(self) -> None:
+        self.state_manager.set_technical_evaluation_selection(
+            date_text=self.technical_evaluation_date_var.get(),
+            time_text=self.technical_evaluation_time_var.get(),
+        )
+
+    def _apply_technical_evaluation_choices(self) -> None:
+        date_display = self.state.technical_evaluation_date or "最新"
+        time_display = self.state.technical_evaluation_time or "最新"
+        self.technical_evaluation_date_var.set(date_display)
+        self.technical_evaluation_time_var.set(time_display)
+        self.view.set_technical_evaluation_choices(
+            dates=self.state.technical_evaluation_date_choices,
+            times=self.state.technical_evaluation_time_choices,
+        )
+
+    def refresh_technical_evaluation_choices(self) -> None:
+        try:
+            self._sync_technical_evaluation_selection()
+            self.state_manager.refresh_technical_evaluation_choices(self.stock_var.get())
+            self._apply_technical_evaluation_choices()
+        except Exception as exc:
+            self.status_var.set(f"Technical評価時点候補を取得できませんでした: {exc}")
+
+    def on_technical_evaluation_date_changed(self, _event=None) -> None:
+        self._sync_technical_evaluation_selection()
+        self.state_manager.update_technical_time_choices_for_selected_date()
+        self._apply_technical_evaluation_choices()
 
     def _handle_fetch_error(self, message: str):
         self.set_busy(False, self.view_model.build_fetch_failed_status())
@@ -169,24 +209,26 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
-    def _technical_fetch_worker(self, name: str, code4: str):
+    def _technical_fetch_worker(self, name: str, code4: str, evaluation_at, evaluation_label: str):
         try:
-            output = self.controller.fetch_technical_output(name=name, code4=code4)
+            output = self.controller.fetch_technical_output(name=name, code4=code4, evaluation_at=evaluation_at)
             summary = self.controller.fetch_institutional_summary_text(
                 name=name,
                 code4=code4,
                 kabutan_html_dir=self.state.kabutan_html_dir,
             )
-            self.master.after(0, lambda: self._render_output_with_summary(output, summary, self.view_model.build_generated_status(name, code4), "technical"))
+            status = f"{self.view_model.build_generated_status(name, code4)} / 評価時点={evaluation_label}"
+            self.master.after(0, lambda: self._render_output_with_summary(output, summary, status, "technical"))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
-    def _summary_worker(self, output_dir: Path, mode: str):
+    def _summary_worker(self, output_dir: Path, mode: str, evaluation_at=None, evaluation_label: str = "最新"):
         try:
             if mode == "technical":
                 output_path = self.controller.build_and_save_technical_summary(
                     watchlist_entries=self.state.watchlist,
                     output_dir=output_dir,
+                    evaluation_at=evaluation_at,
                 )
             else:
                 output_path = self.controller.build_and_save_fundamental_summary(
@@ -194,7 +236,10 @@ class FundamentalApp:
                     output_dir=output_dir,
                     kabutan_html_dir=self.state.kabutan_html_dir,
                 )
-            self.master.after(0, lambda path=output_path: self.set_busy(False, self.view_model.build_saved_status(str(path))))
+            status = self.view_model.build_saved_status(str(output_path))
+            if mode == "technical":
+                status = f"{status} / 評価時点={evaluation_label}"
+            self.master.after(0, lambda: self.set_busy(False, status))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_summary_error(msg))
 
@@ -233,8 +278,15 @@ class FundamentalApp:
         thread.start()
 
     def _start_technical_fetch_thread(self, name: str, code4: str) -> None:
+        self._sync_technical_evaluation_selection()
+        evaluation_at = self.state_manager.technical_evaluation_at()
+        evaluation_label = self.state_manager.technical_evaluation_label()
         self.set_busy(True, self.view_model.build_fetching_status(name, code4))
-        thread = threading.Thread(target=self._technical_fetch_worker, args=(name, code4), daemon=True)
+        thread = threading.Thread(
+            target=self._technical_fetch_worker,
+            args=(name, code4, evaluation_at, evaluation_label),
+            daemon=True,
+        )
         thread.start()
 
     def generate_text(self):
@@ -268,8 +320,15 @@ class FundamentalApp:
             return
 
         output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
+        self._sync_technical_evaluation_selection()
+        evaluation_at = self.state_manager.technical_evaluation_at() if mode == "technical" else None
+        evaluation_label = self.state_manager.technical_evaluation_label() if mode == "technical" else "最新"
         self.set_busy(True, self.view_model.build_summary_running_status())
-        thread = threading.Thread(target=self._summary_worker, args=(output_dir, mode), daemon=True)
+        thread = threading.Thread(
+            target=self._summary_worker,
+            args=(output_dir, mode, evaluation_at, evaluation_label),
+            daemon=True,
+        )
         thread.start()
 
     def build_kabutan_html_package(self):
