@@ -78,15 +78,15 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
     assert "\n　支持：" not in output
     assert "抵抗：170(preH/20dH/60dH)" in output
-    assert "短評：C2 崩れ警戒 監視のみ" in output
-    assert "崩れ 1/9：軽度崩れ" in output
+    assert "短評：C2 崩れ警戒 監視のみ｜5日線良好" in output
+    assert "崩れ 1/12：軽度崩れ" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
     assert "戦略判定：\n前場深押し×：崩れ条件あり。深押し指値は避け、支持線維持を確認する。" in output
     assert "前場VWAP回復×：VWAP回復だけでは根拠不足。安値切り上げと高値更新を確認する。" in output
     assert "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。" in output
-    assert output.index("短評：C2 崩れ警戒 監視のみ") < output.index("■モメンタム")
-    assert output.index("崩れ 1/9：軽度崩れ") < output.index("■モメンタム")
+    assert output.index("短評：C2 崩れ警戒 監視のみ｜5日線良好") < output.index("■モメンタム")
+    assert output.index("崩れ 1/12：軽度崩れ") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output

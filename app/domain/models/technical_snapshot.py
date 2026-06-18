@@ -41,6 +41,9 @@ class TechnicalMovingAverageSnapshot:
     dev25_pct: float | None
     ma25_distance: float | None
     ma25_distance_atr: float | None
+    ma5_slope: float | None = None
+    ma5_slope_prev: float | None = None
+    ma5_slope_3d_ago: float | None = None
 
 
 @dataclass(frozen=True)

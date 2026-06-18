@@ -153,7 +153,13 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
     headline = _build_headline(result)
     if headline is None:
         return "短評：N/A"
-    return "短評：" + build_technical_short_comment(rank=headline.rank)
+    moving_average = result.snapshot.moving_average
+    return "短評：" + build_technical_short_comment(
+        rank=headline.rank,
+        ma5_slope=getattr(moving_average, "ma5_slope", None),
+        ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
+        ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
+    )
 
 
 def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
@@ -164,7 +170,7 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         return "崩れ警戒：N/A\nホールド判定：N/A"
 
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/9：{assessment.collapse_risk_label}",
+        f"崩れ {assessment.collapse_risk_score}/12：{assessment.collapse_risk_label}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"
@@ -191,6 +197,9 @@ def _build_position_assessment(result: TechnicalAnalysisResult):
         ma25=ma25,
         ma5=getattr(snapshot.moving_average, "ma5", None),
         ma5_prev1=getattr(snapshot.moving_average, "ma5_prev1", None),
+        ma5_slope=getattr(snapshot.moving_average, "ma5_slope", None),
+        ma5_slope_prev=getattr(snapshot.moving_average, "ma5_slope_prev", None),
+        ma5_slope_3d_ago=getattr(snapshot.moving_average, "ma5_slope_3d_ago", None),
         ma25_prev5=snapshot.moving_average.ma25_prev5,
         atr14=snapshot.range.atr14,
         day_open=_evaluation_open(result),
@@ -368,6 +377,9 @@ def _build_headline(result: TechnicalAnalysisResult):
         ma25_distance_atr=_evaluation_ma25_distance_atr(result),
         ma5=getattr(snapshot.moving_average, "ma5", None),
         ma5_prev1=getattr(snapshot.moving_average, "ma5_prev1", None),
+        ma5_slope=getattr(snapshot.moving_average, "ma5_slope", None),
+        ma5_slope_prev=getattr(snapshot.moving_average, "ma5_slope_prev", None),
+        ma5_slope_3d_ago=getattr(snapshot.moving_average, "ma5_slope_3d_ago", None),
         ma25=snapshot.moving_average.ma25,
         ma25_prev5=snapshot.moving_average.ma25_prev5,
         rsi14=snapshot.rsi14,

@@ -60,6 +60,9 @@ def calc_moving_averages(history: pd.DataFrame) -> pd.DataFrame:
     close = out["Close"]
     out["ma5"] = close.rolling(5).mean()
     out["ma5_prev1"] = out["ma5"].shift(1)
+    out["ma5_slope"] = out["ma5"] - out["ma5_prev1"]
+    out["ma5_slope_prev"] = out["ma5_slope"].shift(1)
+    out["ma5_slope_3d_ago"] = out["ma5_slope"].shift(3)
     out["ma25"] = close.rolling(25).mean()
     out["ma75"] = close.rolling(75).mean()
     out["ma25_prev5"] = out["ma25"].shift(5)
@@ -280,6 +283,9 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
     atr14 = _none_if_nan(latest_row["atr14"])
     ma5 = _none_if_nan(latest_row["ma5"])
     ma5_prev1 = _none_if_nan(latest_row["ma5_prev1"])
+    ma5_slope = _none_if_nan(latest_row["ma5_slope"])
+    ma5_slope_prev = _none_if_nan(latest_row["ma5_slope_prev"])
+    ma5_slope_3d_ago = _none_if_nan(latest_row["ma5_slope_3d_ago"])
     ma25 = _none_if_nan(latest_row["ma25"])
     ma75 = _none_if_nan(latest_row["ma75"])
     ma25_prev5 = _none_if_nan(latest_row["ma25_prev5"])
@@ -334,6 +340,9 @@ def build_technical_snapshot(history: pd.DataFrame) -> TechnicalSnapshot:
         dev25_pct=_none_if_nan(latest_row["dev25_pct"]),
         ma25_distance=ma25_distance,
         ma25_distance_atr=_safe_div(ma25_distance, atr14),
+        ma5_slope=ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
     range_snapshot = TechnicalRangeSnapshot(
         atr14=atr14,

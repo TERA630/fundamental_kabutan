@@ -282,6 +282,9 @@ def classify_technical_summary_rank(
     ma25_distance_atr: float | None = None,
     ma5: float | None = None,
     ma5_prev1: float | None = None,
+    ma5_slope: float | None = None,
+    ma5_slope_prev: float | None = None,
+    ma5_slope_3d_ago: float | None = None,
     ma25: float | None = None,
     ma25_prev5: float | None = None,
     rsi14: float | None = None,
@@ -324,6 +327,9 @@ def classify_technical_summary_rank(
             vwap=vwap,
             ma5=ma5,
             ma5_prev1=ma5_prev1,
+            ma5_slope=ma5_slope,
+            ma5_slope_prev=ma5_slope_prev,
+            ma5_slope_3d_ago=ma5_slope_3d_ago,
             ma25=ma25,
             ma25_prev5=ma25_prev5,
             atr14=atr14,
@@ -392,6 +398,9 @@ def build_technical_headline_summary(
     ma25_distance_atr: float | None = None,
     ma5: float | None = None,
     ma5_prev1: float | None = None,
+    ma5_slope: float | None = None,
+    ma5_slope_prev: float | None = None,
+    ma5_slope_3d_ago: float | None = None,
     ma25: float | None = None,
     ma25_prev5: float | None = None,
     rsi14: float | None = None,
@@ -420,6 +429,9 @@ def build_technical_headline_summary(
         ma25_distance_atr=ma25_distance_atr,
         ma5=ma5,
         ma5_prev1=ma5_prev1,
+        ma5_slope=ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
         ma25=ma25,
         ma25_prev5=ma25_prev5,
         rsi14=rsi14,
@@ -458,6 +470,9 @@ def build_technical_position_assessment(
     ma25: float,
     ma5: float | None = None,
     ma5_prev1: float | None = None,
+    ma5_slope: float | None = None,
+    ma5_slope_prev: float | None = None,
+    ma5_slope_3d_ago: float | None = None,
     ma25_prev5: float | None = None,
     atr14: float | None,
     day_open: float | None,
@@ -495,22 +510,25 @@ def build_technical_position_assessment(
     )
 
     ma25_slope = _ma25_slope(ma25, ma25_prev5)
-    ma5_slope_down = ma5 is not None and ma5_prev1 is not None and ma5 < ma5_prev1
-
-    score = sum(
-        (
-            latest < ma25,
-            latest < vwap,
-            all_low_highers_failed,
-            all_high_breakouts_failed,
-            day_close_position is not None and day_close_position < 0.4,
-            volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 110 and bearish_or_stalling,
-            support_is_far,
-            ma25_slope in {"down", "flat"},
-            ma5_slope_down,
-        )
+    resolved_ma5_slope = _resolve_ma5_slope(ma5_slope, ma5, ma5_prev1)
+    ma5_score = _ma5_slope_score(
+        ma5_slope=resolved_ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
+        capped=True,
     )
-    level = "低" if score <= 1 else "中" if score <= 3 else "高"
+
+    score = 0
+    score += int(latest < ma25)
+    score += int(latest < vwap)
+    score += int(all_low_highers_failed)
+    score += int(all_high_breakouts_failed)
+    score += int(day_close_position is not None and day_close_position < 0.4)
+    score += int(volume_vs_avg20_pct is not None and volume_vs_avg20_pct > 110 and bearish_or_stalling)
+    score += int(support_is_far)
+    score += 2 if ma25_slope in {"down", "flat"} else 0
+    score += ma5_score
+    level = "低" if score <= 3 else "中" if score <= 6 else "高"
 
     ma25_up = latest >= ma25
     vwap_up = latest >= vwap
@@ -534,37 +552,41 @@ def build_technical_position_assessment(
     def _collapse_label_for(rank: TechnicalSummaryRank, s: int) -> str:
         primary_set = {"A1", "A1弱", "A2", "B1", "B2", "D2", "D3", "E"}
         if rank in primary_set:
-            if s <= 2:
+            if s <= 3:
                 return "崩れ軽微"
-            if s <= 4:
-                return "上値重い"
             if s <= 6:
+                return "上値重い"
+            if s <= 9:
                 return "崩れ警戒"
             return "買い不可"
         if rank == "C1":
-            if s <= 2:
+            if s <= 3:
                 return "押し目候補"
-            if s <= 4:
+            if s <= 6:
                 return "VWAP回復待ち"
-            return "押し目ではなく崩れ警戒"
+            if s <= 9:
+                return "押し目ではなく崩れ警戒"
+            return "買い不可"
         if rank == "C2":
-            if s <= 2:
+            if s <= 3:
                 return "軽度崩れ"
-            if s <= 4:
+            if s <= 6:
                 return "崩れ警戒"
             return "買い不可"
         if rank == "D1":
-            if s <= 2:
+            if s <= 3:
                 return "戻り良好"
-            if s <= 4:
+            if s <= 6:
                 return "25日線奪回待ち"
-            return "戻り売り警戒"
+            if s <= 9:
+                return "戻り売り警戒"
+            return "買い不可"
         # デフォルト
-        if s <= 2:
+        if s <= 3:
             return "崩れ軽微"
-        if s <= 4:
-            return "上値重い"
         if s <= 6:
+            return "上値重い"
+        if s <= 9:
             return "崩れ警戒"
         return "買い不可"
 
@@ -582,8 +604,40 @@ def build_technical_position_assessment(
 def build_technical_short_comment(
     *,
     rank: TechnicalSummaryRank,
+    ma5_slope: float | None = None,
+    ma5_slope_prev: float | None = None,
+    ma5_slope_3d_ago: float | None = None,
 ) -> str:
-    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}"
+    ma5_comment = build_ma5_slope_short_comment(
+        ma5_slope=ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
+    )
+    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}｜{ma5_comment}"
+
+
+def build_ma5_slope_short_comment(
+    *,
+    ma5_slope: float | None = None,
+    ma5_slope_prev: float | None = None,
+    ma5_slope_3d_ago: float | None = None,
+) -> str:
+    details = _ma5_slope_comment_parts(
+        ma5_slope=ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
+    )
+    raw_score = _ma5_slope_score(
+        ma5_slope=ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
+        capped=False,
+    )
+    if raw_score == 0:
+        return "5日線良好"
+    if raw_score == 4:
+        return "5日線悪化"
+    return "・".join(details)
 
 
 def build_volume_comment(volume_vs_avg20_pct: float | None) -> str:
@@ -681,6 +735,51 @@ def _ma25_slope(ma25: float | None, ma25_prev5: float | None) -> str:
     return "flat"
 
 
+def _resolve_ma5_slope(
+    ma5_slope: float | None,
+    ma5: float | None,
+    ma5_prev1: float | None,
+) -> float | None:
+    if ma5_slope is not None:
+        return ma5_slope
+    if ma5 is None or ma5_prev1 is None:
+        return None
+    return ma5 - ma5_prev1
+
+
+def _ma5_slope_score(
+    *,
+    ma5_slope: float | None,
+    ma5_slope_prev: float | None,
+    ma5_slope_3d_ago: float | None,
+    capped: bool,
+) -> int:
+    score = 0
+    if ma5_slope is not None and ma5_slope <= 0:
+        score += 2
+    if ma5_slope is not None and ma5_slope_prev is not None and ma5_slope < ma5_slope_prev:
+        score += 1
+    if ma5_slope is not None and ma5_slope_3d_ago is not None and ma5_slope < ma5_slope_3d_ago:
+        score += 1
+    return min(score, 3) if capped else score
+
+
+def _ma5_slope_comment_parts(
+    *,
+    ma5_slope: float | None,
+    ma5_slope_prev: float | None,
+    ma5_slope_3d_ago: float | None,
+) -> tuple[str, ...]:
+    parts: list[str] = []
+    if ma5_slope is not None and ma5_slope <= 0:
+        parts.append("5日線下向き")
+    if ma5_slope is not None and ma5_slope_prev is not None and ma5_slope < ma5_slope_prev:
+        parts.append("5日線鈍化")
+    if ma5_slope is not None and ma5_slope_3d_ago is not None and ma5_slope < ma5_slope_3d_ago:
+        parts.append("5日線失速")
+    return tuple(parts)
+
+
 def _position_pct(value: float | None) -> float | None:
     return None if value is None else value * 100
 
@@ -716,6 +815,9 @@ def _has_above_ma25_collapse_condition(
     vwap: float,
     ma5: float | None,
     ma5_prev1: float | None,
+    ma5_slope: float | None,
+    ma5_slope_prev: float | None,
+    ma5_slope_3d_ago: float | None,
     ma25: float | None,
     ma25_prev5: float | None,
     atr14: float | None,
@@ -748,6 +850,7 @@ def _has_above_ma25_collapse_condition(
         day_high=day_high,
         day_low=day_low,
     )
+    resolved_ma5_slope = _resolve_ma5_slope(ma5_slope, ma5, ma5_prev1)
     return any(
         (
             latest < vwap,
@@ -757,7 +860,13 @@ def _has_above_ma25_collapse_condition(
             _gt(volume_vs_avg20_pct, 100) and bearish_or_stalling,
             support_distance_atr is not None and support_distance_atr > 0.7,
             _ma25_slope(ma25, ma25_prev5) in {"down", "flat"},
-            ma5 is not None and ma5_prev1 is not None and ma5 < ma5_prev1,
+            _ma5_slope_score(
+                ma5_slope=resolved_ma5_slope,
+                ma5_slope_prev=ma5_slope_prev,
+                ma5_slope_3d_ago=ma5_slope_3d_ago,
+                capped=False,
+            )
+            > 0,
         )
     )
 
@@ -1007,6 +1116,7 @@ __all__ = [
     "build_d3_detail",
     "build_d_detail_headline",
     "build_dev25_risk_label",
+    "build_ma5_slope_short_comment",
     "build_technical_headline_summary",
     "build_technical_position_assessment",
     "build_technical_short_comment",

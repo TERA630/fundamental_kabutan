@@ -11,6 +11,7 @@ from app.domain.policies.technical_summary import (
     build_d3_detail,
     build_d_detail_headline,
     build_dev25_risk_label,
+    build_ma5_slope_short_comment,
     build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
@@ -179,6 +180,34 @@ def test_volume_comment_parts_follow_boundaries():
     assert build_volume_comment(120.0) == "出来高伴う"
     assert build_volume_comment(180.0) == "出来高急増"
     assert build_volume_comment(None) == "出来高N/A"
+
+
+def test_ma5_slope_short_comment_follows_score_details():
+    assert build_ma5_slope_short_comment(ma5_slope=1.0) == "5日線良好"
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=-0.1,
+            ma5_slope_prev=-0.2,
+            ma5_slope_3d_ago=-0.3,
+        )
+        == "5日線下向き"
+    )
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=0.1,
+            ma5_slope_prev=0.3,
+            ma5_slope_3d_ago=0.2,
+        )
+        == "5日線鈍化・5日線失速"
+    )
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=-0.3,
+            ma5_slope_prev=-0.1,
+            ma5_slope_3d_ago=0.0,
+        )
+        == "5日線悪化"
+    )
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
@@ -392,7 +421,7 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         headline_rank="E",
     )
 
-    assert assessment.collapse_risk_score == 8
+    assert assessment.collapse_risk_score == 9
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
@@ -423,7 +452,7 @@ def test_position_assessment_requires_all_three_momentum_marks_to_fail():
     assert assessment.hold_judgement == "◎"
 
 
-def test_position_assessment_counts_declining_ma5_as_collapse_risk():
+def test_position_assessment_scores_non_positive_ma5_slope_as_collapse_risk():
     assessment = build_technical_position_assessment(
         latest=101.0,
         vwap=100.0,
@@ -446,7 +475,7 @@ def test_position_assessment_counts_declining_ma5_as_collapse_risk():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 1
+    assert assessment.collapse_risk_score == 2
     assert assessment.collapse_risk_label == "崩れ軽微"
 
 
