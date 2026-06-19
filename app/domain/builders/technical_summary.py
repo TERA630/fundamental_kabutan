@@ -21,7 +21,7 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
             [
                 f"## {rank} {RANK_LABELS[rank]}",
                 "",
-                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 出来高比 | 前日VWAP維持 | 支持線 | 抵抗線 | 60日レンジ |",
+                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 出来高比 | 崩れスコア | 支持線 | 抵抗線 | 60日レンジ |",
                 "|---|---:|---:|---:|---:|---:|---:|---|---|---|---:|",
             ]
         )
@@ -72,7 +72,7 @@ def _format_row(row: TechnicalSummaryRow) -> str:
         f"| {_fmt_vwap(row)} "
         f"| {_fmt_dev25(row)} "
         f"| {_fmt_pct_unsigned(row.volume_vs_avg20_pct)} "
-        f"| {_fmt_bool(row.previous_vwap_maintained)} "
+        f"| {_fmt_collapse_score(row.collapse_risk_score)} "
         f"| {_fmt_lines(row.support_lines)} "
         f"| {_fmt_resistance_lines(row.resistance_lines)} "
         f"| {_fmt_position(row.recent60_range_position)} |"
@@ -111,6 +111,12 @@ def _fmt_bool(value: bool | None) -> str:
     if value is None:
         return "N/A"
     return "○" if value else "×"
+
+
+def _fmt_collapse_score(value: int | None) -> str:
+    if value is None:
+        return "N/A"
+    return str(value)
 
 
 def _fmt_price(value: float | None) -> str:

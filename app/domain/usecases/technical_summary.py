@@ -11,9 +11,11 @@ from app.domain.models.technical_summary import (
 )
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 from app.domain.policies.technical_summary import (
+    RANK_ORDER,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     build_technical_headline_summary,
+    build_technical_position_assessment,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
@@ -42,7 +44,7 @@ class TechnicalSummaryService:
             except Exception as exc:
                 skipped.append(SkippedTechnicalSummaryStock(name=name, code4=code4, reason=str(exc)))
         us_market = self.build_us_market_summary() if self.build_us_market_summary is not None else None
-        return TechnicalSummaryTable(rows=tuple(rows), skipped=tuple(skipped), us_market=us_market)
+        return TechnicalSummaryTable(rows=_sort_rows_by_rank_and_collapse_score(rows), skipped=tuple(skipped), us_market=us_market)
 
     def build_summary_row(self, result: TechnicalAnalysisResult) -> TechnicalSummaryRow:
         snapshot = result.snapshot
@@ -108,6 +110,30 @@ class TechnicalSummaryService:
             low_highers=tuple(session.low_higher for session in momentum_sessions),
             high_breakouts=tuple(session.high_breakout for session in momentum_sessions),
         )
+        position_assessment = build_technical_position_assessment(
+            latest=latest,
+            vwap=vwap,
+            ma25=moving_average.ma25,
+            ma5=getattr(moving_average, "ma5", None),
+            ma5_prev1=getattr(moving_average, "ma5_prev1", None),
+            ma5_slope=getattr(moving_average, "ma5_slope", None),
+            ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
+            ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
+            ma25_prev5=moving_average.ma25_prev5,
+            atr14=getattr(snapshot.range, "atr14", None),
+            day_open=evaluation_open,
+            day_high=evaluation_high,
+            day_low=evaluation_low,
+            day_close_position=day_close_position,
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
+            high_breakouts=tuple(session.high_breakout for session in momentum_sessions),
+            low_highers=tuple(session.low_higher for session in momentum_sessions),
+            previous_low=previous.prev_low,
+            recent20_low=breakline.recent20_low,
+            ma75=moving_average.ma75,
+            recent60_low=breakline.recent60_low,
+            headline_rank=headline.rank,
+        )
         return TechnicalSummaryRow(
             name=result.name,
             code4=result.code4,
@@ -156,6 +182,7 @@ class TechnicalSummaryService:
                 ma25=moving_average.ma25,
             ),
             recent60_range_position=breakline.recent60_range_position,
+            collapse_risk_score=position_assessment.collapse_risk_score,
             headline_comment=headline.comment,
             next_action=headline.next_action,
         )
@@ -220,6 +247,22 @@ def _safe_div(value: float | None, divisor: float | None) -> float | None:
 
 def _count_true(values: Iterable[bool | None]) -> int:
     return sum(1 for value in values if value is True)
+
+
+_COLLAPSE_SCORE_SORT_RANKS = frozenset(("B2", "B1", "A2", "A1", "A1弱", "C2", "C1"))
+_RANK_ORDER_INDEX = {rank: index for index, rank in enumerate(RANK_ORDER)}
+
+
+def _sort_rows_by_rank_and_collapse_score(rows: list[TechnicalSummaryRow]) -> tuple[TechnicalSummaryRow, ...]:
+    def sort_key(item: tuple[int, TechnicalSummaryRow]) -> tuple[int, int, int]:
+        original_index, row = item
+        score = row.collapse_risk_score if row.collapse_risk_score is not None else 10**9
+        rank_index = _RANK_ORDER_INDEX.get(row.rank, len(RANK_ORDER))
+        if row.rank in _COLLAPSE_SCORE_SORT_RANKS:
+            return (rank_index, score, original_index)
+        return (rank_index, original_index, original_index)
+
+    return tuple(row for _, row in sorted(enumerate(rows), key=sort_key))
 
 
 __all__ = ["TechnicalSummaryService"]

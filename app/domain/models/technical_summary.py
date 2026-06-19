@@ -62,6 +62,7 @@ class TechnicalSummaryRow:
     support_lines: tuple[TechnicalSummaryLine, ...]
     resistance_lines: tuple[TechnicalSummaryLine, ...]
     recent60_range_position: float | None
+    collapse_risk_score: int | None = None
     headline_comment: str = ""
     next_action: str = ""
 

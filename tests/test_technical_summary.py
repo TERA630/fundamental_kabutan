@@ -570,13 +570,45 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert isinstance(table, TechnicalSummaryTable)
     assert table.rows[0].rank == "A1弱"
     assert table.rows[0].previous_vwap_maintained is False
+    assert table.rows[0].collapse_risk_score == 0
     assert table.rows[0].headline_comment == "良好だが、短期逆行も多い。"
     assert "## A1弱 押し目候補" in markdown
     assert "## 冒頭短評" not in markdown
     assert "A1弱 押し目候補｜良好だが、短期逆行も多い。" not in markdown
+    assert "崩れスコア" in markdown
+    assert "前日VWAP維持" not in markdown
+    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) | 120% | 0 |" in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown
+
+
+def test_technical_summary_service_sorts_above_ma25_ranks_by_collapse_score():
+    rows_by_code = {
+        "1111": _summary_row(name="Score3", code4="1111", rank="A1", collapse_risk_score=3),
+        "2222": _summary_row(name="Score1A", code4="2222", rank="A1", collapse_risk_score=1),
+        "3333": _summary_row(name="Score1B", code4="3333", rank="A1", collapse_risk_score=1),
+        "4444": _summary_row(name="C2Score2", code4="4444", rank="C2", collapse_risk_score=2),
+        "5555": _summary_row(name="C2Score0", code4="5555", rank="C2", collapse_risk_score=0),
+    }
+
+    class RowSortingService(TechnicalSummaryService):
+        def build_summary_row(self, result):
+            return result
+
+    service = RowSortingService(lambda _name, code4: rows_by_code[code4])
+    table = service.build_summary_table(
+        [
+            ("Score3", "1111"),
+            ("Score1A", "2222"),
+            ("Score1B", "3333"),
+            ("C2Score2", "4444"),
+            ("C2Score0", "5555"),
+        ]
+    )
+
+    assert [row.code4 for row in table.rows if row.rank == "A1"] == ["2222", "3333", "1111"]
+    assert [row.code4 for row in table.rows if row.rank == "C2"] == ["5555", "4444"]
 
 
 def test_us_market_summary_service_builds_rows_and_skips_failures():
@@ -645,6 +677,7 @@ def test_technical_summary_html_does_not_render_headline_table():
                 support_lines=(),
                 resistance_lines=(),
                 recent60_range_position=0.75,
+                collapse_risk_score=2,
                 headline_comment="順張り可。過熱なし。",
                 next_action="深押し、VWAP回復、後場VWAP維持は可。追加買いは条件付き可。",
             ),
@@ -657,6 +690,9 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "technical-summary-headline-table" not in html
     assert "A1 位置良好｜順張り可。過熱なし。" not in html
     assert "AIテスト(1234)" in html
+    assert "崩れスコア" in html
+    assert "前日VWAP維持" not in html
+    assert "<td>2</td>" in html
 
 
 def test_technical_summary_html_renders_us_market_section():
@@ -683,3 +719,36 @@ def test_technical_summary_html_renders_us_market_section():
     assert "US Market 2026-06-17 09:00" in html
     assert "NASDAQ総合" in html
     assert "+4.5%" in html
+
+
+def _summary_row(
+    *,
+    name: str,
+    code4: str,
+    rank: str,
+    collapse_risk_score: int,
+) -> TechnicalSummaryRow:
+    return TechnicalSummaryRow(
+        name=name,
+        code4=code4,
+        rank=rank,
+        rank_label="",
+        latest=100.0,
+        day_change_price=0.0,
+        day_change_pct=0.0,
+        three_session_change_pct=0.0,
+        day_high=101.0,
+        day_low=99.0,
+        day_close_position=0.5,
+        day_range_atr=1.0,
+        vwap=100.0,
+        vwap_diff_pct=0.0,
+        dev25_pct=6.0,
+        ma25_distance_atr=1.0,
+        volume_vs_avg20_pct=100.0,
+        previous_vwap_maintained=None,
+        support_lines=(),
+        resistance_lines=(),
+        recent60_range_position=0.5,
+        collapse_risk_score=collapse_risk_score,
+    )

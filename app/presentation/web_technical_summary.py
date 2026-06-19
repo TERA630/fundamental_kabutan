@@ -6,7 +6,7 @@ from html import escape
 
 from app.domain.builders.technical_summary import (
     _fmt_atr,
-    _fmt_bool,
+    _fmt_collapse_score,
     _fmt_current,
     _fmt_day_range,
     _fmt_dev25,
@@ -40,7 +40,7 @@ def build_technical_summary_html(table: TechnicalSummaryTable) -> str:
         sections.append(
             "<thead><tr>"
             "<th>銘柄</th><th>現在値</th><th>3日騰落</th><th>当日レンジ</th><th>VWAP</th>"
-            "<th>25ME dev</th><th>出来高比</th><th>前日VWAP維持</th>"
+            "<th>25ME dev</th><th>出来高比</th><th>崩れスコア</th>"
             "<th>支持線</th><th>抵抗線</th><th>60D Pos</th>"
             "</tr></thead><tbody>"
         )
@@ -97,7 +97,7 @@ def _build_row_html(row: TechnicalSummaryRow) -> str:
         _fmt_vwap(row),
         _fmt_dev25(row),
         _fmt_pct_unsigned(row.volume_vs_avg20_pct),
-        _fmt_bool(row.previous_vwap_maintained),
+        _fmt_collapse_score(row.collapse_risk_score),
         _fmt_lines(row.support_lines),
         _fmt_lines(row.resistance_lines),
         _fmt_position(row.recent60_range_position),
