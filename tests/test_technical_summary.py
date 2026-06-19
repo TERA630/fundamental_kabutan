@@ -299,6 +299,24 @@ def test_upper_price_stalling_uses_45_percent_wick_boundary():
     assert at_boundary.collapse_state_label == "崩れ警戒"
 
 
+def test_below_ma25_headline_omits_ranking_collapse_label():
+    d_headline = build_technical_headline_summary(
+        dev25_pct=-3.0,
+        latest=105.0,
+        vwap=100.0,
+    )
+    e_headline = build_technical_headline_summary(
+        dev25_pct=-3.0,
+        latest=95.0,
+        vwap=100.0,
+    )
+
+    assert d_headline.rank == "D1"
+    assert d_headline.collapse_state_label is None
+    assert e_headline.rank == "E"
+    assert e_headline.collapse_state_label is None
+
+
 def test_volume_comment_parts_follow_boundaries():
     assert build_volume_comment(59.9) == "出来高薄い"
     assert build_volume_comment(60.0) == "出来高やや薄い"

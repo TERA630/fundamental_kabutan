@@ -18,7 +18,7 @@ class TechnicalHeadlineSummary:
     rank_label: str
     comment: str
     next_action: str
-    collapse_state_label: str = "崩れ条件なし"
+    collapse_state_label: str | None = "崩れ条件なし"
 
     @property
     def text(self) -> str:

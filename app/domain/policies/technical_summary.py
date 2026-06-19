@@ -467,7 +467,7 @@ def build_technical_headline_summary(
     )
     comment = HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
-    collapse_state_label = "崩れ条件なし"
+    collapse_state_label = None
     if dev25_pct >= 0:
         collapse_state_label = _evaluate_above_ma25_ranking_collapse(
             latest=latest,
