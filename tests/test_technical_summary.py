@@ -182,7 +182,7 @@ def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
     assert headline.collapse_state_label == "要確認"
 
 
-def test_two_point_above_ma25_collapse_conditions_keep_base_rank():
+def test_two_point_above_ma25_collapse_conditions_keep_base_rank_as_check_needed():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
         latest=106.0,
@@ -194,19 +194,58 @@ def test_two_point_above_ma25_collapse_conditions_keep_base_rank():
     )
 
     assert headline.rank == "A1"
-    assert headline.collapse_state_label == "軽度警戒"
+    assert headline.collapse_state_label == "要確認"
 
 
-def test_three_point_above_ma25_collapse_conditions_fall_to_c2():
+def test_three_point_above_ma25_collapse_conditions_keep_base_rank():
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=107.0,
+        high_breakouts=(False, False, False),
+        low_highers=(False, False, False),
+        high_breakout_count=0,
+        low_higher_count=0,
+    )
+
+    assert headline.rank == "A1"
+    assert headline.collapse_state_label == "要確認"
+
+
+def test_mid_score_with_bad_price_structure_falls_to_c2():
     assert (
         classify_technical_summary_rank(
             dev25_pct=6.0,
             latest=106.0,
-            vwap=107.0,
-            high_breakouts=(False, False, False),
+            vwap=105.0,
+            ma25=100.0,
+            ma25_prev5=100.0,
+            atr14=2.0,
             low_highers=(False, False, False),
-            high_breakout_count=0,
+            high_breakouts=(False, False, False),
             low_higher_count=0,
+            high_breakout_count=0,
+        )
+        == "C2"
+    )
+
+
+def test_high_score_falls_to_c2_even_without_immediate_trigger():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=6.0,
+            latest=106.0,
+            vwap=105.0,
+            ma25=100.0,
+            ma25_prev5=100.0,
+            ma5_slope=1.0,
+            ma5_slope_prev=2.0,
+            ma5_slope_3d_ago=3.0,
+            atr14=2.0,
+            low_highers=(False, False, False),
+            high_breakouts=(False, False, False),
+            low_higher_count=0,
+            high_breakout_count=0,
         )
         == "C2"
     )
@@ -221,7 +260,7 @@ def test_ma5_score_two_points_only_keeps_base_rank():
     )
 
     assert headline.rank == "A1"
-    assert headline.collapse_state_label == "軽度警戒"
+    assert headline.collapse_state_label == "要確認"
 
 
 def test_ma5_score_with_price_structure_falls_to_c2():
@@ -643,7 +682,7 @@ def test_position_assessment_counts_volume_with_upper_price_stalling():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 0
+    assert assessment.collapse_risk_score == 1
     assert assessment.collapse_risk_level == "低"
 
 
