@@ -104,7 +104,7 @@ Web UI では以下の構造を想定する。
 
 ### 5.3 Technical Summary 表示構造
 
-Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、60日レンジ判定、前日評価の仕様は `docs/technical_summary_ranking_spec.md` を正とする。
+Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、ランク表示順、60日レンジ判定、前日評価の仕様は `docs/technical_ranking_spec.md` を正とする。
 
 表示順は `docs/technical_summary_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、崩れスコアの低い順とする。同点の場合は WatchList の順序を維持する。
 
@@ -203,20 +203,20 @@ Technical Summary 一覧では、冒頭短評のまとめテーブルは表示�
 単一銘柄 Technical 出力では、判断を速くするための短評を表示する。短評は1銘柄につき次の形式で表示する。
 
 ```text
-{25日線位置コメント}｜{出来高コメント}｜崩れ {score}/9：{collapse_risk_label}
+{ランク} {表示名} {位置の説明}
 ```
 
 例:
 
 ```text
-25日線上・支持維持｜出来高通常｜崩れ 1/9：崩れ軽微
-25日線下・奪回待ち｜出来高やや薄い｜崩れ 4/9：崩れ警戒
+A1 位置良好 リターン良好、買い候補
+C2 崩れ警戒 監視のみ
 ```
 
-短評は25日線乖離率、当日出来高の20日平均比、崩れ警戒スコアから生成する。判定ロジックと文言は domain 層の純粋関数で行う。Markdown / HTML への整形は builder / presentation 層で行い、GUI層には判定ロジックを書かない。
+短評はTechnicalランク、ランク表示名、ランク別の位置説明から生成する。判定ロジックと文言は domain 層の純粋関数で行う。Markdown / HTML への整形は builder / presentation 層で行い、GUI層には判定ロジックを書かない。
 
 ランキング分類条件、判定優先順位、D1 / D2 / D3 の売買行動、補助ラベルは
-`docs/technical_summary_ranking_spec.md` を正とする。
+`docs/technical_ranking_spec.md` を正とする。
 
 表示仕様として、25日線以上は順張り押し目・過熱管理、25日線未満は
 底打ち確認・戻り売り警戒として見せる。分類ロジックは domain 層の純粋関数に置き、
@@ -235,14 +235,14 @@ Technical Summary 一覧の Markdown / Web UI には短評専用テーブルを�
 表示形式は次の通り。
 
 ```text
-短評：{25日線位置コメント}｜{出来高コメント}｜崩れ {score}/9：{collapse_risk_label}
+短評：{ランク} {表示名} {位置の説明}
 ```
 
-D1 / D2 / D3の詳細分類は戦略判定の材料として残すが、単一銘柄詳細画面の短評文言には使わない。
+D1 / D2 / D3の詳細分類は戦略判定の材料として残すが、単一銘柄詳細画面の短評文言には使わない。D / E 系の短評は従来のランク表示名と既存コメントを使う。
 
 ```text
-短評：25日線上・上方乖離｜出来高通常｜崩れ 1/9：崩れ軽微
-短評：25日線下・奪回接近｜出来高伴う｜崩れ 2/9：軽度崩れ
+短評：A1 位置良好 リターン良好、買い候補
+短評：D1 戻り途中 25日線奪回待ち。上値確認中。
 ```
 
 ランキング一覧上のコードはD1/D2/D3のままとし、D1a/D1bとD3強弱は戦略判定用の内部分類として扱う。
@@ -260,16 +260,17 @@ D1 / D2 / D3の詳細分類は戦略判定の材料として残すが、単一�
 D系では詳細分類ごとに評価記号と文言を切り替え、ATR指値帯とRRを可能な範囲で
 価格へ展開する。必要値が欠損する場合は `指値算出不可` または `RR算出不可` とする。
 RR定義、D2からD3への昇格条件、地合い条件の扱いは
-`docs/technical_summary_ranking_spec.md` のD系詳細戦略判定を参照する。
+`docs/technical_ranking_spec.md` のD系詳細戦略判定を参照する。
 
 単一銘柄 Technical 出力では、ランク別テーブル用の `TechnicalSummaryRow` ではなく、`TechnicalAnalysisResult` から同じ domain policy を使って短評を作る。文字列化は `app/domain/builders/technical_output.py` が担当する。
 
 #### 5.7.3 実装上の変更点
 
-- C2 の表示名は、既存実装の `回復途上` から `崩れ警戒` へ変更する。
-- B1 の表示名は、既存実装の `過熱後半` から `上昇後半` へ変更する。
-- 25日線下でVWAP上の分類は、既存実装の `C2` から `D1` / `D3` へ分ける。
-- 既存の `TechnicalSummaryRank` は `D1` / `D2` / `D3` を追加する。
+- C2 の表示名は `崩れ警戒` とする。
+- B1 の表示名は `過熱後半` とする。
+- A1弱 は、A1とC1の間に置く25日線上の押し目候補ランクとして扱う。
+- 25日線下でVWAP上の分類は `D1` / `D3` へ分ける。
+- `TechnicalSummaryRank` は `B2` / `B1` / `A2` / `A1` / `A1弱` / `C2` / `C1` / `D1` / `D2` / `D3` / `E` を扱う。
 - 監視銘柄 Technical Summary と単一銘柄 Technical 出力は、同じ分類・短評生成 policy を共有する。
 
 ## 6. 画面操作フロー

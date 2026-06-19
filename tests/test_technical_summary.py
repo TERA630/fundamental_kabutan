@@ -11,7 +11,7 @@ from app.domain.policies.technical_summary import (
     build_d3_detail,
     build_d_detail_headline,
     build_dev25_risk_label,
-    build_ma25_position_comment,
+    build_ma5_slope_short_comment,
     build_technical_headline_summary,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
@@ -124,54 +124,56 @@ def test_build_d_strategy_lines_cover_detail_classifications():
     assert "RR2.0以上で最小ロット（RR2.20）" in d3_weak[0]
 
 
-def test_classify_technical_summary_rank_uses_focus_theme_thresholds():
-    assert classify_technical_summary_rank(dev25_pct=4.5, latest=105, vwap=100, focus_theme=True) == "A2"
-    assert classify_technical_summary_rank(dev25_pct=7.5, latest=105, vwap=100, focus_theme=True) == "B1"
-    assert classify_technical_summary_rank(dev25_pct=6.5, latest=105, vwap=100, focus_theme=False) == "A2"
+def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
+    assert classify_technical_summary_rank(dev25_pct=12.0, latest=112, vwap=100) == "B2"
+    assert classify_technical_summary_rank(dev25_pct=10.0, latest=110, vwap=100) == "B1"
+    assert classify_technical_summary_rank(dev25_pct=8.5, latest=108.5, vwap=100) == "A2"
+    assert classify_technical_summary_rank(dev25_pct=6.5, latest=106.5, vwap=100) == "A1"
+    assert classify_technical_summary_rank(dev25_pct=4.5, latest=104.5, vwap=100) == "A1弱"
+    assert classify_technical_summary_rank(dev25_pct=3.5, latest=103.5, vwap=100) == "C1"
     assert (
         classify_technical_summary_rank(
             dev25_pct=8.5,
-            latest=95,
+            latest=108.5,
             vwap=100,
-            focus_theme=False,
             recent60_range_position=0.85,
         )
         == "B1"
     )
-
-
-def test_a2_label_describes_uptrend_continuation_not_overheat():
-    headline = build_technical_headline_summary(
-        dev25_pct=4.5,
-        latest=105.0,
-        vwap=100.0,
-    )
-
-    assert headline.rank == "A2"
-    assert headline.rank_label == "上昇継続"
-
-
-def test_b2_classification_does_not_require_volume_surge():
     assert (
         classify_technical_summary_rank(
             dev25_pct=10.0,
             latest=110.0,
-            vwap=109.0,
-            focus_theme=False,
-            volume_vs_avg20_pct=40.0,
+            vwap=100.0,
+            ma25_distance_atr=3.01,
         )
         == "B2"
     )
 
 
-def test_short_comment_parts_follow_boundaries():
-    assert build_ma25_position_comment(3.0) == "25日線上・上方乖離"
-    assert build_ma25_position_comment(0.0) == "25日線上・支持維持"
-    assert build_ma25_position_comment(-4.0) == "25日線下・奪回接近"
-    assert build_ma25_position_comment(-8.0) == "25日線下・奪回待ち"
-    assert build_ma25_position_comment(-8.1) == "25日線下・深い位置"
-    assert build_ma25_position_comment(None) == "25日線位置N/A"
+def test_a2_label_describes_mild_overheat():
+    headline = build_technical_headline_summary(
+        dev25_pct=8.5,
+        latest=108.5,
+        vwap=100.0,
+    )
 
+    assert headline.rank == "A2"
+    assert headline.rank_label == "やや過熱"
+
+
+def test_c2_classification_uses_above_ma25_collapse_conditions():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=6.0,
+            latest=106.0,
+            vwap=107.0,
+        )
+        == "C2"
+    )
+
+
+def test_volume_comment_parts_follow_boundaries():
     assert build_volume_comment(59.9) == "出来高薄い"
     assert build_volume_comment(60.0) == "出来高やや薄い"
     assert build_volume_comment(80.0) == "出来高通常"
@@ -180,10 +182,38 @@ def test_short_comment_parts_follow_boundaries():
     assert build_volume_comment(None) == "出来高N/A"
 
 
+def test_ma5_slope_short_comment_follows_score_details():
+    assert build_ma5_slope_short_comment(ma5_slope=1.0) == "5日線良好"
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=-0.1,
+            ma5_slope_prev=-0.2,
+            ma5_slope_3d_ago=-0.3,
+        )
+        == "5日線下向き"
+    )
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=0.1,
+            ma5_slope_prev=0.3,
+            ma5_slope_3d_ago=0.2,
+        )
+        == "5日線鈍化・5日線失速"
+    )
+    assert (
+        build_ma5_slope_short_comment(
+            ma5_slope=-0.3,
+            ma5_slope_prev=-0.1,
+            ma5_slope_3d_ago=0.0,
+        )
+        == "5日線悪化"
+    )
+
+
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
-    assert classify_technical_summary_rank(dev25_pct=3.0, latest=95, vwap=100, focus_theme=False) == "C1"
-    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100, focus_theme=False) == "D1"
-    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100, focus_theme=False) == "E"
+    assert classify_technical_summary_rank(dev25_pct=3.0, latest=103, vwap=100) == "C1"
+    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100) == "D1"
+    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100) == "E"
 
 
 def test_classify_technical_summary_rank_covers_bottoming_start():
@@ -192,7 +222,6 @@ def test_classify_technical_summary_rank_covers_bottoming_start():
             dev25_pct=-3.0,
             latest=105,
             vwap=100,
-            focus_theme=False,
             high_breakout_count=1,
             low_higher_count=2,
             day_close_position=0.65,
@@ -207,7 +236,6 @@ def test_d2_bottoming_candidate_requires_support_rebound_and_vwap_proximity():
         dev25_pct=-6.0,
         latest=99.0,
         vwap=100.0,
-        focus_theme=False,
         day_open=99.6,
         day_high=100.0,
         day_low=97.4,
@@ -269,7 +297,6 @@ def test_d3_requires_vwap_maintenance_but_not_volume():
         dev25_pct=-12.0,
         latest=105.0,
         vwap=100.0,
-        focus_theme=False,
         high_breakout_count=1,
         low_higher_count=2,
         day_close_position=0.65,
@@ -303,7 +330,6 @@ def test_d2_excludes_clear_support_break_and_missing_direct_support():
     common = dict(
         dev25_pct=-6.0,
         vwap=100.0,
-        focus_theme=False,
         day_open=99.0,
         day_high=100.0,
         day_close_position=0.6,
@@ -338,7 +364,6 @@ def test_d2_exclusion_falls_to_downtrend():
             dev25_pct=-6.0,
             latest=97.8,
             vwap=100.0,
-            focus_theme=False,
             day_open=99.0,
             day_high=100.0,
             day_low=97.6,
@@ -396,7 +421,7 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         headline_rank="E",
     )
 
-    assert assessment.collapse_risk_score == 8
+    assert assessment.collapse_risk_score == 9
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
@@ -427,7 +452,7 @@ def test_position_assessment_requires_all_three_momentum_marks_to_fail():
     assert assessment.hold_judgement == "◎"
 
 
-def test_position_assessment_counts_declining_ma5_as_collapse_risk():
+def test_position_assessment_scores_non_positive_ma5_slope_as_collapse_risk():
     assessment = build_technical_position_assessment(
         latest=101.0,
         vwap=100.0,
@@ -450,7 +475,7 @@ def test_position_assessment_counts_declining_ma5_as_collapse_risk():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 1
+    assert assessment.collapse_risk_score == 2
     assert assessment.collapse_risk_label == "崩れ軽微"
 
 
@@ -517,9 +542,9 @@ def test_technical_summary_service_builds_row_and_markdown():
                 volume_avg20=1000.0,
             ),
             moving_average=SimpleNamespace(
-                ma25=101.0,
+                ma25=100.0,
                 ma75=95.0,
-                ma25_prev5=101.0,
+                ma25_prev5=99.0,
                 dev25_pct=3.96,
                 ma25_distance_atr=0.8,
             ),
@@ -543,12 +568,12 @@ def test_technical_summary_service_builds_row_and_markdown():
     markdown = build_technical_summary_markdown(table)
 
     assert isinstance(table, TechnicalSummaryTable)
-    assert table.rows[0].rank == "A1"
+    assert table.rows[0].rank == "A1弱"
     assert table.rows[0].previous_vwap_maintained is False
-    assert table.rows[0].headline_comment == "順張り可。過熱なし。"
-    assert "## A1 位置良好" in markdown
+    assert table.rows[0].headline_comment == "良好だが、短期逆行も多い。"
+    assert "## A1弱 押し目候補" in markdown
     assert "## 冒頭短評" not in markdown
-    assert "A1 位置良好｜順張り可。過熱なし。" not in markdown
+    assert "A1弱 押し目候補｜良好だが、短期逆行も多い。" not in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown

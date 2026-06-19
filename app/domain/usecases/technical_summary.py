@@ -14,7 +14,6 @@ from app.domain.policies.technical_summary import (
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     build_technical_headline_summary,
-    is_focus_theme,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
@@ -82,8 +81,12 @@ class TechnicalSummaryService:
             dev25_pct=dev25_pct,
             latest=latest,
             vwap=vwap,
-            focus_theme=is_focus_theme(result.name),
             ma25_distance_atr=ma25_distance_atr,
+            ma5=getattr(moving_average, "ma5", None),
+            ma5_prev1=getattr(moving_average, "ma5_prev1", None),
+            ma5_slope=getattr(moving_average, "ma5_slope", None),
+            ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
+            ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
             ma25=moving_average.ma25,
             ma25_prev5=moving_average.ma25_prev5,
             rsi14=getattr(snapshot, "rsi14", None),
@@ -103,6 +106,7 @@ class TechnicalSummaryService:
             recent60_low=breakline.recent60_low,
             vwap_maintained_15m=_as_bool(result.vwap_snapshot.get("vwap_maintained_15m")),
             low_highers=tuple(session.low_higher for session in momentum_sessions),
+            high_breakouts=tuple(session.high_breakout for session in momentum_sessions),
         )
         return TechnicalSummaryRow(
             name=result.name,
