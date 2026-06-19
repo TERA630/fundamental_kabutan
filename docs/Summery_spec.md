@@ -106,7 +106,7 @@ Web UI では以下の構造を想定する。
 
 Technical Summary は、監視銘柄を Technical Summary ランクごとに分類し、ランクごとのセクションにテーブル表示する。ランク判定、ランク表示順、60日レンジ判定、前日評価の仕様は `docs/technical_ranking_spec.md` を正とする。
 
-表示順は `docs/technical_summary_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、崩れスコアの低い順とする。同点の場合は WatchList の順序を維持する。
+表示順は `docs/technical_ranking_spec.md` の Technical ランク順に従う。各セクション内の銘柄順は、崩れスコアの低い順とする。同点の場合は WatchList の順序を維持する。
 
 Technical Summary の列は次の通り。
 

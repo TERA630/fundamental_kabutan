@@ -249,6 +249,56 @@ def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
     )
 
 
+def test_b_ranks_keep_rank_even_when_collapse_condition_is_strong():
+    b2 = build_technical_headline_summary(
+        dev25_pct=12.0,
+        latest=112.0,
+        vwap=113.0,
+        atr14=2.0,
+        day_close_position=0.3,
+    )
+    b1 = build_technical_headline_summary(
+        dev25_pct=10.0,
+        latest=110.0,
+        vwap=111.0,
+        atr14=2.0,
+        day_close_position=0.3,
+    )
+
+    assert b2.rank == "B2"
+    assert b2.collapse_state_label == "崩れ警戒"
+    assert b1.rank == "B1"
+    assert b1.collapse_state_label == "崩れ警戒"
+
+
+def test_upper_price_stalling_uses_45_percent_wick_boundary():
+    below_boundary = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=112.0,
+        vwap=100.0,
+        day_open=110.0,
+        day_high=120.0,
+        day_low=100.0,
+        day_close_position=0.3,
+        volume_vs_avg20_pct=120.0,
+    )
+    at_boundary = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=111.0,
+        vwap=100.0,
+        day_open=110.0,
+        day_high=120.0,
+        day_low=100.0,
+        day_close_position=0.3,
+        volume_vs_avg20_pct=120.0,
+    )
+
+    assert below_boundary.rank == "A1"
+    assert below_boundary.collapse_state_label == "要確認"
+    assert at_boundary.rank == "C2"
+    assert at_boundary.collapse_state_label == "崩れ警戒"
+
+
 def test_volume_comment_parts_follow_boundaries():
     assert build_volume_comment(59.9) == "出来高薄い"
     assert build_volume_comment(60.0) == "出来高やや薄い"

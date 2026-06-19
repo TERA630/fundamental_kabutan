@@ -98,6 +98,9 @@ class _RankingCollapseAssessment:
     label: str
     c2_fall: bool
 
+
+UPPER_STALL_WICK_RATIO = 0.45
+
 STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
     "A1": (
         "前場深押し○：支持線付近 {support_range}円で検討。約定後はVWAP回復・維持を確認。",
@@ -1173,7 +1176,7 @@ def _is_upper_price_stalling(
         return False
     body = abs(latest - day_open)
     upper_wick = day_high - max(day_open, latest)
-    return upper_wick / day_range >= 0.35 and upper_wick >= body * 1.5
+    return upper_wick / day_range >= UPPER_STALL_WICK_RATIO and upper_wick >= body * 1.5
 
 
 __all__ = [
