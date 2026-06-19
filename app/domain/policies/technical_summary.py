@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.domain.models.technical_summary import (
     TechnicalHeadlineSummary,
     TechnicalPositionAssessment,
@@ -88,6 +90,13 @@ D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
     "D3": "小さく可。出来高確認",
     "D3弱": "監視寄り。出来高不足",
 }
+
+
+@dataclass(frozen=True)
+class _RankingCollapseAssessment:
+    score: int
+    label: str
+    c2_fall: bool
 
 STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
     "A1": (
@@ -322,7 +331,7 @@ def classify_technical_summary_rank(
         return "B1"
 
     if dev25_pct >= 0:
-        collapse_condition = _has_above_ma25_collapse_condition(
+        collapse_assessment = _evaluate_above_ma25_ranking_collapse(
             latest=latest,
             vwap=vwap,
             ma5=ma5,
@@ -347,7 +356,7 @@ def classify_technical_summary_rank(
             ma75=ma75,
             recent60_low=recent60_low,
         )
-        if collapse_condition:
+        if collapse_assessment.c2_fall:
             return "C2"
         if dev25_pct >= 8:
             return "A2"
@@ -455,11 +464,39 @@ def build_technical_headline_summary(
     )
     comment = HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
+    collapse_state_label = "崩れ条件なし"
+    if dev25_pct >= 0:
+        collapse_state_label = _evaluate_above_ma25_ranking_collapse(
+            latest=latest,
+            vwap=vwap,
+            ma5=ma5,
+            ma5_prev1=ma5_prev1,
+            ma5_slope=ma5_slope,
+            ma5_slope_prev=ma5_slope_prev,
+            ma5_slope_3d_ago=ma5_slope_3d_ago,
+            ma25=ma25,
+            ma25_prev5=ma25_prev5,
+            atr14=atr14,
+            day_open=day_open,
+            day_high=day_high,
+            day_low=day_low,
+            day_close_position=day_close_position,
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
+            high_breakout_count=high_breakout_count,
+            low_higher_count=low_higher_count,
+            high_breakouts=high_breakouts,
+            low_highers=low_highers,
+            previous_low=previous_low,
+            recent20_low=recent20_low,
+            ma75=ma75,
+            recent60_low=recent60_low,
+        ).label
     return TechnicalHeadlineSummary(
         rank=rank,
         rank_label=RANK_LABELS[rank],
         comment=comment,
         next_action=next_action,
+        collapse_state_label=collapse_state_label,
     )
 
 
@@ -604,6 +641,7 @@ def build_technical_position_assessment(
 def build_technical_short_comment(
     *,
     rank: TechnicalSummaryRank,
+    collapse_state_label: str | None = None,
     ma5_slope: float | None = None,
     ma5_slope_prev: float | None = None,
     ma5_slope_3d_ago: float | None = None,
@@ -613,7 +651,8 @@ def build_technical_short_comment(
         ma5_slope_prev=ma5_slope_prev,
         ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
-    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}｜{ma5_comment}"
+    collapse_part = f"｜{collapse_state_label}" if collapse_state_label else ""
+    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{collapse_part}｜{ma5_comment}"
 
 
 def build_ma5_slope_short_comment(
@@ -809,7 +848,7 @@ def _has_b1_overheat_condition(
     )
 
 
-def _has_above_ma25_collapse_condition(
+def _evaluate_above_ma25_ranking_collapse(
     *,
     latest: float,
     vwap: float,
@@ -834,7 +873,7 @@ def _has_above_ma25_collapse_condition(
     recent20_low: float | None,
     ma75: float | None,
     recent60_low: float | None,
-) -> bool:
+) -> _RankingCollapseAssessment:
     support_distance_atr = _nearest_support_distance_atr(
         latest=latest,
         atr14=atr14,
@@ -851,24 +890,53 @@ def _has_above_ma25_collapse_condition(
         day_low=day_low,
     )
     resolved_ma5_slope = _resolve_ma5_slope(ma5_slope, ma5, ma5_prev1)
-    return any(
+    ma5_score = _ma5_slope_score(
+        ma5_slope=resolved_ma5_slope,
+        ma5_slope_prev=ma5_slope_prev,
+        ma5_slope_3d_ago=ma5_slope_3d_ago,
+        capped=False,
+    )
+    vwap_break = latest < vwap
+    vwap_clear_break = atr14 not in (None, 0) and latest < vwap - 0.2 * atr14
+    low_higher_failed = _all_false(low_highers) or (bool(low_highers) and low_higher_count == 0)
+    high_breakout_failed = _all_false(high_breakouts) or (bool(high_breakouts) and high_breakout_count == 0)
+    close_position_low = day_close_position is not None and day_close_position < 0.4
+    volume_bearish_or_stalling = _gt(volume_vs_avg20_pct, 100) and bearish_or_stalling
+    support_far = support_distance_atr is not None and support_distance_atr > 0.7
+    ma25_slope_bad = _ma25_slope(ma25, ma25_prev5) in {"down", "flat"}
+    ma5_down = resolved_ma5_slope is not None and resolved_ma5_slope <= 0
+
+    score = 0
+    score += int(vwap_break)
+    score += int(low_higher_failed)
+    score += int(high_breakout_failed)
+    score += int(close_position_low)
+    score += int(volume_bearish_or_stalling)
+    score += int(support_far)
+    score += int(ma25_slope_bad)
+    score += min(ma5_score, 2)
+
+    price_structure_bad = vwap_break or low_higher_failed or close_position_low
+    strong_condition = any(
         (
-            latest < vwap,
-            _all_false(low_highers) or (bool(low_highers) and low_higher_count == 0),
-            _all_false(high_breakouts) or (bool(high_breakouts) and high_breakout_count == 0),
-            day_close_position is not None and day_close_position < 0.4,
-            _gt(volume_vs_avg20_pct, 100) and bearish_or_stalling,
-            support_distance_atr is not None and support_distance_atr > 0.7,
-            _ma25_slope(ma25, ma25_prev5) in {"down", "flat"},
-            _ma5_slope_score(
-                ma5_slope=resolved_ma5_slope,
-                ma5_slope_prev=ma5_slope_prev,
-                ma5_slope_3d_ago=ma5_slope_3d_ago,
-                capped=False,
-            )
-            > 0,
+            vwap_clear_break and close_position_low,
+            vwap_clear_break and low_higher_failed,
+            volume_bearish_or_stalling and close_position_low,
+            ma5_down and vwap_break,
+            ma25_slope_bad and ma5_down,
+            support_far and vwap_break,
         )
     )
+    c2_fall = strong_condition or score >= 3 or (ma5_score >= 2 and price_structure_bad)
+    if c2_fall:
+        label = "崩れ警戒"
+    elif score == 2:
+        label = "軽度警戒"
+    elif score == 1:
+        label = "要確認"
+    else:
+        label = "崩れ条件なし"
+    return _RankingCollapseAssessment(score=score, label=label, c2_fall=c2_fall)
 
 
 def _evaluate_d2_bottoming_candidate(

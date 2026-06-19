@@ -162,12 +162,88 @@ def test_a2_label_describes_mild_overheat():
     assert headline.rank_label == "やや過熱"
 
 
-def test_c2_classification_uses_above_ma25_collapse_conditions():
+def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
     assert (
         classify_technical_summary_rank(
             dev25_pct=6.0,
             latest=106.0,
             vwap=107.0,
+        )
+        == "A1"
+    )
+
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=107.0,
+    )
+
+    assert headline.rank == "A1"
+    assert headline.collapse_state_label == "要確認"
+
+
+def test_two_point_above_ma25_collapse_conditions_keep_base_rank():
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=107.0,
+        high_breakouts=(False, False, False),
+        low_highers=(True, True, True),
+        high_breakout_count=0,
+        low_higher_count=3,
+    )
+
+    assert headline.rank == "A1"
+    assert headline.collapse_state_label == "軽度警戒"
+
+
+def test_three_point_above_ma25_collapse_conditions_fall_to_c2():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=6.0,
+            latest=106.0,
+            vwap=107.0,
+            high_breakouts=(False, False, False),
+            low_highers=(False, False, False),
+            high_breakout_count=0,
+            low_higher_count=0,
+        )
+        == "C2"
+    )
+
+
+def test_ma5_score_two_points_only_keeps_base_rank():
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=105.0,
+        ma5_slope=0.0,
+    )
+
+    assert headline.rank == "A1"
+    assert headline.collapse_state_label == "軽度警戒"
+
+
+def test_ma5_score_with_price_structure_falls_to_c2():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=6.0,
+            latest=106.0,
+            vwap=107.0,
+            ma5_slope=0.0,
+        )
+        == "C2"
+    )
+
+
+def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=6.0,
+            latest=106.0,
+            vwap=107.0,
+            atr14=2.0,
+            day_close_position=0.3,
         )
         == "C2"
     )

@@ -156,6 +156,7 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
     moving_average = result.snapshot.moving_average
     return "短評：" + build_technical_short_comment(
         rank=headline.rank,
+        collapse_state_label=headline.collapse_state_label,
         ma5_slope=getattr(moving_average, "ma5_slope", None),
         ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
         ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
