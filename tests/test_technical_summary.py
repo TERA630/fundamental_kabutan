@@ -8,6 +8,7 @@ from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalS
 from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
 from app.domain.policies.technical_summary import (
     build_d1_detail,
+    build_d2_detail,
     build_d3_detail,
     build_d_detail_headline,
     build_dev25_risk_label,
@@ -70,6 +71,9 @@ def test_build_d_detail_headline_uses_detail_specific_main_judgement():
     )
     assert build_d_detail_headline("D2") == (
         "D2 底打ち候補｜支持線反発待ち｜支持線反発候補。原則VWAP回復待ち"
+    )
+    assert build_d_detail_headline("D2", d2_detail_code="D2弱") == (
+        "D2弱 底打ち候補・弱｜支持線根拠弱い｜支持線根拠が弱い。VWAP回復まで監視"
     )
     assert build_d_detail_headline("D3", volume_vs_avg20_pct=80) == (
         "D3強｜VWAP維持・出来高伴う｜小さく可。D3内で最有力"
@@ -496,6 +500,31 @@ def test_d3_requires_vwap_maintenance_but_not_volume():
     )
 
 
+def test_d3_does_not_require_high_breakout_and_promotes_strong_detail():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=-12.0,
+            latest=105.0,
+            vwap=100.0,
+            high_breakout_count=0,
+            low_higher_count=2,
+            day_close_position=0.65,
+            vwap_maintained_15m=True,
+        )
+        == "D3"
+    )
+    assert build_d3_detail(
+        volume_vs_avg20_pct=40.0,
+        high_breakout_count=1,
+        day_close_position=0.65,
+    ) == ("D3強", "VWAP維持・高値更新")
+    assert build_d3_detail(
+        volume_vs_avg20_pct=40.0,
+        high_breakout_count=0,
+        day_close_position=0.70,
+    ) == ("D3強", "VWAP維持・終端強い")
+
+
 def test_d1_and_d3_detail_labels_follow_atr_and_volume_boundaries():
     assert build_d1_detail(ma25_distance_atr=-2.0) == ("D1a", "戻り途中・25日線接近")
     assert build_d1_detail(ma25_distance_atr=-2.01) == ("D1b", "戻り途中・25日線遠い")
@@ -556,6 +585,83 @@ def test_d2_exclusion_falls_to_downtrend():
             rsi14=40.0,
             low_higher_count=1,
             previous_low=98.0,
+        )
+        == "E"
+    )
+
+
+def test_d2_requires_point_one_atr_rebound_above_support():
+    common = dict(
+        dev25_pct=-6.0,
+        vwap=100.0,
+        day_open=98.2,
+        day_high=100.0,
+        day_low=98.0,
+        day_close_position=0.5,
+        atr14=2.0,
+        volume_vs_avg20_pct=50.0,
+        rsi14=55.0,
+        low_higher_count=1,
+        previous_low=98.0,
+    )
+    assert classify_technical_summary_rank(**common, latest=98.19) == "E"
+    assert classify_technical_summary_rank(**common, latest=98.20) == "D2"
+
+
+def test_d2_weak_detail_for_standalone_previous_low_lower_lows_and_moderate_bearish():
+    base = dict(
+        latest=99.0,
+        vwap=100.0,
+        day_open=99.6,
+        day_high=100.0,
+        day_low=97.4,
+        day_close_position=0.62,
+        atr14=2.0,
+        rsi14=40.0,
+        previous_low=98.0,
+    )
+    assert build_d2_detail(
+        **base,
+        volume_vs_avg20_pct=90.0,
+        recent20_low=None,
+        ma75=None,
+        recent60_low=None,
+        low_highers=(True, True, True),
+    ) == ("D2弱", "底打ち候補・弱")
+    assert build_d2_detail(
+        **base,
+        volume_vs_avg20_pct=90.0,
+        recent20_low=98.2,
+        ma75=None,
+        recent60_low=None,
+        low_highers=(False, False, True),
+    ) == ("D2弱", "底打ち候補・弱")
+    assert build_d2_detail(
+        **base,
+        volume_vs_avg20_pct=120.0,
+        recent20_low=98.2,
+        ma75=None,
+        recent60_low=None,
+        low_highers=(True, True, True),
+    ) == ("D2弱", "底打ち候補・弱")
+
+
+def test_d2_big_bearish_volume_above_150_falls_to_downtrend():
+    assert (
+        classify_technical_summary_rank(
+            dev25_pct=-6.0,
+            latest=98.0,
+            vwap=100.0,
+            day_open=99.8,
+            day_high=100.0,
+            day_low=97.4,
+            day_close_position=0.42,
+            atr14=2.0,
+            volume_vs_avg20_pct=151.0,
+            rsi14=40.0,
+            low_higher_count=1,
+            previous_low=97.8,
+            recent20_low=97.9,
         )
         == "E"
     )

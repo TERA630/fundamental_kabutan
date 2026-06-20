@@ -86,6 +86,7 @@ D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
     "D1b": "監視優先。深指値は原則不可",
     "D1": "判定保留。新規不可",
     "D2": "支持線反発候補。原則VWAP回復待ち",
+    "D2弱": "支持線根拠が弱い。VWAP回復まで監視",
     "D3強": "小さく可。D3内で最有力",
     "D3": "小さく可。出来高確認",
     "D3弱": "監視寄り。出来高不足",
@@ -198,8 +199,9 @@ def build_technical_strategy_lines(
             risk_reward=risk_reward,
         )
     if rank == "D2":
+        prefix = "D2弱｜支持線根拠弱い｜" if detail_code == "D2弱" else ""
         return (
-            f"前場深押し△：地合い良好時のみ {support_entry_range}。RR1.5以上なら試し可（{risk_reward}）。安全重視ならVWAP回復確認。",
+            f"前場深押し△：{prefix}地合い良好時のみ {support_entry_range}。RR1.5以上なら試し可（{risk_reward}）。安全重視ならVWAP回復確認。",
             f"前場VWAP回復△：VWAP15分維持なら試し玉候補 {vwap_recovery_range}。安値切り上げ・高値更新・終端60%以上が揃いD3化すれば○。出来高60%以上が望ましい。",
             "後場VWAP回復△〜○：後場VWAP上維持かつ終端60%以上なら小さく可。当日高値圏でなければ持ち越しは弱い。",
         )
@@ -226,16 +228,26 @@ def build_d_detail_headline(
     *,
     ma25_distance_atr: float | None = None,
     volume_vs_avg20_pct: float | None = None,
+    high_breakout_count: int | None = None,
+    day_close_position: float | None = None,
+    d2_detail_code: str | None = None,
     dev25_pct: float | None = None,
 ) -> str | None:
     if rank == "D1":
         code, label = build_d1_detail(ma25_distance_atr=ma25_distance_atr)
         return f"{code} {label}｜{D_DETAIL_MAIN_JUDGEMENTS[code]}"
     if rank == "D2":
-        text = f"D2 底打ち候補｜支持線反発待ち｜{D_DETAIL_MAIN_JUDGEMENTS['D2']}"
+        code = "D2弱" if d2_detail_code == "D2弱" else "D2"
+        label = "底打ち候補・弱" if code == "D2弱" else "底打ち候補"
+        state = "支持線根拠弱い" if code == "D2弱" else "支持線反発待ち"
+        text = f"{code} {label}｜{state}｜{D_DETAIL_MAIN_JUDGEMENTS[code]}"
         return _append_dev25_risk_label(text, rank=rank, dev25_pct=dev25_pct)
     if rank == "D3":
-        code, label = build_d3_detail(volume_vs_avg20_pct=volume_vs_avg20_pct)
+        code, label = build_d3_detail(
+            volume_vs_avg20_pct=volume_vs_avg20_pct,
+            high_breakout_count=high_breakout_count,
+            day_close_position=day_close_position,
+        )
         text = f"{code}｜{label}｜{D_DETAIL_MAIN_JUDGEMENTS[code]}"
         return _append_dev25_risk_label(text, rank=rank, dev25_pct=dev25_pct)
     return None
@@ -403,7 +415,6 @@ def classify_technical_summary_rank(
     if vwap_up:
         if (
             _gte(low_higher_count, 2)
-            and _gte(high_breakout_count, 1)
             and _gte(close_position_pct, 60)
             and vwap_maintained_15m is True
         ):
@@ -1060,7 +1071,7 @@ def _evaluate_d2_bottoming_candidate(
     close_position_pct = _position_pct(day_close_position)
     if not _gte(close_position_pct, 40):
         return "none"
-    if latest <= support:
+    if latest < support + 0.1 * atr14:
         return "none"
     if not _has_direct_support(latest=latest, atr14=atr14, supports=supports):
         return "exclude"
@@ -1074,8 +1085,20 @@ def _evaluate_d2_bottoming_candidate(
         volume_vs_avg20_pct=volume_vs_avg20_pct,
     ):
         return "exclude"
-    if _all_false(low_highers):
-        return "exclude"
+    weak = _is_previous_low_standalone_support(
+        support=support,
+        atr14=atr14,
+        previous_low=previous_low,
+        recent20_low=recent20_low,
+        ma75=ma75,
+        recent60_low=recent60_low,
+    )
+    weak = weak or _has_two_of_three_lower_lows(low_highers)
+    weak = weak or _is_moderate_volume_bearish(
+        day_open=day_open,
+        latest=latest,
+        volume_vs_avg20_pct=volume_vs_avg20_pct,
+    )
 
     score = _d2_auxiliary_score(
         latest=latest,
@@ -1086,7 +1109,7 @@ def _evaluate_d2_bottoming_candidate(
         volume_vs_avg20_pct=volume_vs_avg20_pct,
         rsi14=rsi14,
     )
-    return "strong" if score >= 2 else "weak"
+    return "weak" if weak or score < 2 else "strong"
 
 
 def _nearest_d2_support(
@@ -1134,6 +1157,28 @@ def _has_direct_support(
     )
 
 
+def _is_previous_low_standalone_support(
+    *,
+    support: float,
+    atr14: float,
+    previous_low: float | None,
+    recent20_low: float | None,
+    ma75: float | None,
+    recent60_low: float | None,
+) -> bool:
+    if previous_low is None or abs(support - previous_low) > 0.000001:
+        return False
+    related_supports = (recent20_low, ma75, recent60_low)
+    return not any(
+        related is not None and abs(previous_low - related) <= 0.35 * atr14
+        for related in related_supports
+    )
+
+
+def _has_two_of_three_lower_lows(low_highers: tuple[bool | None, ...]) -> bool:
+    return sum(value is False for value in low_highers) >= 2
+
+
 def build_d1_detail(*, ma25_distance_atr: float | None) -> tuple[str, str]:
     if ma25_distance_atr is None:
         return "D1", "判定保留"
@@ -1143,7 +1188,54 @@ def build_d1_detail(*, ma25_distance_atr: float | None) -> tuple[str, str]:
     return "D1b", "戻り途中・25日線遠い"
 
 
-def build_d3_detail(*, volume_vs_avg20_pct: float | None) -> tuple[str, str]:
+def build_d2_detail(
+    *,
+    latest: float,
+    vwap: float,
+    day_open: float | None,
+    day_high: float | None,
+    day_low: float | None,
+    day_close_position: float | None,
+    atr14: float | None,
+    volume_vs_avg20_pct: float | None,
+    rsi14: float | None,
+    previous_low: float | None,
+    recent20_low: float | None,
+    ma75: float | None,
+    recent60_low: float | None,
+    low_highers: tuple[bool | None, ...] = (),
+) -> tuple[str, str]:
+    evaluation = _evaluate_d2_bottoming_candidate(
+        latest=latest,
+        vwap=vwap,
+        day_open=day_open,
+        day_high=day_high,
+        day_low=day_low,
+        day_close_position=day_close_position,
+        atr14=atr14,
+        volume_vs_avg20_pct=volume_vs_avg20_pct,
+        rsi14=rsi14,
+        previous_low=previous_low,
+        recent20_low=recent20_low,
+        ma75=ma75,
+        recent60_low=recent60_low,
+        low_highers=low_highers,
+    )
+    if evaluation == "weak":
+        return "D2弱", "底打ち候補・弱"
+    return "D2", "底打ち候補"
+
+
+def build_d3_detail(
+    *,
+    volume_vs_avg20_pct: float | None,
+    high_breakout_count: int | None = None,
+    day_close_position: float | None = None,
+) -> tuple[str, str]:
+    if _gte(high_breakout_count, 1):
+        return "D3強", "VWAP維持・高値更新"
+    if _gte(_position_pct(day_close_position), 70):
+        return "D3強", "VWAP維持・終端強い"
     if volume_vs_avg20_pct is None:
         return "D3", "VWAP維持・出来高N/A"
     if volume_vs_avg20_pct >= 80:
@@ -1205,7 +1297,20 @@ def _is_volume_surge_big_bearish(
     if day_range <= 0:
         return False
     body_ratio = abs(latest - day_open) / day_range
-    return _gte(volume_vs_avg20_pct, 180) and latest < day_open and body_ratio >= 0.65
+    return _gt(volume_vs_avg20_pct, 150) and latest < day_open and body_ratio >= 0.65
+
+
+def _is_moderate_volume_bearish(
+    *,
+    day_open: float,
+    latest: float,
+    volume_vs_avg20_pct: float | None,
+) -> bool:
+    return (
+        volume_vs_avg20_pct is not None
+        and 100 <= volume_vs_avg20_pct <= 150
+        and latest < day_open
+    )
 
 
 def _lower_wick_ratio(*, day_open: float, day_high: float, day_low: float, latest: float) -> float:
@@ -1265,6 +1370,7 @@ __all__ = [
     "RANK_ORDER",
     "SINGLE_STOCK_POSITION_DESCRIPTIONS",
     "build_d1_detail",
+    "build_d2_detail",
     "build_d3_detail",
     "build_d_detail_headline",
     "build_dev25_risk_label",

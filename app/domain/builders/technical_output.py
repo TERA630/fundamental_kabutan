@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
     build_d1_detail,
+    build_d2_detail,
     build_d3_detail,
     build_technical_headline_summary,
     build_technical_position_assessment,
@@ -276,13 +277,45 @@ def _strategy_detail_code(result: TechnicalAnalysisResult, rank: str) -> str | N
     if rank == "D1":
         return build_d1_detail(ma25_distance_atr=_evaluation_ma25_distance_atr(result))[0]
     if rank == "D3":
+        sessions = result.three_session_momentum.sessions
         return build_d3_detail(
             volume_vs_avg20_pct=_ratio_pct(
                 _evaluation_volume(result),
                 result.snapshot.price.volume_avg20,
-            )
+            ),
+            high_breakout_count=_count_true(session.high_breakout for session in sessions),
+            day_close_position=_range_position(
+                _evaluation_price(result),
+                _evaluation_low(result),
+                _evaluation_high(result),
+            ),
         )[0]
-    return rank if rank == "D2" else None
+    if rank == "D2":
+        sessions = result.three_session_momentum.sessions
+        return build_d2_detail(
+            latest=_evaluation_price(result) or 0.0,
+            vwap=_as_float(result.vwap_snapshot.get("vwap")) or 0.0,
+            day_open=_evaluation_open(result),
+            day_high=_evaluation_high(result),
+            day_low=_evaluation_low(result),
+            day_close_position=_range_position(
+                _evaluation_price(result),
+                _evaluation_low(result),
+                _evaluation_high(result),
+            ),
+            atr14=result.snapshot.range.atr14,
+            volume_vs_avg20_pct=_ratio_pct(
+                _evaluation_volume(result),
+                result.snapshot.price.volume_avg20,
+            ),
+            rsi14=result.snapshot.rsi14,
+            previous_low=result.snapshot.previous_session.prev_low,
+            recent20_low=result.snapshot.breakline.recent20_low,
+            ma75=result.snapshot.moving_average.ma75,
+            recent60_low=result.snapshot.breakline.recent60_low,
+            low_highers=tuple(session.low_higher for session in sessions),
+        )[0]
+    return None
 
 
 def _offset_price(price: float | None, atr14: float | None, multiple: float) -> float | None:
