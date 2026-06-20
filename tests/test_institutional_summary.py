@@ -53,6 +53,23 @@ def test_score_roic_and_eps_cagr_thresholds():
     assert score_eps_cagr(None) == 0
 
 
+@pytest.mark.parametrize(
+    ("scorer", "value", "expected"),
+    (
+        (score_market_cap, 3 * YEN_PER_CHO - 1, 4),
+        (score_market_cap, 1 * YEN_PER_CHO - 1, 3),
+        (score_trading_value, 100 * YEN_PER_OKU - 1, 4),
+        (score_trading_value, 50 * YEN_PER_OKU - 1, 3),
+        (score_roic, 14.999, 4),
+        (score_roic, 9.999, 3),
+        (score_eps_cagr, 19.999, 4),
+        (score_eps_cagr, -5.001, 0),
+    ),
+)
+def test_institutional_score_tables_preserve_bands(scorer, value, expected):
+    assert scorer(value) == expected
+
+
 def test_calc_trading_value_and_volume_average_ratio():
     assert calc_trading_value_yen(2000, 1_000_000) == 2_000_000_000
     assert calc_trading_value_yen(None, 1_000_000) is None

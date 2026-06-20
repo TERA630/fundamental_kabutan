@@ -9,9 +9,55 @@ from app.domain.models.institutional_summary import (
     TechnicalConditionSummary,
     TechnicalSignal,
 )
+from app.domain.policies.range_table import RangeBand, RangeTable
 
 YEN_PER_OKU = 100_000_000
 YEN_PER_CHO = 1_000_000_000_000
+
+
+MARKET_CAP_SCORE_TABLE = RangeTable(
+    bands=(
+        RangeBand(3 * YEN_PER_CHO, 5),
+        RangeBand(1 * YEN_PER_CHO, 4),
+        RangeBand(5000 * YEN_PER_OKU, 3),
+        RangeBand(2000 * YEN_PER_OKU, 2),
+        RangeBand(1000 * YEN_PER_OKU, 1),
+    ),
+    default=0,
+)
+
+TRADING_VALUE_SCORE_TABLE = RangeTable(
+    bands=(
+        RangeBand(100 * YEN_PER_OKU, 5),
+        RangeBand(50 * YEN_PER_OKU, 4),
+        RangeBand(20 * YEN_PER_OKU, 3),
+        RangeBand(10 * YEN_PER_OKU, 2),
+        RangeBand(5 * YEN_PER_OKU, 1),
+    ),
+    default=0,
+)
+
+ROIC_SCORE_TABLE = RangeTable(
+    bands=(
+        RangeBand(15, 5),
+        RangeBand(10, 4),
+        RangeBand(8, 3),
+        RangeBand(5, 2),
+        RangeBand(3, 1),
+    ),
+    default=0,
+)
+
+EPS_CAGR_SCORE_TABLE = RangeTable(
+    bands=(
+        RangeBand(20, 5),
+        RangeBand(10, 4),
+        RangeBand(5, 3),
+        RangeBand(0, 2),
+        RangeBand(-5, 1),
+    ),
+    default=0,
+)
 
 
 def calc_trading_value_yen(close: float | int | None, volume: float | int | None) -> float | None:
@@ -40,71 +86,19 @@ def classify_market_cap(market_cap_yen: float | int | None) -> MarketCapClass | 
 
 
 def score_market_cap(market_cap_yen: float | int | None) -> int:
-    if market_cap_yen is None:
-        return 0
-    value = float(market_cap_yen)
-    if value >= 3 * YEN_PER_CHO:
-        return 5
-    if value >= 1 * YEN_PER_CHO:
-        return 4
-    if value >= 5000 * YEN_PER_OKU:
-        return 3
-    if value >= 2000 * YEN_PER_OKU:
-        return 2
-    if value >= 1000 * YEN_PER_OKU:
-        return 1
-    return 0
+    return MARKET_CAP_SCORE_TABLE.resolve(market_cap_yen)
 
 
 def score_trading_value(trading_value_yen: float | int | None) -> int:
-    if trading_value_yen is None:
-        return 0
-    value_oku = float(trading_value_yen) / YEN_PER_OKU
-    if value_oku >= 100:
-        return 5
-    if value_oku >= 50:
-        return 4
-    if value_oku >= 20:
-        return 3
-    if value_oku >= 10:
-        return 2
-    if value_oku >= 5:
-        return 1
-    return 0
+    return TRADING_VALUE_SCORE_TABLE.resolve(trading_value_yen)
 
 
 def score_roic(roic_pct: float | int | None) -> int:
-    if roic_pct is None:
-        return 0
-    value = float(roic_pct)
-    if value >= 15:
-        return 5
-    if value >= 10:
-        return 4
-    if value >= 8:
-        return 3
-    if value >= 5:
-        return 2
-    if value >= 3:
-        return 1
-    return 0
+    return ROIC_SCORE_TABLE.resolve(roic_pct)
 
 
 def score_eps_cagr(eps_cagr_pct: float | int | None) -> int:
-    if eps_cagr_pct is None:
-        return 0
-    value = float(eps_cagr_pct)
-    if value >= 20:
-        return 5
-    if value >= 10:
-        return 4
-    if value >= 5:
-        return 3
-    if value >= 0:
-        return 2
-    if value >= -5:
-        return 1
-    return 0
+    return EPS_CAGR_SCORE_TABLE.resolve(eps_cagr_pct)
 
 
 def build_technical_signal(latest: float | int | None, reference: float | int | None) -> TechnicalSignal:
