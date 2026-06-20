@@ -3,21 +3,18 @@
 ## 正本
 
 現行実装の正本仕様は `current_implementation_spec.md` とする。
-画面表示の詳細仕様は `screen_spec.md` とする。
-プレゼンテーション層の詳細仕様は `presentation_spec.md` とする。
+画面・表示の詳細仕様は `screen_spec.md` とする。
 
 この仕様書は、分割されていた表示仕様、Technical仕様、Domain責務、rankCF、監視銘柄サマリ、アナリスト予想の内容を統合し、次の責務ごとに整理している。
 
-- 画面表示案
-- プレゼンテーション層
+- 画面・表示
 - ドメイン層
 - データー層
 
 ## 分離仕様
 
-- `screen_spec.md`: GUI画面表示、操作、ステータス、固定パネル、GUI出力キャッシュ表示
-- `presentation_spec.md`: 出力テキスト、Markdown、表示用セクション、数値表現、N/A表現
-- `Summery_spec.md`: Tkinter / Web UI のサマリ表示、保存、Technical Summary 表示仕様
+- `screen_spec.md`: GUI / Web UI の画面表示、操作、ステータス、固定パネル、出力テキスト、数値表現、`N/A` 表現
+- `Summery_spec.md`: Fundamental / Technical のサマリ画面・サマリファイルの出力仕様
 - `kabutan_html_package_workflow.md`: 株探HTMLの正規化、Zip作成、Codespaces受け入れ手順
 
 ## 起動方法

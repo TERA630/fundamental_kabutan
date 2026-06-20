@@ -10,7 +10,7 @@
 - Fundamental / Technical の出力
 - 機関投資サマリ固定パネル
 - 監視銘柄 Fundamental / Technical サマリ
-- Data / Domain / UseCase / Presentation / GUI の責務
+- Data / Domain / UseCase / 画面・表示 の責務
 
 ## 2. 全体構成
 
@@ -20,16 +20,15 @@
 
 | 層 | 責務 | 主なファイル |
 |---|---|---|
-| 画面表示 | Tkinter UI、ユーザー操作、タブ、ステータス、コピー、保存 | `app/gui.py`, `app/gui_view.py`, `app/gui_view_model.py`, `app/gui_state.py` |
-| プレゼンテーション層 | 出力テキスト、Markdown、表示用セクション、数値表現、N/A表現 | `app/presenters.py`, `app/domain/builders/*.py`, `app/presentation/display_formatter.py` |
+| 画面・表示 | Tkinter / Web UI、ユーザー操作、タブ、ステータス、コピー、保存、出力テキストとHTML整形 | `app/gui*.py`, `app/presenters.py`, `app/domain/builders/*.py`, `app/presentation/*.py` |
 | ドメイン層 | DTO、純計算、採点、分類、UseCase orchestration | `app/domain/models/*.py`, `app/domain/policies/*.py`, `app/domain/usecases/*.py` |
 | データー層 | yFinance取得、株探HTML解析、監視銘柄読込、JSONキャッシュ | `app/data/*.py` |
 
-## 3. 画面表示案
+## 3. 画面・表示
 
-画面表示の詳細仕様は `screen_spec.md` を正とする。
+画面・表示の詳細仕様は `screen_spec.md` を正とする。
 
-本層は、Tkinter UI、ユーザー操作、タブ、ステータス、コピー、保存を担当する。データ取得、HTML解析、ドメイン計算、出力テキストの組み立ては持たない。
+本層は、Tkinter / Web UI、ユーザー操作、タブ、ステータス、コピー、保存、出力テキストとHTMLの整形を担当する。データ取得、HTML解析、ドメイン計算は持たない。
 
 主な対象は次の通り。
 
@@ -39,30 +38,15 @@
 - 機関投資サマリ固定パネル
 - GUI出力キャッシュ表示
 
-## 4. プレゼンテーション層
+## 4. ドメイン層
 
-プレゼンテーション層の詳細仕様は `presentation_spec.md` を正とする。
-
-本層は、UseCaseが返すDTOと計算結果を表示用テキストへ変換する。データ取得、HTML解析、採点ロジック、指標計算は持たない。
-
-主な対象は次の通り。
-
-- Fundamental 出力
-- rankCF 表示
-- Technical 出力
-- 前日評価表示
-- 機関投資サマリ表示
-- 監視銘柄 Fundamental / Technical サマリ
-
-## 5. ドメイン層
-
-### 5.1 基本責務
+### 4.1 基本責務
 
 ドメイン層はモデル、UseCase、純計算ポリシーを持つ。GUI部品や表示文言、外部APIの直接呼び出しは持たない。
 
 Domain Policy は原則として純粋関数にする。表示用の `N/A` 文字列ではなく、`None` やDTOの値で欠損を表す。
 
-### 5.2 主要モデル
+### 4.2 主要モデル
 
 | モデル | 内容 |
 |---|---|
@@ -80,7 +64,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 | `TechnicalSummaryRow` / `TechnicalSummaryTable` | 監視銘柄Technicalサマリ出力 |
 | `UsMarketSummaryRow` / `UsMarketSummaryTable` | Technical Summary 冒頭のUS Market指標出力 |
 
-### 5.3 UseCase
+### 4.3 UseCase
 
 | UseCase | 責務 |
 |---|---|
@@ -94,7 +78,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 | `FetchKabutanForecastUseCase` | 株探業績取得をRepository越しに行う |
 | `ResolveKabutanHtmlDirUseCase` / `ResolveWatchlistPathUseCase` | キャッシュ済みパスの有効性を判定する |
 
-### 5.4 Fundamental 計算
+### 4.4 Fundamental 計算
 
 主な計算は次の通り。
 
@@ -108,7 +92,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 - ROIC水準分類
 - 四半期YoY成長率
 
-### 5.5 rankCF 採点
+### 4.5 rankCF 採点
 
 rankCF は `calculate_cf_score()` で計算する。
 
@@ -120,7 +104,7 @@ rankCF は `calculate_cf_score()` で計算する。
 
 欠損指標は原則0点として扱う。総合スコアから `S` / `A` / `B` / `C` の判定を作る。
 
-### 5.6 Technical 計算
+### 4.6 Technical 計算
 
 Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を参照する。
 
@@ -143,7 +127,7 @@ Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を�
 詳細な定義式はすべて `technical_ranking_spec.md` に記載されており、
 本書ではリスト形式で概要のみ記載する。
 
-### 5.7 Technical Summary ランク
+### 4.7 Technical Summary ランク
 
 ランキング分類条件の正本は `docs/technical_ranking_spec.md` とする。
 D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、25日線乖離ラベル、
@@ -164,7 +148,7 @@ D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、25日線乖離ラベル�
 - ATR14と支持線が取得できる場合は指値帯を価格へ展開し、RRを表示する
 - 必要値の欠損時は `指値算出不可` または `RR算出不可` とする
 
-### 5.8 Technical Summary US Market
+### 4.8 Technical Summary US Market
 
 Technical Summary の冒頭には US Market セクションを表示する。
 
@@ -177,7 +161,7 @@ Technical Summary の冒頭には US Market セクションを表示する。
 - 取得失敗時は Technical Summary 全体の失敗にしない
 - 取得できない指標は skipped として理由を保持し、表示可能な指標だけを出力
 
-### 5.9 前日VWAPと後場評価
+### 4.9 前日VWAPと後場評価
 
 前日5分足から計算する指標の詳細は `docs/technical_ranking_spec.md` 第3章を参照する。
 
@@ -190,7 +174,7 @@ Technical Summary の冒頭には US Market セクションを表示する。
 - 前日終値の後場VWAP位置
 - 後場評価
 
-### 5.10 ローソク足型とヒゲ
+### 4.10 ローソク足型とヒゲ
 
 ローソク足型とヒゲの判定定義は `docs/technical_ranking_spec.md` 第4章を参照する。
 
@@ -200,13 +184,13 @@ Technical Summary の冒頭には US Market セクションを表示する。
 - ヒゲ判定：上髭 / 下髭 / ヒゲなし / N/A を判定
 - 定義式と判定条件は `technical_ranking_spec.md` を正本とする
 
-## 6. データー層
+## 5. データー層
 
-### 6.1 基本責務
+### 5.1 基本責務
 
 データー層は外部データ取得、HTML解析、ファイル読込、永続キャッシュを担当する。ドメイン判定や表示文言の組み立ては行わない。
 
-### 6.2 yFinance
+### 5.2 yFinance
 
 `app/data/market_data_provider.py` が担当する。
 
@@ -222,7 +206,7 @@ Technical Summary の冒頭には US Market セクションを表示する。
 
 日中VWAPは、5分足が取得できる場合は5分足から計算する。取得できない場合は日足の `(High + Low + Close) / 3` を日足参考値として使う。
 
-### 6.3 株探HTML
+### 5.3 株探HTML
 
 `app/data/kabutan_repository.py` が担当する。
 
@@ -235,7 +219,7 @@ Technical Summary の冒頭には US Market セクションを表示する。
 
 GUIで株探HTMLフォルダが指定されている場合は、対象銘柄のHTMLファイルを優先する。HTMLフォルダが未指定、または対象HTMLがない場合はWeb取得経路を使う。
 
-#### 6.3.1 株探HTML正規化とZipパッケージ
+#### 5.3.1 株探HTML正規化とZipパッケージ
 
 `app/domain/usecases/kabutan_html_normalizer.py` は、ダウンロード済み株探HTMLをCodespacesへ運搬しやすい形へ正規化する。
 
@@ -260,11 +244,11 @@ kabutan_html_package.zip
 
 運用手順と未確認事項は `kabutan_html_package_workflow.md` に分離する。
 
-### 6.4 監視銘柄ファイル
+### 5.4 監視銘柄ファイル
 
 `app/data/watchlist_repository.py` が担当する。Markdown / Text から銘柄名と4桁コードを抽出する。
 
-### 6.5 キャッシュ
+### 5.5 キャッシュ
 
 `app/data/file_cache.py` が `.fundamental_cache` 配下へJSONで保存する。
 
@@ -282,7 +266,7 @@ kabutan_html_package.zip
 
 GUI出力キャッシュは日付が変わると再利用しない。株探HTMLフォルダまたは株探Package Zipを変更した場合はGUI出力キャッシュをクリアする。Web UI 起動時は、キャッシュ済みの監視銘柄ファイル、株探HTMLフォルダ、株探Package Zipを復元する。
 
-## 7. 欠損時の方針
+## 6. 欠損時の方針
 
 - 任意データの取得失敗は画面全体の失敗にしない。
 - 表示できない値は `N/A` とする。
@@ -291,7 +275,7 @@ GUI出力キャッシュは日付が変わると再利用しない。株探HTML�
 - 前日評価の前日VWAPは、前日5分足が不足する場合に日足参考値へフォールバックしない。
 - rankCF の欠損指標は原則0点として扱う。
 
-## 8. 検証方針
+## 7. 検証方針
 
 主な検証対象は次の通り。
 

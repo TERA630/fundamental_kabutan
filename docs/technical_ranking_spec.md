@@ -8,7 +8,7 @@
 
 
 - ランキング分類条件の正本：本書
-- 画面表示仕様：`docs/Summery_spec.md`
+- 画面・表示仕様：`docs/screen_spec.md`
 - 現行実装状況：`docs/current_implementation_spec.md`
 
 ## 2. Technical 計算 / 日足ベースの指標
@@ -676,7 +676,6 @@ US Market の取得失敗は Technical Summary 全体の失敗にしない。
 
 ## 15. 関連仕様書
 
-- **画面表示仕様：** `docs/Summery_spec.md`（表示形式、レイアウト）
+- **画面・表示仕様：** `docs/screen_spec.md`（表示形式、レイアウト、GUI操作）
 - **現行実装状況：** `docs/current_implementation_spec.md`（実装の詳細、責務分離）
-- **Presentation層仕様：** `docs/presentation_spec.md`（出力テキスト、Markdown形式）
-- **画面仕様：** `docs/screen_spec.md`（GUI操作、画面構成）
+- **サマリ出力仕様：** `docs/Summery_spec.md`（監視銘柄サマリの表・ファイル形式）
