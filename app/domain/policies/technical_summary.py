@@ -99,6 +99,7 @@ class _RankingCollapseAssessment:
     score: int
     label: str
     c2_fall: bool
+    c2_fall_reason: str | None
 
 
 @dataclass(frozen=True)
@@ -162,16 +163,20 @@ class _CollapseRiskSignals:
         return self.vwap_break or self.low_higher_failed or self.close_position_low
 
     @property
-    def immediate_c2_fall(self) -> bool:
-        return any(
-            (
-                self.vwap_clear_break and self.close_position_low,
-                self.vwap_clear_break and self.low_higher_failed,
-                self.volume_bearish_or_stalling and self.close_position_low,
-                self.ma5_down and (self.vwap_break or self.ma25_slope_bad),
-                self.support_far and self.vwap_break,
-            )
-        )
+    def immediate_c2_fall_reason(self) -> str | None:
+        """Return the first matched immediate C2 trigger in specification order."""
+
+        if self.vwap_clear_break and self.close_position_low:
+            return "VWAP明確割れ＋終端位置低下"
+        if self.vwap_clear_break and self.low_higher_failed:
+            return "VWAP明確割れ＋安値切り上げ失敗"
+        if self.volume_bearish_or_stalling and self.close_position_low:
+            return "出来高陰線/上値失速＋終端位置低下"
+        if self.ma5_down and (self.vwap_break or self.ma25_slope_bad):
+            return "下降トレンド初動"
+        if self.support_far and self.vwap_break:
+            return "支持線崩落"
+        return None
 
 
 UPPER_STALL_WICK_RATIO = 0.45
@@ -553,8 +558,9 @@ def build_technical_headline_summary(
     comment = HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
     collapse_state_label = None
+    c2_fall_reason = None
     if dev25_pct >= 0:
-        collapse_state_label = _evaluate_above_ma25_ranking_collapse(
+        collapse_assessment = _evaluate_above_ma25_ranking_collapse(
             latest=latest,
             vwap=vwap,
             ma5=ma5,
@@ -578,13 +584,17 @@ def build_technical_headline_summary(
             recent20_low=recent20_low,
             ma75=ma75,
             recent60_low=recent60_low,
-        ).label
+        )
+        collapse_state_label = collapse_assessment.label
+        if rank == "C2":
+            c2_fall_reason = collapse_assessment.c2_fall_reason
     return TechnicalHeadlineSummary(
         rank=rank,
         rank_label=RANK_LABELS[rank],
         comment=comment,
         next_action=next_action,
         collapse_state_label=collapse_state_label,
+        c2_fall_reason=c2_fall_reason,
     )
 
 
@@ -725,6 +735,7 @@ def build_technical_short_comment(
     *,
     rank: TechnicalSummaryRank,
     collapse_state_label: str | None = None,
+    c2_fall_reason: str | None = None,
     ma5_slope: float | None = None,
     ma5_slope_prev: float | None = None,
     ma5_slope_3d_ago: float | None = None,
@@ -735,7 +746,8 @@ def build_technical_short_comment(
         ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
     collapse_part = f"｜{collapse_state_label}" if collapse_state_label else ""
-    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{collapse_part}｜{ma5_comment}"
+    c2_reason_part = f"｜C2 崩れ警戒 陥落トリガー：{c2_fall_reason}" if rank == "C2" and c2_fall_reason else ""
+    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{collapse_part}{c2_reason_part}｜{ma5_comment}"
 
 
 def build_ma5_slope_short_comment(
@@ -985,7 +997,6 @@ def _score_collapse_risk(
 
     return _CollapseRiskSignals(
         atoms=(
-            SignalAtom("below_ma25", ma25 is not None and latest < ma25, points=1),
             SignalAtom("vwap_break", vwap_break, points=1),
             SignalAtom("vwap_clear_break", vwap_clear_break),
             SignalAtom("low_higher_failed", low_higher_failed, points=1),
@@ -1068,7 +1079,12 @@ def _evaluate_above_ma25_ranking_collapse(
         ma75=ma75,
         recent60_low=recent60_low,
     )
-    c2_fall = risk.immediate_c2_fall or risk.score >= 7 or (4 <= risk.score <= 6 and risk.price_structure_bad)
+    c2_fall_reason = risk.immediate_c2_fall_reason
+    if c2_fall_reason is None and risk.score >= 7:
+        c2_fall_reason = "崩れスコア高リスク"
+    if c2_fall_reason is None and 4 <= risk.score <= 6 and risk.price_structure_bad:
+        c2_fall_reason = "崩れスコア中リスク＋価格構造悪化"
+    c2_fall = c2_fall_reason is not None
     if c2_fall:
         label = "崩れ警戒"
     elif risk.score >= 4:
@@ -1077,7 +1093,12 @@ def _evaluate_above_ma25_ranking_collapse(
         label = "要確認"
     else:
         label = "崩れ条件なし"
-    return _RankingCollapseAssessment(score=risk.score, label=label, c2_fall=c2_fall)
+    return _RankingCollapseAssessment(
+        score=risk.score,
+        label=label,
+        c2_fall=c2_fall,
+        c2_fall_reason=c2_fall_reason,
+    )
 
 
 def _evaluate_d2_bottoming_candidate(

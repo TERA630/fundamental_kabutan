@@ -158,6 +158,7 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
     return "短評：" + build_technical_short_comment(
         rank=headline.rank,
         collapse_state_label=headline.collapse_state_label,
+        c2_fall_reason=headline.c2_fall_reason,
         ma5_slope=getattr(moving_average, "ma5_slope", None),
         ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
         ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
@@ -172,7 +173,7 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         return "崩れ警戒：N/A\nホールド判定：N/A"
 
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/12：{assessment.collapse_risk_label}",
+        f"崩れ {assessment.collapse_risk_score}/11：{assessment.collapse_risk_label}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"

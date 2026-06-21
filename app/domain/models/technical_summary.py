@@ -20,6 +20,7 @@ class TechnicalHeadlineSummary:
     comment: str
     next_action: str
     collapse_state_label: str | None = "崩れ条件なし"
+    c2_fall_reason: str | None = None
 
     @property
     def text(self) -> str:
