@@ -19,6 +19,10 @@ class RangeBand(Generic[ResultT]):
 
     minimum: float
     result: ResultT
+    inclusive: bool = True
+
+    def matches(self, value: float) -> bool:
+        return value >= self.minimum if self.inclusive else value > self.minimum
 
 
 @dataclass(frozen=True)
@@ -39,6 +43,6 @@ class RangeTable(Generic[ResultT]):
 
         numeric_value = float(value)
         for band in self.bands:
-            if numeric_value >= band.minimum:
+            if band.matches(numeric_value):
                 return band.result
         return self.default

@@ -714,6 +714,10 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
+    signals = {signal.signal_id: signal for signal in assessment.collapse_risk_signals}
+    assert signals["below_ma25"].matched is True
+    assert signals["vwap_clear_break"].matched is True
+    assert signals["ma5_down"].points == 2
 
 
 def test_position_assessment_requires_all_three_momentum_marks_to_fail():

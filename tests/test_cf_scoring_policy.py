@@ -1,5 +1,37 @@
 from app.domain.models.cf_scoring_input import CfScoringInput
-from app.domain.policies.cf_scoring import calculate_cf_score, score_per
+import pytest
+
+from app.domain.policies.cf_scoring import (
+    calculate_cf_score,
+    score_eps_cagr_3y,
+    score_ocf_margin,
+    score_op_margin,
+    score_per,
+    score_roic,
+    score_sales_cagr_3y,
+)
+
+
+@pytest.mark.parametrize(
+    ("scorer", "args", "rank", "points"),
+    (
+        (score_roic, (25,), "S", 15),
+        (score_roic, (24.999,), "A", 12),
+        (score_ocf_margin, (200, 1000), "S", 10),
+        (score_ocf_margin, (199.99, 1000), "A", 8),
+        (score_op_margin, (250, 1000), "S", 10),
+        (score_op_margin, (249.99, 1000), "A", 8),
+        (score_eps_cagr_3y, (25,), "A", 12),
+        (score_eps_cagr_3y, (25.001,), "S", 15),
+        (score_sales_cagr_3y, (20,), "A", 8),
+        (score_sales_cagr_3y, (20.001,), "S", 10),
+    ),
+)
+def test_range_table_backed_rankcf_metrics_preserve_boundary_behavior(scorer, args, rank, points):
+    metric = scorer(*args)
+
+    assert metric.rank == rank
+    assert metric.points == points
 
 
 def test_calculate_cf_score_high_case_reaches_100_and_top_judgement():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.domain.models.signal_atom import SignalAtom, score_signal_atoms
 from app.domain.models.technical_summary import (
     TechnicalHeadlineSummary,
     TechnicalPositionAssessment,
@@ -102,17 +103,59 @@ class _RankingCollapseAssessment:
 
 @dataclass(frozen=True)
 class _CollapseRiskSignals:
-    score: int
-    vwap_break: bool
-    vwap_clear_break: bool
-    low_higher_failed: bool
-    high_breakout_failed: bool
-    close_position_low: bool
-    volume_bearish_or_stalling: bool
-    support_far: bool
-    ma25_slope_bad: bool
-    ma5_down: bool
-    ma5_score: int
+    atoms: tuple[SignalAtom, ...]
+
+    def __post_init__(self) -> None:
+        signal_ids = tuple(atom.signal_id for atom in self.atoms)
+        if len(signal_ids) != len(set(signal_ids)):
+            raise ValueError("Collapse risk signal IDs must be unique")
+
+    def _matched(self, signal_id: str) -> bool:
+        return next(atom.matched for atom in self.atoms if atom.signal_id == signal_id)
+
+    @property
+    def score(self) -> int:
+        return score_signal_atoms(self.atoms)
+
+    @property
+    def vwap_break(self) -> bool:
+        return self._matched("vwap_break")
+
+    @property
+    def vwap_clear_break(self) -> bool:
+        return self._matched("vwap_clear_break")
+
+    @property
+    def low_higher_failed(self) -> bool:
+        return self._matched("low_higher_failed")
+
+    @property
+    def high_breakout_failed(self) -> bool:
+        return self._matched("high_breakout_failed")
+
+    @property
+    def close_position_low(self) -> bool:
+        return self._matched("close_position_low")
+
+    @property
+    def volume_bearish_or_stalling(self) -> bool:
+        return self._matched("volume_bearish_or_stalling")
+
+    @property
+    def support_far(self) -> bool:
+        return self._matched("support_far")
+
+    @property
+    def ma25_slope_bad(self) -> bool:
+        return self._matched("ma25_slope_bad")
+
+    @property
+    def ma5_down(self) -> bool:
+        return self._matched("ma5_down")
+
+    @property
+    def ma5_score(self) -> int:
+        return score_signal_atoms(atom for atom in self.atoms if atom.group == "ma5_slope")
 
     @property
     def price_structure_bad(self) -> bool:
@@ -674,6 +717,7 @@ def build_technical_position_assessment(
         collapse_risk_label=collapse_label,
         hold_judgement=hold,
         bottoming_start_established=latest < ma25 and headline_rank == "D3",
+        collapse_risk_signals=risk.atoms,
     )
 
 
@@ -929,12 +973,6 @@ def _score_collapse_risk(
         day_low=day_low,
     )
     resolved_ma5_slope = _resolve_ma5_slope(ma5_slope, ma5, ma5_prev1)
-    ma5_score = _ma5_slope_score(
-        ma5_slope=resolved_ma5_slope,
-        ma5_slope_prev=ma5_slope_prev,
-        ma5_slope_3d_ago=ma5_slope_3d_ago,
-        capped=True,
-    )
     vwap_break = latest < vwap
     vwap_clear_break = atr14 not in (None, 0) and latest < vwap - 0.2 * atr14
     low_higher_failed = _all_false(low_highers) or (bool(low_highers) and low_higher_count == 0)
@@ -945,29 +983,37 @@ def _score_collapse_risk(
     ma25_slope_bad = _ma25_slope(ma25, ma25_prev5) in {"down", "flat"}
     ma5_down = resolved_ma5_slope is not None and resolved_ma5_slope <= 0
 
-    score = 0
-    score += int(ma25 is not None and latest < ma25)
-    score += int(vwap_break)
-    score += int(low_higher_failed)
-    score += int(high_breakout_failed)
-    score += int(close_position_low)
-    score += int(volume_bearish_or_stalling)
-    score += int(support_far)
-    score += 2 if ma25_slope_bad else 0
-    score += ma5_score
-
     return _CollapseRiskSignals(
-        score=score,
-        vwap_break=vwap_break,
-        vwap_clear_break=vwap_clear_break,
-        low_higher_failed=low_higher_failed,
-        high_breakout_failed=high_breakout_failed,
-        close_position_low=close_position_low,
-        volume_bearish_or_stalling=volume_bearish_or_stalling,
-        support_far=support_far,
-        ma25_slope_bad=ma25_slope_bad,
-        ma5_down=ma5_down,
-        ma5_score=ma5_score,
+        atoms=(
+            SignalAtom("below_ma25", ma25 is not None and latest < ma25, points=1),
+            SignalAtom("vwap_break", vwap_break, points=1),
+            SignalAtom("vwap_clear_break", vwap_clear_break),
+            SignalAtom("low_higher_failed", low_higher_failed, points=1),
+            SignalAtom("high_breakout_failed", high_breakout_failed, points=1),
+            SignalAtom("close_position_low", close_position_low, points=1),
+            SignalAtom("volume_bearish_or_stalling", volume_bearish_or_stalling, points=1),
+            SignalAtom("support_far", support_far, points=1),
+            SignalAtom("ma25_slope_bad", ma25_slope_bad, points=2),
+            SignalAtom("ma5_down", ma5_down, points=2, group="ma5_slope", group_max_points=3),
+            SignalAtom(
+                "ma5_slowing",
+                resolved_ma5_slope is not None
+                and ma5_slope_prev is not None
+                and resolved_ma5_slope < ma5_slope_prev,
+                points=1,
+                group="ma5_slope",
+                group_max_points=3,
+            ),
+            SignalAtom(
+                "ma5_stalling",
+                resolved_ma5_slope is not None
+                and ma5_slope_3d_ago is not None
+                and resolved_ma5_slope < ma5_slope_3d_ago,
+                points=1,
+                group="ma5_slope",
+                group_max_points=3,
+            ),
+        ),
     )
 
 

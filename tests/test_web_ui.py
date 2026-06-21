@@ -79,6 +79,36 @@ def test_web_ui_defaults_to_technical_mode():
     assert 'name="mode" value="technical" checked' in html
 
 
+def test_web_summary_rejects_a_second_market_data_operation():
+    class FakeController:
+        def __init__(self):
+            self.summary_calls = 0
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def build_summary_table_for_mode(self, **_kwargs):
+            self.summary_calls += 1
+            return "UNREACHABLE"
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    client = create_app(state).test_client()
+    assert state.market_data_operation_lock.acquire(blocking=False)
+    try:
+        response = client.post("/summary", data={"selected_stock": "トヨタ (7203)", "mode": "technical"})
+    finally:
+        state.market_data_operation_lock.release()
+
+    assert "市場データ取得中です。完了後に再実行してください。" in response.data.decode("utf-8")
+    assert controller.summary_calls == 0
+
+
 def test_technical_evaluation_selects_use_existing_intraday_timestamps():
     class FakeController:
         def fetch_resolved_watchlist_path(self):

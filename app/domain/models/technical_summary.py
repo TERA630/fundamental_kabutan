@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from app.domain.models.signal_atom import SignalAtom
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
 TechnicalSummaryRank = Literal["B2", "B1", "A2", "A1", "A1弱", "C2", "C1", "D1", "D2", "D3", "E"]
@@ -32,6 +33,7 @@ class TechnicalPositionAssessment:
     collapse_risk_label: str
     hold_judgement: HoldJudgement
     bottoming_start_established: bool
+    collapse_risk_signals: tuple[SignalAtom, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
+from typing import Any
 
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
@@ -37,6 +39,7 @@ class WebUiState:
     technical_evaluation_time_choices: list[str] = field(default_factory=list)
     technical_evaluation_time_choices_by_date: dict[str, list[str]] = field(default_factory=dict)
     status: str = field(default_factory=GuiViewModel.build_initial_status)
+    market_data_operation_lock: Any = field(default_factory=Lock, repr=False)
 
     @property
     def stock_choices(self) -> list[str]:

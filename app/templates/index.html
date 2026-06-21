@@ -97,7 +97,7 @@
           </select>
         </label>
 
-        <button formaction="/fetch" type="submit">取得</button>
+        <button id="fetch-button" formaction="/fetch" type="submit">取得</button>
         <button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>
         <button id="copy-button" type="button">コピー</button>
         <a class="button-link" href="/download">保存</a>
@@ -161,6 +161,7 @@
     const copyButton = document.getElementById("copy-button");
     const copySource = document.getElementById("copy-source");
     const summaryButton = document.getElementById("summary-button");
+    const fetchButton = document.getElementById("fetch-button");
     const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
     const modeInputs = document.querySelectorAll('input[name="mode"]');
     const technicalEvaluationDate = document.getElementById("technical-evaluation-date");
@@ -178,6 +179,14 @@
 
     modeInputs.forEach((input) => input.addEventListener("change", updateSummaryButton));
     updateSummaryButton();
+
+    document.querySelector("form.work-area").addEventListener("submit", (event) => {
+      if (event.submitter !== summaryButton && event.submitter !== fetchButton) {
+        return;
+      }
+      summaryButton.disabled = true;
+      fetchButton.disabled = true;
+    });
 
     function allTechnicalTimes() {
       const values = Object.values(technicalTimesByDate).flat();

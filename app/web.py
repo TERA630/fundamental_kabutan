@@ -52,6 +52,8 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     @app.get("/")
     def index() -> str:
+        with ui_state.market_data_operation_lock:
+            state_manager.refresh_technical_evaluation_choices()
         return _render(ui_state)
 
     @app.post("/watchlist")
@@ -105,42 +107,54 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
     @app.post("/fetch")
     def fetch_output() -> str:
-        state_manager.sync_form_selection(
-            request.form.get("selected_stock", ui_state.selected_label),
-            request.form.get("mode", ui_state.mode),
-            request.form.get("technical_evaluation_date"),
-            request.form.get("technical_evaluation_time"),
-        )
-        state_manager.refresh_technical_evaluation_choices()
+        if not ui_state.market_data_operation_lock.acquire(blocking=False):
+            ui_state.status = "市場データ取得中です。完了後に再実行してください。"
+            return _render(ui_state)
         try:
-            state_manager.fetch_output_for_current_selection()
-        except Exception as exc:
-            ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
-        return _render(ui_state)
+            state_manager.sync_form_selection(
+                request.form.get("selected_stock", ui_state.selected_label),
+                request.form.get("mode", ui_state.mode),
+                request.form.get("technical_evaluation_date"),
+                request.form.get("technical_evaluation_time"),
+            )
+            state_manager.refresh_technical_evaluation_choices()
+            try:
+                state_manager.fetch_output_for_current_selection()
+            except Exception as exc:
+                ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
+            return _render(ui_state)
+        finally:
+            ui_state.market_data_operation_lock.release()
 
     @app.post("/summary")
     def build_summary() -> str:
-        state_manager.sync_form_selection(
-            request.form.get("selected_stock", ui_state.selected_label),
-            request.form.get("mode", ui_state.mode),
-            request.form.get("technical_evaluation_date"),
-            request.form.get("technical_evaluation_time"),
-        )
-        state_manager.refresh_technical_evaluation_choices()
+        if not ui_state.market_data_operation_lock.acquire(blocking=False):
+            ui_state.status = "市場データ取得中です。完了後に再実行してください。"
+            return _render(ui_state)
         try:
-            table = state_manager.build_summary_table_for_current_mode()
-            if table is None:
-                return _render(ui_state)
-            if ui_state.mode == "technical":
-                ui_state.fundamental_summary_html = build_technical_summary_html(table)
-                ui_state.status = f"Technicalサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label()}"
-            else:
-                ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
-                ui_state.status = "Fundamentalサマリを表示しました。"
-        except Exception as exc:
-            ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
-            ui_state.fundamental_summary_html = ""
-        return _render(ui_state)
+            state_manager.sync_form_selection(
+                request.form.get("selected_stock", ui_state.selected_label),
+                request.form.get("mode", ui_state.mode),
+                request.form.get("technical_evaluation_date"),
+                request.form.get("technical_evaluation_time"),
+            )
+            state_manager.refresh_technical_evaluation_choices()
+            try:
+                table = state_manager.build_summary_table_for_current_mode()
+                if table is None:
+                    return _render(ui_state)
+                if ui_state.mode == "technical":
+                    ui_state.fundamental_summary_html = build_technical_summary_html(table)
+                    ui_state.status = f"Technicalサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label()}"
+                else:
+                    ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
+                    ui_state.status = "Fundamentalサマリを表示しました。"
+            except Exception as exc:
+                ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
+                ui_state.fundamental_summary_html = ""
+            return _render(ui_state)
+        finally:
+            ui_state.market_data_operation_lock.release()
 
     @app.get("/download")
     def download_output() -> Response:
@@ -155,7 +169,6 @@ def create_app(state: WebUiState | None = None) -> Flask:
 
 
 def _render(state: WebUiState) -> str:
-    WebUiStateManager(state).refresh_technical_evaluation_choices()
     output_blocks = (
         [WebTextBlock(kind="text", text=state.output)]
         if state.mode == "technical"

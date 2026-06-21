@@ -16,6 +16,16 @@ def test_range_table_uses_descending_inclusive_lower_bounds_and_default():
     assert table.resolve(None) == "low"
 
 
+def test_range_table_can_use_an_exclusive_lower_bound():
+    table = RangeTable(
+        bands=(RangeBand(25, "top", inclusive=False), RangeBand(15, "high")),
+        default="other",
+    )
+
+    assert table.resolve(25) == "high"
+    assert table.resolve(25.001) == "top"
+
+
 def test_range_table_rejects_ascending_bands():
     with pytest.raises(ValueError, match="descending"):
         RangeTable(bands=(RangeBand(5, 1), RangeBand(10, 2)), default=0)

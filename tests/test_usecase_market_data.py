@@ -96,5 +96,60 @@ def test_market_data_service_does_not_cache_snapshot_without_price():
     assert build_market_snapshot_cache_key("7203") not in cache.store
 
 
+def test_market_data_service_retries_and_discards_mixed_symbol_intraday_history():
+    cache = InMemoryCache()
+    calls = {"intraday": 0}
+    daily = _history()
+    mixed_symbol_intraday = _history(3).assign(Close=[1000.0, 1000.0, 1000.0])
+
+    def fetch_intraday(_code4):
+        calls["intraday"] += 1
+        return mixed_symbol_intraday
+
+    service = MarketDataService(
+        file_cache=cache,
+        fetch_daily_history=lambda _code4: daily,
+        fetch_intraday_history=fetch_intraday,
+        fetch_market_snapshot=lambda _code4, **_kwargs: MarketSnapshot.empty(),
+    )
+
+    bundle = service.fetch_bundle("7203")
+
+    assert calls["intraday"] == 2
+    assert bundle.intraday_history.empty
+    intraday_payload = cache.store["tech_intraday_7203_60d_5m_jst"]
+    assert intraday_payload["code4"] == "7203"
+    assert intraday_payload["kind"] == "technical_intraday_5m"
+    assert intraday_payload["data"] == []
+
+
+def test_market_data_service_replaces_legacy_history_cache_without_metadata():
+    cache = InMemoryCache()
+    cache.store["tech_daily_7203_4mo_1d"] = {
+        "index": ["2026-05-29"],
+        "columns": ["Open", "High", "Low", "Close", "Volume"],
+        "data": [[1, 1, 1, 1, 1]],
+    }
+    calls = {"daily": 0}
+
+    def fetch_daily(_code4):
+        calls["daily"] += 1
+        return _history()
+
+    service = MarketDataService(
+        file_cache=cache,
+        fetch_daily_history=fetch_daily,
+        fetch_intraday_history=lambda _code4: _history(),
+        fetch_market_snapshot=lambda _code4, **_kwargs: MarketSnapshot.empty(),
+    )
+
+    daily = service.fetch_daily_history_cached("7203")
+
+    assert calls["daily"] == 1
+    assert daily.iloc[-1]["Close"] == 102.0
+    assert cache.store["tech_daily_7203_4mo_1d"]["code4"] == "7203"
+    assert cache.store["tech_daily_7203_4mo_1d"]["kind"] == "technical_daily"
+
+
 def test_market_snapshot_cache_ttl_matches_existing_yfinance_ttl():
     assert MARKET_SNAPSHOT_TTL_SEC == 12 * 60 * 60

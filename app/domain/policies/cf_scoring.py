@@ -4,8 +4,63 @@ from __future__ import annotations
 
 from app.domain.models.cf_scoring_input import CfScoringInput
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
+from app.domain.policies.range_table import RangeBand, RangeTable
 
 SCORING_VERSION = "rankcf-v1"
+
+MetricRating = tuple[str, int]
+
+ROIC_RATINGS = RangeTable[MetricRating](
+    bands=(
+        RangeBand(25, ("S", 15)),
+        RangeBand(20, ("A", 12)),
+        RangeBand(15, ("B", 9)),
+        RangeBand(10, ("C", 6)),
+        RangeBand(5, ("D", 3)),
+    ),
+    default=("E", 0),
+)
+
+OCF_MARGIN_RATINGS = RangeTable[MetricRating](
+    bands=(
+        RangeBand(20, ("S", 10)),
+        RangeBand(15, ("A", 8)),
+        RangeBand(10, ("B", 6)),
+        RangeBand(5, ("C", 3)),
+        RangeBand(0, ("D", 1)),
+    ),
+    default=("E", 0),
+)
+
+OP_MARGIN_RATINGS = RangeTable[MetricRating](
+    bands=(
+        RangeBand(25, ("S", 10)),
+        RangeBand(15, ("A", 8)),
+        RangeBand(10, ("B", 5)),
+        RangeBand(5, ("C", 2)),
+    ),
+    default=("D", 0),
+)
+
+EPS_CAGR_3Y_RATINGS = RangeTable[MetricRating](
+    bands=(
+        RangeBand(25, ("S", 15), inclusive=False),
+        RangeBand(15, ("A", 12)),
+        RangeBand(8, ("B", 8)),
+        RangeBand(0, ("C", 4)),
+    ),
+    default=("D", 0),
+)
+
+SALES_CAGR_3Y_RATINGS = RangeTable[MetricRating](
+    bands=(
+        RangeBand(20, ("S", 10), inclusive=False),
+        RangeBand(12, ("A", 8)),
+        RangeBand(6, ("B", 5)),
+        RangeBand(0, ("C", 2)),
+    ),
+    default=("D", 0),
+)
 
 
 def _metric(metric_id: str, category: str, raw_value: float | None, rank: str, points: int, max_points: int, *notes: str) -> MetricScore:
@@ -23,17 +78,8 @@ def _metric(metric_id: str, category: str, raw_value: float | None, rank: str, p
 def score_roic(roic: float | None) -> MetricScore:
     if roic is None:
         return _metric("roic", "quality", None, "N/A", 0, 15)
-    if roic >= 25:
-        return _metric("roic", "quality", roic, "S", 15, 15)
-    if roic >= 20:
-        return _metric("roic", "quality", roic, "A", 12, 15)
-    if roic >= 15:
-        return _metric("roic", "quality", roic, "B", 9, 15)
-    if roic >= 10:
-        return _metric("roic", "quality", roic, "C", 6, 15)
-    if roic >= 5:
-        return _metric("roic", "quality", roic, "D", 3, 15)
-    return _metric("roic", "quality", roic, "E", 0, 15)
+    rank, points = ROIC_RATINGS.resolve(roic)
+    return _metric("roic", "quality", roic, rank, points, 15)
 
 
 def score_cash_conversion_np(ocf: float | None, net_income: float | None) -> MetricScore:
@@ -78,32 +124,16 @@ def score_ocf_margin(ocf: float | None, revenue: float | None) -> MetricScore:
     if ocf is None or revenue in (None, 0):
         return _metric("ocf_margin", "quality", None, "N/A", 0, 10)
     margin = (ocf / revenue) * 100
-    if margin >= 20:
-        return _metric("ocf_margin", "quality", margin, "S", 10, 10)
-    if margin >= 15:
-        return _metric("ocf_margin", "quality", margin, "A", 8, 10)
-    if margin >= 10:
-        return _metric("ocf_margin", "quality", margin, "B", 6, 10)
-    if margin >= 5:
-        return _metric("ocf_margin", "quality", margin, "C", 3, 10)
-    if margin >= 0:
-        return _metric("ocf_margin", "quality", margin, "D", 1, 10)
-    return _metric("ocf_margin", "quality", margin, "E", 0, 10)
+    rank, points = OCF_MARGIN_RATINGS.resolve(margin)
+    return _metric("ocf_margin", "quality", margin, rank, points, 10)
 
 
 def score_op_margin(operating_income: float | None, revenue: float | None) -> MetricScore:
     if operating_income is None or revenue in (None, 0):
         return _metric("op_margin", "quality", None, "N/A", 0, 10)
     margin = (operating_income / revenue) * 100
-    if margin >= 25:
-        return _metric("op_margin", "quality", margin, "S", 10, 10)
-    if margin >= 15:
-        return _metric("op_margin", "quality", margin, "A", 8, 10)
-    if margin >= 10:
-        return _metric("op_margin", "quality", margin, "B", 5, 10)
-    if margin >= 5:
-        return _metric("op_margin", "quality", margin, "C", 2, 10)
-    return _metric("op_margin", "quality", margin, "D", 0, 10)
+    rank, points = OP_MARGIN_RATINGS.resolve(margin)
+    return _metric("op_margin", "quality", margin, rank, points, 10)
 
 
 def score_fcf_ratio(fcf: float | None, ocf: float | None, sales_cagr_3y: float | None, roic: float | None) -> MetricScore:
@@ -139,29 +169,15 @@ def score_fcf_ratio(fcf: float | None, ocf: float | None, sales_cagr_3y: float |
 def score_eps_cagr_3y(eps_cagr_3y: float | None) -> MetricScore:
     if eps_cagr_3y is None:
         return _metric("eps_cagr_3y", "growth", None, "N/A", 0, 15)
-    if eps_cagr_3y > 25:
-        return _metric("eps_cagr_3y", "growth", eps_cagr_3y, "S", 15, 15)
-    if eps_cagr_3y >= 15:
-        return _metric("eps_cagr_3y", "growth", eps_cagr_3y, "A", 12, 15)
-    if eps_cagr_3y >= 8:
-        return _metric("eps_cagr_3y", "growth", eps_cagr_3y, "B", 8, 15)
-    if eps_cagr_3y >= 0:
-        return _metric("eps_cagr_3y", "growth", eps_cagr_3y, "C", 4, 15)
-    return _metric("eps_cagr_3y", "growth", eps_cagr_3y, "D", 0, 15)
+    rank, points = EPS_CAGR_3Y_RATINGS.resolve(eps_cagr_3y)
+    return _metric("eps_cagr_3y", "growth", eps_cagr_3y, rank, points, 15)
 
 
 def score_sales_cagr_3y(sales_cagr_3y: float | None) -> MetricScore:
     if sales_cagr_3y is None:
         return _metric("sales_cagr_3y", "growth", None, "N/A", 0, 10)
-    if sales_cagr_3y > 20:
-        return _metric("sales_cagr_3y", "growth", sales_cagr_3y, "S", 10, 10)
-    if sales_cagr_3y >= 12:
-        return _metric("sales_cagr_3y", "growth", sales_cagr_3y, "A", 8, 10)
-    if sales_cagr_3y >= 6:
-        return _metric("sales_cagr_3y", "growth", sales_cagr_3y, "B", 5, 10)
-    if sales_cagr_3y >= 0:
-        return _metric("sales_cagr_3y", "growth", sales_cagr_3y, "C", 2, 10)
-    return _metric("sales_cagr_3y", "growth", sales_cagr_3y, "D", 0, 10)
+    rank, points = SALES_CAGR_3Y_RATINGS.resolve(sales_cagr_3y)
+    return _metric("sales_cagr_3y", "growth", sales_cagr_3y, rank, points, 10)
 
 
 def score_fcf_yield(fcf_yield: float | None, sales_cagr_3y: float | None) -> MetricScore:

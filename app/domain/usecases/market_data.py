@@ -14,6 +14,11 @@ from app.domain.policies.market_history import (
     build_technical_intraday_history_cache_key,
 )
 from app.domain.usecases.technical_analysis import dataframe_from_cache_payload, dataframe_to_cache_payload
+from app.domain.usecases.market_data_lock import (
+    INTRADAY_MARKET_DATA_LOCK,
+    INTRADAY_PRICE_DEVIATION_LIMIT,
+    is_intraday_history_consistent,
+)
 
 MARKET_SNAPSHOT_TTL_SEC = 12 * 60 * 60
 
@@ -70,7 +75,7 @@ class MarketDataService:
 
     def fetch_bundle(self, code4: str) -> MarketDataBundle:
         daily_history = self.fetch_daily_history_cached(code4)
-        intraday_history = self.fetch_intraday_history_cached(code4)
+        intraday_history = self.fetch_intraday_history_cached(code4, daily_history=daily_history)
         snapshot = self.fetch_market_snapshot_cached(code4, daily_history=daily_history)
         return MarketDataBundle(
             code4=code4,
@@ -81,21 +86,43 @@ class MarketDataService:
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:
         key = build_technical_daily_history_cache_key(code4)
-        cached = dataframe_from_cache_payload(self.file_cache.get(key, TECH_DAILY_HISTORY_TTL_SEC))
+        cached = dataframe_from_cache_payload(
+            self.file_cache.get(key, TECH_DAILY_HISTORY_TTL_SEC),
+            code4=code4,
+            kind="technical_daily",
+        )
         if cached is not None:
             return cached
         frame = self.fetch_daily_history(code4)
-        self.file_cache.set(key, dataframe_to_cache_payload(frame))
+        self.file_cache.set(key, dataframe_to_cache_payload(frame, code4=code4, kind="technical_daily"))
         return frame
 
-    def fetch_intraday_history_cached(self, code4: str) -> pd.DataFrame:
+    def fetch_intraday_history_cached(
+        self,
+        code4: str,
+        *,
+        daily_history: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
         key = build_technical_intraday_history_cache_key(code4)
-        cached = dataframe_from_cache_payload(self.file_cache.get(key, TECH_INTRADAY_HISTORY_TTL_SEC))
-        if cached is not None:
-            return cached
-        frame = self.fetch_intraday_history(code4)
-        self.file_cache.set(key, dataframe_to_cache_payload(frame))
-        return frame
+        with INTRADAY_MARKET_DATA_LOCK:
+            cached = dataframe_from_cache_payload(
+                self.file_cache.get(key, TECH_INTRADAY_HISTORY_TTL_SEC),
+                code4=code4,
+                kind="technical_intraday_5m",
+            )
+            if cached is not None and is_intraday_history_consistent(cached, daily_history):
+                return cached
+
+            frame = self.fetch_intraday_history(code4)
+            if not is_intraday_history_consistent(frame, daily_history):
+                frame = self.fetch_intraday_history(code4)
+            if not is_intraday_history_consistent(frame, daily_history):
+                frame = pd.DataFrame()
+            self.file_cache.set(
+                key,
+                dataframe_to_cache_payload(frame, code4=code4, kind="technical_intraday_5m"),
+            )
+            return frame
 
     def fetch_market_snapshot_cached(self, code4: str, *, daily_history: pd.DataFrame | None = None) -> MarketSnapshot:
         key = build_market_snapshot_cache_key(code4)
@@ -113,6 +140,7 @@ class MarketDataService:
 
 
 __all__ = [
+    "INTRADAY_PRICE_DEVIATION_LIMIT",
     "MARKET_SNAPSHOT_TTL_SEC",
     "MarketDataCachePort",
     "MarketDataService",

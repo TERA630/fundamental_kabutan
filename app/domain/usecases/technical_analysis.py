@@ -22,6 +22,7 @@ from app.domain.policies.market_history import (
     slice_technical_histories_for_evaluation,
 )
 from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
+from app.domain.usecases.market_data_lock import INTRADAY_MARKET_DATA_LOCK, is_intraday_history_consistent
 
 
 class TechnicalHistoryCachePort(Protocol):
@@ -61,16 +62,35 @@ class TechnicalAnalysisResult:
     evaluation_price_timestamp: str | None
 
 
-def dataframe_to_cache_payload(frame: pd.DataFrame) -> dict[str, Any]:
-    return {
+def dataframe_to_cache_payload(
+    frame: pd.DataFrame,
+    *,
+    code4: str | None = None,
+    kind: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "index": [str(value) for value in frame.index],
         "columns": list(frame.columns),
         "data": frame.astype(object).where(pd.notna(frame), None).values.tolist(),
     }
+    if code4 is not None:
+        payload["code4"] = code4
+    if kind is not None:
+        payload["kind"] = kind
+    return payload
 
 
-def dataframe_from_cache_payload(payload: Any) -> pd.DataFrame | None:
+def dataframe_from_cache_payload(
+    payload: Any,
+    *,
+    code4: str | None = None,
+    kind: str | None = None,
+) -> pd.DataFrame | None:
     if not isinstance(payload, dict):
+        return None
+    if code4 is not None and payload.get("code4") != code4:
+        return None
+    if kind is not None and payload.get("kind") != kind:
         return None
     index = payload.get("index")
     columns = payload.get("columns")
@@ -107,7 +127,7 @@ class TechnicalAnalysisService:
         evaluation_at: datetime | None = None,
     ) -> TechnicalAnalysisResult:
         daily_history = self.fetch_daily_history_cached(code4)
-        intraday_history = self.fetch_intraday_history_cached(code4)
+        intraday_history = self.fetch_intraday_history_cached(code4, daily_history=daily_history)
         return self.build_analysis_result_from_histories(
             name=name,
             code4=code4,
@@ -173,21 +193,42 @@ class TechnicalAnalysisService:
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:
         key = build_technical_daily_history_cache_key(code4)
-        cached = dataframe_from_cache_payload(self.file_cache.get(key, TECH_DAILY_HISTORY_TTL_SEC))
+        cached = dataframe_from_cache_payload(
+            self.file_cache.get(key, TECH_DAILY_HISTORY_TTL_SEC),
+            code4=code4,
+            kind="technical_daily",
+        )
         if cached is not None:
             return cached
         frame = self.fetch_daily_history(code4)
-        self.file_cache.set(key, dataframe_to_cache_payload(frame))
+        self.file_cache.set(key, dataframe_to_cache_payload(frame, code4=code4, kind="technical_daily"))
         return frame
 
-    def fetch_intraday_history_cached(self, code4: str) -> pd.DataFrame:
+    def fetch_intraday_history_cached(
+        self,
+        code4: str,
+        *,
+        daily_history: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
         key = build_technical_intraday_history_cache_key(code4)
-        cached = dataframe_from_cache_payload(self.file_cache.get(key, TECH_INTRADAY_HISTORY_TTL_SEC))
-        if cached is not None:
-            return cached
-        frame = self.fetch_intraday_history(code4)
-        self.file_cache.set(key, dataframe_to_cache_payload(frame))
-        return frame
+        with INTRADAY_MARKET_DATA_LOCK:
+            cached = dataframe_from_cache_payload(
+                self.file_cache.get(key, TECH_INTRADAY_HISTORY_TTL_SEC),
+                code4=code4,
+                kind="technical_intraday_5m",
+            )
+            if cached is not None and is_intraday_history_consistent(cached, daily_history):
+                return cached
+            frame = self.fetch_intraday_history(code4)
+            if not is_intraday_history_consistent(frame, daily_history):
+                frame = self.fetch_intraday_history(code4)
+            if not is_intraday_history_consistent(frame, daily_history):
+                frame = pd.DataFrame()
+            self.file_cache.set(
+                key,
+                dataframe_to_cache_payload(frame, code4=code4, kind="technical_intraday_5m"),
+            )
+            return frame
 
 
 def _as_optional_str(value: Any) -> str | None:
