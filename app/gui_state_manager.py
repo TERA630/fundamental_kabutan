@@ -97,10 +97,12 @@ class GuiStateManager:
         )
         if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in valid_times:
             self.state.technical_evaluation_time = ""
+            self.state.technical_evaluation_time_is_latest = False
 
     def set_technical_evaluation_selection(self, *, date_text: str, time_text: str) -> None:
         self.state.technical_evaluation_date = "" if date_text == "最新" else date_text.strip()
         self.state.technical_evaluation_time = "" if time_text == "最新" else time_text.strip()
+        self.state.technical_evaluation_time_is_latest = time_text == "最新" or not time_text.strip()
 
     def update_technical_time_choices_for_selected_date(self) -> None:
         times_by_date = self.state.technical_evaluation_time_choices_by_date
@@ -109,15 +111,33 @@ class GuiStateManager:
         else:
             times = sorted({time for values in times_by_date.values() for time in values})
         self.state.technical_evaluation_time_choices = times
+        if not self.state.technical_evaluation_date:
+            return
         if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in times:
             self.state.technical_evaluation_time = ""
+        if not self.state.technical_evaluation_time:
+            self.state.technical_evaluation_time = self._preferred_historical_time(times)
+            self.state.technical_evaluation_time_is_latest = False
+
+    @staticmethod
+    def _preferred_historical_time(times: list[str]) -> str:
+        """Choose 14:00 when possible, otherwise the nearest usable afternoon bar."""
+
+        if "14:00" in times:
+            return "14:00"
+        return next((time for time in times if time >= "14:00"), times[-1] if times else "")
 
     def technical_evaluation_at(self) -> datetime | None:
         date_text = self.state.technical_evaluation_date.strip()
         time_text = self.state.technical_evaluation_time.strip()
-        if not date_text or not time_text:
+        if not date_text:
             return None
         times_by_date = self.state.technical_evaluation_time_choices_by_date
+        if not time_text and self.state.technical_evaluation_time_is_latest:
+            available_times = times_by_date.get(date_text, [])
+            time_text = available_times[-1] if available_times else ""
+        if not time_text:
+            return None
         if times_by_date and time_text not in times_by_date.get(date_text, []):
             return None
         try:

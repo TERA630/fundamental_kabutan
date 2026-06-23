@@ -142,3 +142,14 @@ def test_technical_evaluation_label_formats_valid_selection():
     manager = WebUiStateManager(state)
 
     assert manager.technical_evaluation_label() == "2026-05-29 09:10"
+
+
+def test_technical_evaluation_at_uses_selected_dates_latest_bar_when_time_is_latest():
+    state = WebUiState(controller=FakeController())
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-06-19"
+    state.technical_evaluation_time_choices_by_date = {"2026-06-19": ["09:00", "14:00", "15:20"]}
+    manager = WebUiStateManager(state)
+
+    assert manager.technical_evaluation_at() == datetime(2026, 6, 19, 15, 20)
+    assert manager.technical_evaluation_label() == "2026-06-19 15:20"

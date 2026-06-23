@@ -35,6 +35,7 @@ class WebUiState:
     summary_filename: str = ""
     technical_evaluation_date: str = ""
     technical_evaluation_time: str = ""
+    technical_evaluation_time_is_latest: bool = True
     technical_evaluation_date_choices: list[str] = field(default_factory=list)
     technical_evaluation_time_choices: list[str] = field(default_factory=list)
     technical_evaluation_time_choices_by_date: dict[str, list[str]] = field(default_factory=dict)
@@ -101,6 +102,7 @@ class WebUiStateManager:
             self.state.technical_evaluation_date = technical_evaluation_date
         if technical_evaluation_time is not None:
             self.state.technical_evaluation_time = technical_evaluation_time
+            self.state.technical_evaluation_time_is_latest = not technical_evaluation_time.strip()
 
     def selected_stock(self) -> tuple[str, str] | None:
         _, mapping = build_stock_choices(self.state.watchlist)
@@ -206,9 +208,14 @@ class WebUiStateManager:
             return None
         date_text = self.state.technical_evaluation_date.strip()
         time_text = self.state.technical_evaluation_time.strip()
-        if not date_text or not time_text:
+        if not date_text:
             return None
         times_by_date = self.state.technical_evaluation_time_choices_by_date
+        if not time_text and self.state.technical_evaluation_time_is_latest:
+            available_times = times_by_date.get(date_text, [])
+            time_text = available_times[-1] if available_times else ""
+        if not time_text:
+            return None
         if times_by_date and time_text not in times_by_date.get(date_text, []):
             return None
         try:
@@ -262,3 +269,4 @@ class WebUiStateManager:
             valid_times = times
         if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in valid_times:
             self.state.technical_evaluation_time = ""
+            self.state.technical_evaluation_time_is_latest = False

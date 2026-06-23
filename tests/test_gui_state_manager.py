@@ -105,6 +105,29 @@ def test_technical_evaluation_at_uses_valid_gui_selection(tmp_path: Path):
     assert manager.technical_evaluation_label() == "2026-05-29 09:10"
 
 
+def test_technical_evaluation_at_uses_selected_dates_latest_bar_when_time_is_latest():
+    state = GuiState(
+        technical_evaluation_date="2026-06-19",
+        technical_evaluation_time_choices_by_date={"2026-06-19": ["09:00", "14:00", "15:20"]},
+    )
+    manager = build_manager(FakeController(), state)
+
+    assert manager.technical_evaluation_at() == datetime(2026, 6, 19, 15, 20)
+    assert manager.technical_evaluation_label() == "2026-06-19 15:20"
+
+
+def test_date_change_defaults_gui_time_to_1400_when_available():
+    state = GuiState(
+        technical_evaluation_date="2026-06-19",
+        technical_evaluation_time_choices_by_date={"2026-06-19": ["09:00", "14:00", "14:05", "15:20"]},
+    )
+    manager = build_manager(FakeController(), state)
+
+    manager.update_technical_time_choices_for_selected_date()
+
+    assert state.technical_evaluation_time == "14:00"
+
+
 def test_technical_evaluation_at_rejects_invalid_gui_date_time_pair():
     state = GuiState(
         technical_evaluation_date="2026-05-29",

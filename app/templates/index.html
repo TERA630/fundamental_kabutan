@@ -193,6 +193,13 @@
       return Array.from(new Set(values)).sort();
     }
 
+    function preferredHistoricalTime(times) {
+      if (times.includes("14:00")) {
+        return "14:00";
+      }
+      return times.find((time) => time >= "14:00") || times.at(-1) || "";
+    }
+
     function rebuildTechnicalTimeOptions() {
       if (!technicalEvaluationDate || !technicalEvaluationTime) {
         return;
@@ -211,7 +218,9 @@
         option.textContent = time;
         technicalEvaluationTime.appendChild(option);
       });
-      technicalEvaluationTime.value = times.includes(currentTime) ? currentTime : "";
+      technicalEvaluationTime.value = times.includes(currentTime)
+        ? currentTime
+        : (selectedDate ? preferredHistoricalTime(times) : "");
     }
 
     if (technicalEvaluationDate) {
