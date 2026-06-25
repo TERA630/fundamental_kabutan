@@ -40,6 +40,7 @@ class FundamentalView:
         on_open_kabutan_dir,
         on_build_kabutan_package,
         on_summary,
+        on_hybrid_summary,
         on_tab_changed,
         on_refresh_technical_evaluation,
         on_technical_evaluation_date_changed,
@@ -72,6 +73,8 @@ class FundamentalView:
         self.fetch_button.pack(side="left", padx=(0, 6))
         self.summary_button = ttk.Button(control, text="サマリ出力", command=on_summary)
         self.summary_button.pack(side="left", padx=(0, 6))
+        self.hybrid_summary_button = ttk.Button(control, text="Hybridサマリ", command=on_hybrid_summary)
+        self.hybrid_summary_button.pack(side="left", padx=(0, 6))
         self.copy_button = ttk.Button(control, text="コピー", command=on_copy)
         self.copy_button.pack(side="left", padx=(0, 6))
         self.save_button = ttk.Button(control, text="保存", command=on_save)
@@ -145,6 +148,7 @@ class FundamentalView:
         self.kabutan_package_button.configure(state=state)
         self.fetch_button.configure(state=state)
         self.summary_button.configure(state=state)
+        self.hybrid_summary_button.configure(state=state)
         self.copy_button.configure(state=state)
         self.save_button.configure(state=state)
         self.stock_combo.configure(state=readonly_state)

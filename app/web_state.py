@@ -203,8 +203,24 @@ class WebUiStateManager:
             evaluation_at=self.technical_evaluation_at(),
         )
 
-    def technical_evaluation_at(self) -> datetime | None:
-        if self.state.mode != "technical":
+    def build_hybrid_summary_table(self):
+        if not self.state.watchlist:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            self.state.fundamental_summary_html = ""
+            return None
+        self.ensure_kabutan_html_dir_for_fundamental()
+        if self.state.kabutan_html_dir is None:
+            self.state.status = self.state.view_model.build_kabutan_dir_restore_required_status()
+            self.state.fundamental_summary_html = ""
+            return None
+        return self.state.controller.build_hybrid_summary_table(
+            watchlist_entries=self.state.watchlist,
+            kabutan_html_dir=self.state.kabutan_html_dir,
+            evaluation_at=self.technical_evaluation_at(force=True),
+        )
+
+    def technical_evaluation_at(self, *, force: bool = False) -> datetime | None:
+        if not force and self.state.mode != "technical":
             return None
         date_text = self.state.technical_evaluation_date.strip()
         time_text = self.state.technical_evaluation_time.strip()
@@ -223,14 +239,14 @@ class WebUiStateManager:
         except ValueError:
             return None
 
-    def technical_evaluation_label(self) -> str:
-        value = self.technical_evaluation_at()
+    def technical_evaluation_label(self, *, force: bool = False) -> str:
+        value = self.technical_evaluation_at(force=force)
         if value is None:
             return "最新"
         return value.strftime("%Y-%m-%d %H:%M")
 
-    def refresh_technical_evaluation_choices(self) -> None:
-        if self.state.mode != "technical":
+    def refresh_technical_evaluation_choices(self, *, force: bool = False) -> None:
+        if not force and self.state.mode != "technical":
             return
         selected = self.selected_stock()
         if selected is None:

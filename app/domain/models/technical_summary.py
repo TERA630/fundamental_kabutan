@@ -69,6 +69,11 @@ class TechnicalSummaryRow:
     collapse_risk_score: int | None = None
     headline_comment: str = ""
     next_action: str = ""
+    high_breakout_count: int | None = None
+    low_higher_count: int | None = None
+    low_lower_count: int | None = None
+    previous_low_maintained: bool | None = None
+    volume_spike_bearish: bool | None = None
 
 
 @dataclass(frozen=True)

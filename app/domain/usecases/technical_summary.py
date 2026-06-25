@@ -74,6 +74,7 @@ class TechnicalSummaryService:
         momentum_sessions = getattr(result.three_session_momentum, "sessions", ())
         high_breakout_count = _count_true(session.high_breakout for session in momentum_sessions)
         low_higher_count = _count_true(session.low_higher for session in momentum_sessions)
+        low_lower_count = _count_false(session.low_higher for session in momentum_sessions)
         day_close_position = _range_position(latest, evaluation_low, evaluation_high)
         ma25_distance_atr = _safe_div(
             None if moving_average.ma25 is None else latest - moving_average.ma25,
@@ -185,6 +186,15 @@ class TechnicalSummaryService:
             collapse_risk_score=position_assessment.collapse_risk_score,
             headline_comment=headline.comment,
             next_action=headline.next_action,
+            high_breakout_count=high_breakout_count,
+            low_higher_count=low_higher_count,
+            low_lower_count=low_lower_count,
+            previous_low_maintained=_gte(evaluation_low, previous.prev_low),
+            volume_spike_bearish=_volume_spike_bearish(
+                latest=latest,
+                day_open=evaluation_open,
+                volume_vs_avg20_pct=volume_vs_avg20_pct,
+            ),
         )
 
 
@@ -247,6 +257,30 @@ def _safe_div(value: float | None, divisor: float | None) -> float | None:
 
 def _count_true(values: Iterable[bool | None]) -> int:
     return sum(1 for value in values if value is True)
+
+
+def _count_false(values: Iterable[bool | None]) -> int | None:
+    items = tuple(values)
+    if not any(value is not None for value in items):
+        return None
+    return sum(1 for value in items if value is False)
+
+
+def _gte(value: float | None, threshold: float | None) -> bool | None:
+    if value is None or threshold is None:
+        return None
+    return value >= threshold
+
+
+def _volume_spike_bearish(
+    *,
+    latest: float,
+    day_open: float | None,
+    volume_vs_avg20_pct: float | None,
+) -> bool | None:
+    if day_open is None or volume_vs_avg20_pct is None:
+        return None
+    return volume_vs_avg20_pct >= 150 and latest < day_open
 
 
 _COLLAPSE_SCORE_SORT_RANKS = frozenset(("B2", "B1", "A2", "A1", "A1弱", "C2", "C1"))

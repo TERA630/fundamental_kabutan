@@ -61,6 +61,7 @@ class FundamentalApp:
             on_open_kabutan_dir=self.open_kabutan_html_dir,
             on_build_kabutan_package=self.build_kabutan_html_package,
             on_summary=self.generate_summary,
+            on_hybrid_summary=self.generate_hybrid_summary,
             on_tab_changed=self.on_tab_changed,
             on_refresh_technical_evaluation=self.refresh_technical_evaluation_choices,
             on_technical_evaluation_date_changed=self.on_technical_evaluation_date_changed,
@@ -224,7 +225,14 @@ class FundamentalApp:
 
     def _summary_worker(self, output_dir: Path, mode: str, evaluation_at=None, evaluation_label: str = "最新"):
         try:
-            if mode == "technical":
+            if mode == "hybrid":
+                output_path = self.controller.build_and_save_hybrid_summary(
+                    watchlist_entries=self.state.watchlist,
+                    output_dir=output_dir,
+                    kabutan_html_dir=self.state.kabutan_html_dir,
+                    evaluation_at=evaluation_at,
+                )
+            elif mode == "technical":
                 output_path = self.controller.build_and_save_technical_summary(
                     watchlist_entries=self.state.watchlist,
                     output_dir=output_dir,
@@ -237,7 +245,7 @@ class FundamentalApp:
                     kabutan_html_dir=self.state.kabutan_html_dir,
                 )
             status = self.view_model.build_saved_status(str(output_path))
-            if mode == "technical":
+            if mode in {"technical", "hybrid"}:
                 status = f"{status} / 評価時点={evaluation_label}"
             self.master.after(0, lambda: self.set_busy(False, status))
         except Exception as exc:
@@ -327,6 +335,28 @@ class FundamentalApp:
         thread = threading.Thread(
             target=self._summary_worker,
             args=(output_dir, mode, evaluation_at, evaluation_label),
+            daemon=True,
+        )
+        thread.start()
+
+    def generate_hybrid_summary(self):
+        if self.state.is_fetching:
+            return
+
+        if not self.state.watchlist:
+            self.status_var.set(self.view_model.build_missing_stock_status())
+            return
+        if not self._require_kabutan_html_dir():
+            return
+
+        output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
+        self._sync_technical_evaluation_selection()
+        evaluation_at = self.state_manager.technical_evaluation_at()
+        evaluation_label = self.state_manager.technical_evaluation_label()
+        self.set_busy(True, self.view_model.build_summary_running_status())
+        thread = threading.Thread(
+            target=self._summary_worker,
+            args=(output_dir, "hybrid", evaluation_at, evaluation_label),
             daemon=True,
         )
         thread.start()

@@ -34,9 +34,11 @@ from app.services.kabutan_package_workflow import (
 )
 from app.services.summary_workflow import (
     FUNDAMENTAL_SUMMARY_FILENAME_PREFIX,
+    HYBRID_SUMMARY_FILENAME_PREFIX,
     TECHNICAL_SUMMARY_FILENAME_PREFIX,
     SummaryWorkflow,
     build_fundamental_summary_filename,
+    build_hybrid_summary_filename,
     build_technical_summary_filename,
 )
 from app.services.stock_analysis_workflow import StockAnalysisWorkflow
@@ -263,6 +265,19 @@ class AnalysisApplicationService:
             evaluation_at=evaluation_at,
         )
 
+    def build_hybrid_summary_table(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+        kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
+    ):
+        return self.summary_workflow.build_hybrid_summary_table(
+            watchlist_entries=watchlist_entries,
+            kabutan_html_dir=kabutan_html_dir,
+            evaluation_at=evaluation_at,
+        )
+
     def build_and_save_technical_summary(
         self,
         *,
@@ -274,6 +289,23 @@ class AnalysisApplicationService:
         return self.summary_workflow.build_and_save_technical_summary(
             watchlist_entries=watchlist_entries,
             output_dir=output_dir,
+            generated_at=generated_at,
+            evaluation_at=evaluation_at,
+        )
+
+    def build_and_save_hybrid_summary(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str]],
+        output_dir: Path,
+        kabutan_html_dir: Path | None = None,
+        generated_at: datetime | None = None,
+        evaluation_at: datetime | None = None,
+    ) -> Path:
+        return self.summary_workflow.build_and_save_hybrid_summary(
+            watchlist_entries=watchlist_entries,
+            output_dir=output_dir,
+            kabutan_html_dir=kabutan_html_dir,
             generated_at=generated_at,
             evaluation_at=evaluation_at,
         )
@@ -311,6 +343,7 @@ class AnalysisApplicationService:
 
 __all__ = [
     "FUNDAMENTAL_SUMMARY_FILENAME_PREFIX",
+    "HYBRID_SUMMARY_FILENAME_PREFIX",
     "TECHNICAL_SUMMARY_FILENAME_PREFIX",
     "AnalysisApplicationService",
     "AnalysisOutputResult",
@@ -320,5 +353,6 @@ __all__ = [
     "build_default_technical_service",
     "build_default_us_market_summary_service",
     "build_fundamental_summary_filename",
+    "build_hybrid_summary_filename",
     "build_technical_summary_filename",
 ]
