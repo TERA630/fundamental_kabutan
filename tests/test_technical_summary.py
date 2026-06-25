@@ -301,7 +301,8 @@ def test_c2_short_comment_shows_fall_reason():
         c2_fall_reason="VWAP明確割れ＋終端位置低下",
     )
 
-    assert "C2 崩れ警戒 陥落トリガー：VWAP明確割れ＋終端位置低下" in comment
+    assert "C2陥落トリガー：VWAP明確割れ＋終端位置低下" in comment
+    assert "C2 崩れ警戒 陥落トリガー" not in comment
 
 
 def test_b_ranks_keep_rank_even_when_collapse_condition_is_strong():

@@ -771,9 +771,8 @@ def build_technical_short_comment(
         ma5_slope_prev=ma5_slope_prev,
         ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
-    collapse_part = f"｜{collapse_state_label}" if collapse_state_label else ""
-    c2_reason_part = f"｜C2 崩れ警戒 陥落トリガー：{c2_fall_reason}" if rank == "C2" and c2_fall_reason else ""
-    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{collapse_part}{c2_reason_part}｜{ma5_comment}"
+    c2_reason_part = f"｜C2陥落トリガー：{c2_fall_reason}" if rank == "C2" and c2_fall_reason else ""
+    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{c2_reason_part}｜{ma5_comment}"
 
 
 def build_ma5_slope_short_comment(
