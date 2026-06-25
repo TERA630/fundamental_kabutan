@@ -7,6 +7,7 @@ from app.domain.builders.technical_summary import build_technical_summary_markdo
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
 from app.domain.policies.technical_summary import (
+    build_collapse_score_brief,
     build_d1_detail,
     build_d2_detail,
     build_d3_detail,
@@ -14,6 +15,7 @@ from app.domain.policies.technical_summary import (
     build_dev25_risk_label,
     build_ma5_slope_short_comment,
     build_technical_headline_summary,
+    build_technical_short_comment,
     build_nearby_resistance_lines,
     build_nearby_support_lines,
     build_technical_position_assessment,
@@ -377,6 +379,18 @@ def test_volume_comment_parts_follow_boundaries():
     assert build_volume_comment(120.0) == "出来高伴う"
     assert build_volume_comment(180.0) == "出来高急増"
     assert build_volume_comment(None) == "出来高N/A"
+
+
+def test_collapse_score_brief_follows_practical_score_bands():
+    assert build_collapse_score_brief(0).text == "候補｜買い条件は別確認"
+    assert build_collapse_score_brief(4).text == "候補｜買い条件は別確認"
+    assert build_collapse_score_brief(5).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
+    assert build_collapse_score_brief(6).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
+    assert build_collapse_score_brief(7).text == "原則回避｜新規買い回避。前場深押し指値は避ける"
+    assert build_collapse_score_brief(8).text == "かなり回避｜例外条件が揃う時だけ短期リバ検討"
+    assert build_collapse_score_brief(9).text == "ほぼ触らない｜構造回復まで見送り"
+    assert build_collapse_score_brief(11).text == "ほぼ触らない｜構造回復まで見送り"
+    assert build_collapse_score_brief(None).text == "候補｜買い条件は別確認"
 
 
 def test_ma5_slope_short_comment_follows_score_details():

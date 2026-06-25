@@ -11,6 +11,7 @@ from app.domain.models.technical_summary import (
     TechnicalSummaryLine,
     TechnicalSummaryRank,
 )
+from app.domain.policies.range_table import RangeBand, RangeTable
 
 RANK_LABELS: dict[TechnicalSummaryRank, str] = {
     "B2": "過熱極大",
@@ -100,6 +101,27 @@ class _RankingCollapseAssessment:
     label: str
     c2_fall: bool
     c2_fall_reason: str | None
+
+
+@dataclass(frozen=True)
+class CollapseScoreBrief:
+    label: str
+    comment: str
+
+    @property
+    def text(self) -> str:
+        return f"{self.label}｜{self.comment}"
+
+
+_COLLAPSE_SCORE_BRIEF_TABLE = RangeTable[CollapseScoreBrief](
+    bands=(
+        RangeBand(9, CollapseScoreBrief("ほぼ触らない", "構造回復まで見送り")),
+        RangeBand(8, CollapseScoreBrief("かなり回避", "例外条件が揃う時だけ短期リバ検討")),
+        RangeBand(7, CollapseScoreBrief("原則回避", "新規買い回避。前場深押し指値は避ける")),
+        RangeBand(5, CollapseScoreBrief("条件付き候補", "後場VWAP上維持・終端60%以上を確認")),
+    ),
+    default=CollapseScoreBrief("候補", "買い条件は別確認"),
+)
 
 
 @dataclass(frozen=True)
@@ -729,6 +751,10 @@ def build_technical_position_assessment(
         bottoming_start_established=latest < ma25 and headline_rank == "D3",
         collapse_risk_signals=risk.atoms,
     )
+
+
+def build_collapse_score_brief(score: int | None) -> CollapseScoreBrief:
+    return _COLLAPSE_SCORE_BRIEF_TABLE.resolve(score)
 
 
 def build_technical_short_comment(
@@ -1436,6 +1462,7 @@ __all__ = [
     "RANK_LABELS",
     "RANK_ORDER",
     "SINGLE_STOCK_POSITION_DESCRIPTIONS",
+    "build_collapse_score_brief",
     "build_d1_detail",
     "build_d2_detail",
     "build_d3_detail",

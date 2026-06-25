@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
+    build_collapse_score_brief,
     build_d1_detail,
     build_d2_detail,
     build_d3_detail,
@@ -172,8 +173,9 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
     if latest is None or ma25 is None or assessment is None:
         return "崩れ警戒：N/A\nホールド判定：N/A"
 
+    collapse_brief = build_collapse_score_brief(assessment.collapse_risk_score)
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/11：{assessment.collapse_risk_label}",
+        f"崩れ {assessment.collapse_risk_score}/11：{collapse_brief.text}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"
