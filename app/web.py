@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from flask import Flask, Response, render_template, request
+    from flask import Flask, Response, render_template, request, url_for
 except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Flask installed
     Flask = Any  # type: ignore[misc, assignment]
     Response = Any  # type: ignore[misc, assignment]
     render_template = None  # type: ignore[assignment]
     request = None  # type: ignore[assignment]
+    url_for = None  # type: ignore[assignment]
 
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 from app.presentation.web_fundamental_summary import build_fundamental_summary_html
@@ -42,7 +43,7 @@ def resolve_existing_dir(raw_path: str) -> Path:
 
 
 def create_app(state: WebUiState | None = None) -> Flask:
-    if render_template is None or request is None:
+    if render_template is None or request is None or url_for is None:
         raise RuntimeError("Flask is not installed. Install dependencies with: pip install -r requirements.txt")
 
     app = Flask(__name__)
@@ -50,6 +51,9 @@ def create_app(state: WebUiState | None = None) -> Flask:
     state_manager = WebUiStateManager(ui_state)
     upload_workflow = WebUploadWorkflow(file_cache=getattr(ui_state.controller, "file_cache", FileCache()))
     state_manager.restore_cached_state()
+
+    def build_detail_url(code4: str, mode: str) -> str:
+        return url_for("fetch_stock_detail", code4=code4, mode=mode)
 
     @app.get("/")
     def index() -> str:
@@ -145,10 +149,16 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 if table is None:
                     return _render(ui_state)
                 if ui_state.mode == "technical":
-                    ui_state.fundamental_summary_html = build_technical_summary_html(table)
+                    ui_state.fundamental_summary_html = build_technical_summary_html(
+                        table,
+                        detail_url_builder=build_detail_url,
+                    )
                     ui_state.status = f"Technicalサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label()}"
                 else:
-                    ui_state.fundamental_summary_html = build_fundamental_summary_html(table)
+                    ui_state.fundamental_summary_html = build_fundamental_summary_html(
+                        table,
+                        detail_url_builder=build_detail_url,
+                    )
                     ui_state.status = "Fundamentalサマリを表示しました。"
             except Exception as exc:
                 ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
@@ -174,11 +184,35 @@ def create_app(state: WebUiState | None = None) -> Flask:
                 table = state_manager.build_hybrid_summary_table()
                 if table is None:
                     return _render(ui_state)
-                ui_state.fundamental_summary_html = build_hybrid_summary_html(table)
+                ui_state.fundamental_summary_html = build_hybrid_summary_html(
+                    table,
+                    detail_url_builder=build_detail_url,
+                )
                 ui_state.status = f"Hybridサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label(force=True)}"
             except Exception as exc:
                 ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
                 ui_state.fundamental_summary_html = ""
+            return _render(ui_state)
+        finally:
+            ui_state.market_data_operation_lock.release()
+
+    @app.get("/stock/<code4>")
+    def fetch_stock_detail(code4: str) -> str:
+        if not ui_state.market_data_operation_lock.acquire(blocking=False):
+            ui_state.status = "市場データ取得中です。完了後に再実行してください。"
+            return _render(ui_state)
+        try:
+            mode = request.args.get("mode", "technical")
+            if mode not in {"technical", "fundamental"}:
+                mode = "technical"
+            if not state_manager.select_stock_by_code4(code4):
+                return _render(ui_state)
+            ui_state.mode = mode
+            state_manager.refresh_technical_evaluation_choices(force=mode == "technical")
+            try:
+                state_manager.fetch_output_for_current_selection(clear_summary=False)
+            except Exception as exc:
+                ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
             return _render(ui_state)
         finally:
             ui_state.market_data_operation_lock.release()

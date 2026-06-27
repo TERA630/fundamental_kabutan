@@ -102,6 +102,50 @@ def test_hybrid_summary_service_merges_fundamental_and_technical_rows():
     assert "候補(1234)" in html
 
 
+def test_hybrid_summary_html_links_stock_name_to_technical_detail():
+    table = HybridSummaryService().build_summary_table(
+        fundamental_table=FundamentalSummaryTable(
+            rows=(
+                FundamentalSummaryRow(
+                    name="候補",
+                    code4="1234",
+                    total_score=72,
+                    quality_score=44,
+                    growth_score=None,
+                    valuation_score=None,
+                    operating_margin=None,
+                    operating_profit_cagr_3y=None,
+                    roic=None,
+                    cash_conversion=None,
+                    per=None,
+                    investment_rate=None,
+                ),
+            )
+        ),
+        technical_table=TechnicalSummaryTable(
+            rows=(
+                _technical_row(
+                    name="候補",
+                    code4="1234",
+                    dev25_pct=-4.0,
+                    vwap=100.0,
+                    vwap_diff_pct=2.0,
+                    high_breakout_count=1,
+                    low_lower_count=1,
+                    volume_vs_avg20_pct=85.0,
+                ),
+            )
+        ),
+    )
+
+    html = build_hybrid_summary_html(
+        table,
+        detail_url_builder=lambda code4, mode: f"/stock/{code4}?mode={mode}",
+    )
+
+    assert '<a href="/stock/1234?mode=technical">候補(1234)</a>' in html
+
+
 def _technical_row(
     *,
     name: str,

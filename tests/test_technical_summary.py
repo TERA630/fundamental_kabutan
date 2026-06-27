@@ -1057,6 +1057,21 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "<td>2</td>" in html
 
 
+def test_technical_summary_html_links_stock_name_to_technical_detail():
+    table = TechnicalSummaryTable(
+        rows=(
+            _summary_row(name="AIテスト", code4="1234", rank="A1", collapse_risk_score=2),
+        )
+    )
+
+    html = build_technical_summary_html(
+        table,
+        detail_url_builder=lambda code4, mode: f"/stock/{code4}?mode={mode}",
+    )
+
+    assert '<a href="/stock/1234?mode=technical">AIテスト(1234)</a>' in html
+
+
 def test_technical_summary_html_renders_us_market_section():
     table = TechnicalSummaryTable(
         rows=(),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from html import escape
+from typing import Callable
 
 from app.domain.builders.technical_summary import (
     _fmt_atr,
@@ -23,7 +24,13 @@ from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSumm
 from app.domain.policies.technical_summary import RANK_LABELS, RANK_ORDER
 
 
-def build_technical_summary_html(table: TechnicalSummaryTable) -> str:
+DetailUrlBuilder = Callable[[str, str], str]
+
+
+def build_technical_summary_html(
+    table: TechnicalSummaryTable,
+    detail_url_builder: DetailUrlBuilder | None = None,
+) -> str:
     sections = [
         '<section class="output-block summary-output technical-summary-output">',
         "<h2>Technical Summary</h2>",
@@ -44,7 +51,7 @@ def build_technical_summary_html(table: TechnicalSummaryTable) -> str:
             "<th>支持線</th><th>抵抗線</th><th>60D Pos</th>"
             "</tr></thead><tbody>"
         )
-        sections.extend(_build_row_html(row) for row in rows)
+        sections.extend(_build_row_html(row, detail_url_builder=detail_url_builder) for row in rows)
         sections.append("</tbody></table></div>")
     sections.append(_build_skipped_html(table))
     sections.append("</section>")
@@ -88,9 +95,10 @@ def _build_us_market_row_html(row: UsMarketSummaryRow) -> str:
     return f"<tr>{cells}</tr>"
 
 
-def _build_row_html(row: TechnicalSummaryRow) -> str:
+def _build_row_html(row: TechnicalSummaryRow, *, detail_url_builder: DetailUrlBuilder | None) -> str:
+    stock_cell = _build_stock_link(row.name, row.code4, "technical", detail_url_builder)
     values = (
-        f"{row.name}({row.code4})",
+        stock_cell,
         _fmt_current(row),
         _fmt_pct(row.three_session_change_pct),
         _fmt_day_range(row),
@@ -102,8 +110,21 @@ def _build_row_html(row: TechnicalSummaryRow) -> str:
         _fmt_lines(row.resistance_lines),
         _fmt_position(row.recent60_range_position),
     )
-    cells = "".join(f"<td>{escape(value)}</td>" for value in values)
+    cells = f"<td>{stock_cell}</td>" + "".join(f"<td>{escape(value)}</td>" for value in values[1:])
     return f"<tr>{cells}</tr>"
+
+
+def _build_stock_link(
+    name: str,
+    code4: str,
+    mode: str,
+    detail_url_builder: DetailUrlBuilder | None,
+) -> str:
+    label = f"{escape(name)}({escape(code4)})"
+    if detail_url_builder is None:
+        return label
+    href = escape(detail_url_builder(code4, mode), quote=True)
+    return f'<a href="{href}">{label}</a>'
 
 
 def _build_skipped_html(table: TechnicalSummaryTable) -> str:
