@@ -124,6 +124,26 @@ def test_build_technical_output_contains_summary_and_sections():
     assert output.index("■重要価格") < output.index("■前日評価")
 
 
+def test_build_technical_output_appends_three_axis_collapse_reason():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(
+        result.snapshot.moving_average,
+        ma25_prev5=(result.snapshot.moving_average.ma25 or 0) + 1,
+        ma5_slope=0.0,
+    )
+    result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+
+    output = build_technical_output(result)
+
+    assert "短評：C2 崩れ警戒 監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
+    assert "｜下行初動：5日線下向き＋25日線下向き" in output
+
+
 def test_build_technical_output_marks_daily_reference_vwap():
     service = TechnicalAnalysisService(
         file_cache=InMemoryCache(),

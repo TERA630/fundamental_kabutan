@@ -224,7 +224,7 @@ def test_mid_score_with_bad_price_structure_falls_to_c2():
         latest=106.0,
         vwap=105.0,
         ma25=100.0,
-        ma25_prev5=100.0,
+        ma25_prev5=101.0,
         atr14=2.0,
         low_highers=(False, False, False),
         high_breakouts=(False, False, False),
@@ -233,7 +233,7 @@ def test_mid_score_with_bad_price_structure_falls_to_c2():
     )
 
     assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "崩れスコア中リスク＋価格構造悪化"
+    assert headline.c2_fall_reason == "構造崩れ：25日線下向き＋崩れスコア中以上＋価格構造悪化"
 
 
 def test_high_score_falls_to_c2_even_without_immediate_trigger():
@@ -242,19 +242,24 @@ def test_high_score_falls_to_c2_even_without_immediate_trigger():
         latest=106.0,
         vwap=105.0,
         ma25=100.0,
-        ma25_prev5=100.0,
+        ma25_prev5=101.0,
         ma5_slope=1.0,
         ma5_slope_prev=2.0,
         ma5_slope_3d_ago=3.0,
         atr14=2.0,
-        low_highers=(False, False, False),
+        day_open=105.0,
+        day_high=111.0,
+        day_low=100.0,
+        day_close_position=0.55,
+        volume_vs_avg20_pct=120.0,
+        low_highers=(True, True, True),
         high_breakouts=(False, False, False),
-        low_higher_count=0,
+        low_higher_count=3,
         high_breakout_count=0,
     )
 
     assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "崩れスコア高リスク"
+    assert headline.c2_fall_reason == "高リスク：崩れスコア高リスク"
 
 
 def test_ma5_score_two_points_only_keeps_base_rank():
@@ -281,6 +286,20 @@ def test_ma5_score_with_price_structure_falls_to_c2():
     )
 
 
+def test_ma5_and_ma25_down_falls_to_c2_as_downtrend_start():
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=105.0,
+        ma25=100.0,
+        ma25_prev5=101.0,
+        ma5_slope=0.0,
+    )
+
+    assert headline.rank == "C2"
+    assert headline.c2_fall_reason == "下行初動：5日線下向き＋25日線下向き"
+
+
 def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
@@ -291,7 +310,7 @@ def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
     )
 
     assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "VWAP明確割れ＋終端位置低下"
+    assert headline.c2_fall_reason == "即時崩れ：VWAP明確割れ＋終端位置低下"
 
 
 def test_c2_short_comment_shows_fall_reason():
@@ -795,6 +814,32 @@ def test_position_assessment_scores_non_positive_ma5_slope_as_collapse_risk():
 
     assert assessment.collapse_risk_score == 2
     assert assessment.collapse_risk_label == "崩れ軽微"
+
+
+def test_position_assessment_exposes_three_axis_collapse_reason():
+    assessment = build_technical_position_assessment(
+        latest=101.0,
+        vwap=100.0,
+        ma25=100.0,
+        ma5_slope=0.0,
+        ma25_prev5=101.0,
+        atr14=2.0,
+        day_open=100.0,
+        day_high=102.0,
+        day_low=99.0,
+        day_close_position=0.6,
+        volume_vs_avg20_pct=90.0,
+        high_breakouts=(True, True, True),
+        low_highers=(True, True, True),
+        previous_low=100.0,
+        recent20_low=95.0,
+        ma75=90.0,
+        recent60_low=80.0,
+        headline_rank="A1",
+    )
+
+    assert assessment.collapse_risk_score == 4
+    assert assessment.collapse_risk_reason == "下行初動：5日線下向き＋25日線下向き"
 
 
 def test_position_assessment_counts_volume_with_upper_price_stalling():

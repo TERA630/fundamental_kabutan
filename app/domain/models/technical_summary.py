@@ -34,6 +34,7 @@ class TechnicalPositionAssessment:
     collapse_risk_label: str
     hold_judgement: HoldJudgement
     bottoming_start_established: bool
+    collapse_risk_reason: str | None = None
     collapse_risk_signals: tuple[SignalAtom, ...] = ()
 
 
