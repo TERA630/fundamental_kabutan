@@ -115,10 +115,10 @@ class CollapseScoreBrief:
 
 _COLLAPSE_SCORE_BRIEF_TABLE = RangeTable[CollapseScoreBrief](
     bands=(
-        RangeBand(9, CollapseScoreBrief("ほぼ触らない", "構造回復まで見送り")),
-        RangeBand(8, CollapseScoreBrief("かなり回避", "例外条件が揃う時だけ短期リバ検討")),
-        RangeBand(7, CollapseScoreBrief("原則回避", "新規買い回避。前場深押し指値は避ける")),
-        RangeBand(5, CollapseScoreBrief("条件付き候補", "後場VWAP上維持・終端60%以上を確認")),
+        RangeBand(6, CollapseScoreBrief("ほぼ触らない", "構造回復まで見送り")),
+        RangeBand(5, CollapseScoreBrief("かなり回避", "例外条件が揃う時だけ短期リバ検討")),
+        RangeBand(4, CollapseScoreBrief("原則回避", "新規買い回避。前場深押し指値は避ける")),
+        RangeBand(2, CollapseScoreBrief("条件付き候補", "後場VWAP上維持・終端60%以上を確認")),
     ),
     default=CollapseScoreBrief("候補", "買い条件は別確認"),
 )
@@ -177,10 +177,6 @@ class _CollapseRiskSignals:
         return self._matched("ma5_down")
 
     @property
-    def ma5_score(self) -> int:
-        return score_signal_atoms(atom for atom in self.atoms if atom.group == "ma5_slope")
-
-    @property
     def price_structure_bad(self) -> bool:
         return self.vwap_break or self.low_higher_failed or self.close_position_low
 
@@ -194,15 +190,15 @@ class _CollapseRiskSignals:
             return "即時崩れ：VWAP明確割れ＋安値切り上げ失敗"
         if self.volume_bearish_or_stalling and self.close_position_low:
             return "即時崩れ：出来高陰線/上値失速＋終端位置低下"
+        if self.support_far and self.vwap_break:
+            return "即時崩れ：支持線崩落"
         if self.ma5_down and self.ma25_slope_bad:
             return "下行初動：5日線下向き＋25日線下向き"
         if self.ma5_down and self.vwap_break:
             return "下行初動：5日線下向き＋VWAP割れ"
-        if self.support_far and self.vwap_break:
-            return "即時崩れ：支持線崩落"
-        if self.ma25_slope_bad and self.score >= 4 and self.price_structure_bad:
+        if self.ma25_slope_bad and self.score >= 2 and self.price_structure_bad:
             return "構造崩れ：25日線下向き＋崩れスコア中以上＋価格構造悪化"
-        if self.score >= 7:
+        if self.score >= 4:
             return "高リスク：崩れスコア高リスク"
         return None
 
@@ -685,7 +681,7 @@ def build_technical_position_assessment(
         recent60_low=recent60_low,
     )
     score = risk.score
-    level = "低" if score <= 3 else "中" if score <= 6 else "高"
+    level = "低" if score <= 1 else "中" if score <= 3 else "高"
 
     ma25_up = latest >= ma25
     vwap_up = latest >= vwap
@@ -709,43 +705,35 @@ def build_technical_position_assessment(
     def _collapse_label_for(rank: TechnicalSummaryRank, s: int) -> str:
         primary_set = {"A1", "A1弱", "A2", "B1", "B2", "D2", "D3", "E"}
         if rank in primary_set:
-            if s <= 3:
+            if s <= 1:
                 return "崩れ軽微"
-            if s <= 6:
+            if s <= 3:
                 return "上値重い"
-            if s <= 9:
-                return "崩れ警戒"
-            return "買い不可"
+            return "崩れ警戒"
         if rank == "C1":
-            if s <= 3:
+            if s <= 1:
                 return "押し目候補"
-            if s <= 6:
-                return "VWAP回復待ち"
-            if s <= 9:
-                return "押し目ではなく崩れ警戒"
-            return "買い不可"
-        if rank == "C2":
             if s <= 3:
+                return "VWAP回復待ち"
+            return "押し目ではなく崩れ警戒"
+        if rank == "C2":
+            if s <= 1:
                 return "軽度崩れ"
-            if s <= 6:
+            if s <= 3:
                 return "崩れ警戒"
             return "買い不可"
         if rank == "D1":
-            if s <= 3:
+            if s <= 1:
                 return "戻り良好"
-            if s <= 6:
+            if s <= 3:
                 return "25日線奪回待ち"
-            if s <= 9:
-                return "戻り売り警戒"
-            return "買い不可"
+            return "戻り売り警戒"
         # デフォルト
-        if s <= 3:
+        if s <= 1:
             return "崩れ軽微"
-        if s <= 6:
+        if s <= 3:
             return "上値重い"
-        if s <= 9:
-            return "崩れ警戒"
-        return "買い不可"
+        return "崩れ警戒"
 
     collapse_label = _collapse_label_for(headline_rank, score)
 
@@ -1044,25 +1032,19 @@ def _score_collapse_risk(
             SignalAtom("close_position_low", close_position_low, points=1),
             SignalAtom("volume_bearish_or_stalling", volume_bearish_or_stalling, points=1),
             SignalAtom("support_far", support_far, points=1),
-            SignalAtom("ma25_slope_bad", ma25_slope_bad, points=2),
-            SignalAtom("ma5_down", ma5_down, points=2, group="ma5_slope", group_max_points=3),
+            SignalAtom("ma25_slope_bad", ma25_slope_bad),
+            SignalAtom("ma5_down", ma5_down),
             SignalAtom(
                 "ma5_slowing",
                 resolved_ma5_slope is not None
                 and ma5_slope_prev is not None
                 and resolved_ma5_slope < ma5_slope_prev,
-                points=1,
-                group="ma5_slope",
-                group_max_points=3,
             ),
             SignalAtom(
                 "ma5_stalling",
                 resolved_ma5_slope is not None
                 and ma5_slope_3d_ago is not None
                 and resolved_ma5_slope < ma5_slope_3d_ago,
-                points=1,
-                group="ma5_slope",
-                group_max_points=3,
             ),
         ),
     )
@@ -1123,7 +1105,7 @@ def _evaluate_above_ma25_ranking_collapse(
     c2_fall = c2_fall_reason is not None
     if c2_fall:
         label = "崩れ警戒"
-    elif risk.score >= 4:
+    elif risk.score >= 2:
         label = "軽度警戒"
     elif risk.score >= 1:
         label = "要確認"

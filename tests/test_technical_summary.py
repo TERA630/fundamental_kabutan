@@ -200,7 +200,7 @@ def test_two_point_above_ma25_collapse_conditions_keep_base_rank_as_check_needed
     )
 
     assert headline.rank == "A1"
-    assert headline.collapse_state_label == "要確認"
+    assert headline.collapse_state_label == "軽度警戒"
 
 
 def test_three_point_above_ma25_collapse_conditions_keep_base_rank():
@@ -215,7 +215,7 @@ def test_three_point_above_ma25_collapse_conditions_keep_base_rank():
     )
 
     assert headline.rank == "A1"
-    assert headline.collapse_state_label == "要確認"
+    assert headline.collapse_state_label == "軽度警戒"
 
 
 def test_mid_score_with_bad_price_structure_falls_to_c2():
@@ -242,7 +242,7 @@ def test_high_score_falls_to_c2_even_without_immediate_trigger():
         latest=106.0,
         vwap=105.0,
         ma25=100.0,
-        ma25_prev5=101.0,
+        ma25_prev5=99.0,
         ma5_slope=1.0,
         ma5_slope_prev=2.0,
         ma5_slope_3d_ago=3.0,
@@ -252,9 +252,9 @@ def test_high_score_falls_to_c2_even_without_immediate_trigger():
         day_low=100.0,
         day_close_position=0.55,
         volume_vs_avg20_pct=120.0,
-        low_highers=(True, True, True),
+        low_highers=(False, False, False),
         high_breakouts=(False, False, False),
-        low_higher_count=3,
+        low_higher_count=0,
         high_breakout_count=0,
     )
 
@@ -271,7 +271,7 @@ def test_ma5_score_two_points_only_keeps_base_rank():
     )
 
     assert headline.rank == "A1"
-    assert headline.collapse_state_label == "要確認"
+    assert headline.collapse_state_label == "崩れ条件なし"
 
 
 def test_ma5_score_with_price_structure_falls_to_c2():
@@ -403,13 +403,12 @@ def test_volume_comment_parts_follow_boundaries():
 
 def test_collapse_score_brief_follows_practical_score_bands():
     assert build_collapse_score_brief(0).text == "候補｜買い条件は別確認"
-    assert build_collapse_score_brief(4).text == "候補｜買い条件は別確認"
-    assert build_collapse_score_brief(5).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
-    assert build_collapse_score_brief(6).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
-    assert build_collapse_score_brief(7).text == "原則回避｜新規買い回避。前場深押し指値は避ける"
-    assert build_collapse_score_brief(8).text == "かなり回避｜例外条件が揃う時だけ短期リバ検討"
-    assert build_collapse_score_brief(9).text == "ほぼ触らない｜構造回復まで見送り"
-    assert build_collapse_score_brief(11).text == "ほぼ触らない｜構造回復まで見送り"
+    assert build_collapse_score_brief(1).text == "候補｜買い条件は別確認"
+    assert build_collapse_score_brief(2).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
+    assert build_collapse_score_brief(3).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
+    assert build_collapse_score_brief(4).text == "原則回避｜新規買い回避。前場深押し指値は避ける"
+    assert build_collapse_score_brief(5).text == "かなり回避｜例外条件が揃う時だけ短期リバ検討"
+    assert build_collapse_score_brief(6).text == "ほぼ触らない｜構造回復まで見送り"
     assert build_collapse_score_brief(None).text == "候補｜買い条件は別確認"
 
 
@@ -754,14 +753,14 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         headline_rank="E",
     )
 
-    assert assessment.collapse_risk_score == 8
+    assert assessment.collapse_risk_score == 6
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
     signals = {signal.signal_id: signal for signal in assessment.collapse_risk_signals}
     assert "below_ma25" not in signals
     assert signals["vwap_clear_break"].matched is True
-    assert signals["ma5_down"].points == 2
+    assert signals["ma5_down"].points == 0
 
 
 def test_position_assessment_requires_all_three_momentum_marks_to_fail():
@@ -812,7 +811,7 @@ def test_position_assessment_scores_non_positive_ma5_slope_as_collapse_risk():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 2
+    assert assessment.collapse_risk_score == 0
     assert assessment.collapse_risk_label == "崩れ軽微"
 
 
@@ -838,7 +837,7 @@ def test_position_assessment_exposes_three_axis_collapse_reason():
         headline_rank="A1",
     )
 
-    assert assessment.collapse_risk_score == 4
+    assert assessment.collapse_risk_score == 0
     assert assessment.collapse_risk_reason == "下行初動：5日線下向き＋25日線下向き"
 
 
