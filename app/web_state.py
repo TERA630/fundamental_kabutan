@@ -156,8 +156,17 @@ class WebUiStateManager:
         self.state.kabutan_html_dir = result.html_dir
         self.state.kabutan_package_zip_signature = result.signature
 
-    def fetch_output_for_current_selection(self) -> bool:
-        self.state.fundamental_summary_html = ""
+    def select_stock_by_code4(self, code4: str) -> bool:
+        for name, entry_code4 in self.state.watchlist:
+            if entry_code4 == code4:
+                self.state.selected_label = f"{name} ({entry_code4})"
+                return True
+        self.state.status = f"銘柄コード {code4} は監視銘柄に見つかりません。"
+        return False
+
+    def fetch_output_for_current_selection(self, *, clear_summary: bool = True) -> bool:
+        if clear_summary:
+            self.state.fundamental_summary_html = ""
         selected = self.selected_stock()
         if selected is None:
             self.state.status = self.state.view_model.build_missing_stock_status()

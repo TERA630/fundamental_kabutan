@@ -102,6 +102,30 @@ def test_fetch_output_for_current_selection_passes_technical_evaluation_at():
     assert "評価時点=2026-05-29 09:10" in state.status
 
 
+def test_fetch_output_for_current_selection_can_keep_summary_html():
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "technical"
+    state.fundamental_summary_html = '<section class="summary-output">Summary</section>'
+    manager = WebUiStateManager(state)
+
+    assert manager.fetch_output_for_current_selection(clear_summary=False) is True
+
+    assert state.fundamental_summary_html == '<section class="summary-output">Summary</section>'
+
+
+def test_select_stock_by_code4_updates_selected_label():
+    state = WebUiState(controller=FakeController())
+    state.watchlist = [("トヨタ", "7203"), ("任天堂", "7974")]
+    manager = WebUiStateManager(state)
+
+    assert manager.select_stock_by_code4("7974") is True
+
+    assert state.selected_label == "任天堂 (7974)"
+
+
 def test_refresh_technical_evaluation_choices_groups_times_by_date():
     controller = FakeTechnicalTimestampController()
     state = WebUiState(controller=controller)

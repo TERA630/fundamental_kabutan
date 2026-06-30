@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from typing import Callable
 
 from app.domain.models.fundamental_summary import FundamentalSummaryRow, FundamentalSummaryTable
 
@@ -20,10 +21,16 @@ TABLE_HEADERS = (
     "PER",
     "投資率",
 )
+DetailUrlBuilder = Callable[[str, str], str]
 
 
-def build_fundamental_summary_html(table: FundamentalSummaryTable) -> str:
-    rows_html = "\n".join(_build_row_html(row) for row in table.rows) or '<tr><td colspan="11">N/A</td></tr>'
+def build_fundamental_summary_html(
+    table: FundamentalSummaryTable,
+    detail_url_builder: DetailUrlBuilder | None = None,
+) -> str:
+    rows_html = "\n".join(
+        _build_row_html(row, detail_url_builder=detail_url_builder) for row in table.rows
+    ) or '<tr><td colspan="11">N/A</td></tr>'
     skipped_html = _build_skipped_html(table)
     return (
         '<section class="output-block summary-output">'
@@ -43,10 +50,10 @@ def build_fundamental_summary_html(table: FundamentalSummaryTable) -> str:
     )
 
 
-def _build_row_html(row: FundamentalSummaryRow) -> str:
+def _build_row_html(row: FundamentalSummaryRow, *, detail_url_builder: DetailUrlBuilder | None) -> str:
     return (
         "<tr>"
-        f"<th scope=\"row\">{html.escape(row.name)} ({html.escape(row.code4)})</th>"
+        f"<th scope=\"row\">{_build_stock_link(row.name, row.code4, 'fundamental', detail_url_builder)}</th>"
         f"<td>{row.total_score}</td>"
         f"<td>{_format_optional_int(row.quality_score)}</td>"
         f"<td>{_format_optional_int(row.growth_score)}</td>"
@@ -59,6 +66,19 @@ def _build_row_html(row: FundamentalSummaryRow) -> str:
         f"<td>{_format_percent(row.investment_rate)}</td>"
         "</tr>"
     )
+
+
+def _build_stock_link(
+    name: str,
+    code4: str,
+    mode: str,
+    detail_url_builder: DetailUrlBuilder | None,
+) -> str:
+    label = f"{html.escape(name)} ({html.escape(code4)})"
+    if detail_url_builder is None:
+        return label
+    href = html.escape(detail_url_builder(code4, mode), quote=True)
+    return f'<a href="{href}">{label}</a>'
 
 
 def _build_skipped_html(table: FundamentalSummaryTable) -> str:

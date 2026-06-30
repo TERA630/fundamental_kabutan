@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from html import escape
+from typing import Callable
 
 from app.domain.models.hybrid_summary import HybridSummaryRow, HybridSummaryTable
 from app.domain.policies.hybrid_classification import TAG_LABELS, TAG_ORDER
 
 
-def build_hybrid_summary_html(table: HybridSummaryTable) -> str:
+DetailUrlBuilder = Callable[[str, str], str]
+
+
+def build_hybrid_summary_html(
+    table: HybridSummaryTable,
+    detail_url_builder: DetailUrlBuilder | None = None,
+) -> str:
     sections = [
         '<section class="output-block summary-output hybrid-summary-output">',
         "<h2>Hybrid Summary</h2>",
@@ -29,17 +36,18 @@ def build_hybrid_summary_html(table: HybridSummaryTable) -> str:
             "<th>抵抗余地</th><th>理由</th>"
             "</tr></thead><tbody>"
         )
-        sections.extend(_build_row_html(row) for row in rows)
+        sections.extend(_build_row_html(row, detail_url_builder=detail_url_builder) for row in rows)
         sections.append("</tbody></table></div>")
     sections.append(_build_skipped_html(table))
     sections.append("</section>")
     return "".join(sections)
 
 
-def _build_row_html(row: HybridSummaryRow) -> str:
+def _build_row_html(row: HybridSummaryRow, *, detail_url_builder: DetailUrlBuilder | None) -> str:
+    stock_cell = _build_stock_link(row.name, row.code4, "technical", detail_url_builder)
     values = (
         f"{row.tag} {row.tag_label}",
-        f"{row.name}({row.code4})",
+        stock_cell,
         str(row.fundamental_score),
         _fmt_optional_int(row.quality_score),
         f"{row.technical_rank} {row.technical_rank_label}",
@@ -52,8 +60,25 @@ def _build_row_html(row: HybridSummaryRow) -> str:
         _fmt_resistance_upside(row.resistance_upside_pct),
         " / ".join(row.reasons),
     )
-    cells = "".join(f"<td>{escape(value)}</td>" for value in values)
+    cells = (
+        f"<td>{escape(values[0])}</td>"
+        f"<td>{stock_cell}</td>"
+        + "".join(f"<td>{escape(value)}</td>" for value in values[2:])
+    )
     return f"<tr>{cells}</tr>"
+
+
+def _build_stock_link(
+    name: str,
+    code4: str,
+    mode: str,
+    detail_url_builder: DetailUrlBuilder | None,
+) -> str:
+    label = f"{escape(name)}({escape(code4)})"
+    if detail_url_builder is None:
+        return label
+    href = escape(detail_url_builder(code4, mode), quote=True)
+    return f'<a href="{href}">{label}</a>'
 
 
 def _build_skipped_html(table: HybridSummaryTable) -> str:

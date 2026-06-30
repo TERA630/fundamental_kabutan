@@ -205,7 +205,7 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
             assert evaluation_at is None
             return self.build_technical_summary_table(watchlist_entries=watchlist_entries)
 
-    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table, **_kwargs: f"<section>{table}</section>")
 
     state = WebUiState(controller=FakeController())
     state.mode = "technical"
@@ -243,7 +243,7 @@ def test_hybrid_summary_post_renders_hybrid_html_with_kabutan_dir(monkeypatch, t
             assert evaluation_at == datetime(2026, 5, 29, 9, 10)
             return "HYBRID_TABLE"
 
-    monkeypatch.setattr("app.web.build_hybrid_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_hybrid_summary_html", lambda table, **_kwargs: f"<section>{table}</section>")
 
     state = WebUiState(controller=FakeController())
     state.mode = "fundamental"
@@ -285,7 +285,7 @@ def test_technical_summary_status_includes_selected_evaluation_at(monkeypatch):
             assert evaluation_at == datetime(2026, 5, 29, 9, 10)
             return "TECH_TABLE"
 
-    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_technical_summary_html", lambda table, **_kwargs: f"<section>{table}</section>")
 
     state = WebUiState(controller=FakeController())
     state.mode = "technical"
@@ -305,6 +305,45 @@ def test_technical_summary_status_includes_selected_evaluation_at(monkeypatch):
 
     assert "<section>TECH_TABLE</section>" in html
     assert state.status == "Technicalサマリを表示しました。 / 評価時点=2026-05-29 09:10"
+
+
+def test_stock_detail_link_fetches_detail_without_clearing_summary():
+    class FakeController:
+        def __init__(self):
+            self.fetch_call = None
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def fetch_technical_evaluation_timestamps(self, code4):
+            assert code4 == "7974"
+            return (datetime(2026, 5, 29, 9, 10),)
+
+        def fetch_output_for_mode(self, **kwargs):
+            self.fetch_call = kwargs
+            return SimpleNamespace(output="Technical detail", institutional_summary="SUMMARY")
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.mode = "fundamental"
+    state.watchlist = [("トヨタ", "7203"), ("任天堂", "7974")]
+    state.selected_label = "トヨタ (7203)"
+    state.fundamental_summary_html = '<section class="summary-output">Summary</section>'
+    client = create_app(state).test_client()
+
+    html = client.get("/stock/7974?mode=technical").data.decode("utf-8")
+
+    assert '<section class="summary-output">Summary</section>' in html
+    assert "Technical detail" in html
+    assert state.selected_label == "任天堂 (7974)"
+    assert state.mode == "technical"
+    assert state.fundamental_summary_html == '<section class="summary-output">Summary</section>'
+    assert controller.fetch_call["name"] == "任天堂"
+    assert controller.fetch_call["code4"] == "7974"
+    assert controller.fetch_call["mode"] == "technical"
 
 
 def test_index_copy_button_has_textarea_fallback_for_insecure_contexts():
@@ -597,7 +636,7 @@ def test_fundamental_summary_extracts_uploaded_kabutan_package(tmp_path: Path, m
                 kabutan_html_dir=kabutan_html_dir,
             )
 
-    monkeypatch.setattr("app.web.build_fundamental_summary_html", lambda table: f"<section>{table}</section>")
+    monkeypatch.setattr("app.web.build_fundamental_summary_html", lambda table, **_kwargs: f"<section>{table}</section>")
 
     zip_path = tmp_path / "web_uploaded_kabutan_html_package.zip"
     zip_path.write_bytes(b"zip")

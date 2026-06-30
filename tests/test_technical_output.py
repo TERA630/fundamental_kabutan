@@ -80,14 +80,14 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "抵抗：170(preH/20dH/60dH)" in output
     assert "短評：A1 位置良好 リターン良好、買い候補｜" in output
     assert "｜5日線良好" in output
-    assert "崩れ 1/11：候補｜買い条件は別確認" in output
+    assert "崩れ 1/6：候補｜買い条件は別確認" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
     assert "戦略判定：\n前場深押し○：支持線付近" in output
     assert "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。" in output
     assert "後場VWAP回復◎：後場VWAP上維持ならエントリー可。" in output
     assert output.index("短評：A1 位置良好 リターン良好、買い候補｜") < output.index("■モメンタム")
-    assert output.index("崩れ 1/11：候補｜買い条件は別確認") < output.index("■モメンタム")
+    assert output.index("崩れ 1/6：候補｜買い条件は別確認") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
@@ -122,6 +122,26 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■流れ" not in output
     assert "トレンド：" not in output
     assert output.index("■重要価格") < output.index("■前日評価")
+
+
+def test_build_technical_output_appends_three_axis_collapse_reason():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    moving_average = replace(
+        result.snapshot.moving_average,
+        ma25_prev5=(result.snapshot.moving_average.ma25 or 0) + 1,
+        ma5_slope=0.0,
+    )
+    result = replace(result, snapshot=replace(result.snapshot, moving_average=moving_average))
+
+    output = build_technical_output(result)
+
+    assert "短評：C2 崩れ警戒 監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
+    assert "｜下行初動：5日線下向き＋25日線下向き" in output
 
 
 def test_build_technical_output_marks_daily_reference_vwap():

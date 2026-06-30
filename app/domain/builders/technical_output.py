@@ -174,8 +174,9 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
         return "崩れ警戒：N/A\nホールド判定：N/A"
 
     collapse_brief = build_collapse_score_brief(assessment.collapse_risk_score)
+    collapse_reason = f"｜{assessment.collapse_risk_reason}" if assessment.collapse_risk_reason else ""
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/11：{collapse_brief.text}",
+        f"崩れ {assessment.collapse_risk_score}/6：{collapse_brief.text}{collapse_reason}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"

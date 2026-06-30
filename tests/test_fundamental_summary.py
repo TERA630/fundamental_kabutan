@@ -9,6 +9,7 @@ from app.domain.models.kabutan_cashflow import KabutanCashflowRow
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService, KabutanFetchResult
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
+from app.presentation.web_fundamental_summary import build_fundamental_summary_html
 
 
 class FakeFundamentalAnalysisService:
@@ -143,3 +144,31 @@ def test_build_fundamental_summary_markdown_formats_na_values():
     markdown = build_fundamental_summary_markdown(table)
 
     assert "|Sample (1234)|50|N/A|10|5|12.3%|N/A|N/A|N/A|20.0倍|-60.0%|" in markdown
+
+
+def test_fundamental_summary_html_links_stock_name_to_fundamental_detail():
+    table = FundamentalSummaryTable(
+        rows=(
+            FundamentalSummaryRow(
+                name="Sample",
+                code4="1234",
+                total_score=50,
+                quality_score=None,
+                growth_score=10,
+                valuation_score=5,
+                operating_margin=12.3,
+                operating_profit_cagr_3y=None,
+                roic=None,
+                cash_conversion=None,
+                per=20.0,
+                investment_rate=-60.0,
+            ),
+        )
+    )
+
+    html = build_fundamental_summary_html(
+        table,
+        detail_url_builder=lambda code4, mode: f"/stock/{code4}?mode={mode}",
+    )
+
+    assert '<a href="/stock/1234?mode=fundamental">Sample (1234)</a>' in html
