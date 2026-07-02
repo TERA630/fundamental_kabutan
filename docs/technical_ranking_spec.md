@@ -2,8 +2,7 @@
 
 ## 1. 目的
 
-本書は Technical 分析に必要な指標計算、VWAP定義、ローソク足型判定、
-ランキング分類条件を一元管理する。
+本書は Technical 分析に必要な指標計算、VWAP定義、ローソク足型判定、ランキング分類条件を一元管理する。
 ランキング分類は、単一銘柄 Technical 出力と監視銘柄 Technical Summary で共通とする。
 
 - 画面・表示仕様：`docs/screen_spec.md`
