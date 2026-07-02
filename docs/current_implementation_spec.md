@@ -136,7 +136,7 @@ Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を�
 ### 4.7 Technical Summary ランク
 
 ランキング分類条件の正本は `docs/technical_ranking_spec.md` とする。
-D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、25日線乖離ラベル、
+D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、
 技術指標の定義、崩れ警戒スコア、ホールド判定、ローソク足型と髭の定義など
 すべてのランキング・指標仕様は同書を参照する。
 
