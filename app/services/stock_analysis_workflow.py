@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Protocol
 
 from app.data.file_cache import FileCache
 from app.domain.builders.technical_output import build_technical_output
@@ -18,6 +18,10 @@ from app.presenters import build_fundamental_output
 from app.services.institutional_summary_service import InstitutionalSummaryService
 
 
+class FetchMarketDataBundle(Protocol):
+    def __call__(self, code4: str, *, use_memory_cache: bool = True) -> MarketDataBundle: ...
+
+
 class StockAnalysisWorkflow:
     def __init__(
         self,
@@ -27,7 +31,7 @@ class StockAnalysisWorkflow:
         build_technical_service: Callable[[FileCache], TechnicalAnalysisService],
         uses_default_fundamental_service: bool,
         uses_default_technical_service: bool,
-        fetch_market_data_bundle: Callable[[str], MarketDataBundle],
+        fetch_market_data_bundle: FetchMarketDataBundle,
         build_fundamental_service_with_market_bundle: Callable[[MarketDataBundle], FundamentalAnalysisService],
     ):
         self.file_cache = file_cache
@@ -65,7 +69,10 @@ class StockAnalysisWorkflow:
         evaluation_at: datetime | None = None,
     ):
         if self.uses_default_technical_service:
-            bundle = self.fetch_market_data_bundle(code4)
+            bundle = self.fetch_market_data_bundle(
+                code4,
+                use_memory_cache=evaluation_at is not None,
+            )
             return TechnicalAnalysisService.build_analysis_result_from_bundle(
                 name=name,
                 bundle=bundle,
