@@ -21,6 +21,7 @@ def build_technical_output(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
     lines = [
         _format_opening_summary(result),
+        _format_rsi_analysis(result),
         "",
         _format_headline_summary(result),
         _format_position_assessment(result),
@@ -48,6 +49,31 @@ def _format_resistance_lines(result: TechnicalAnalysisResult) -> list[str]:
     if not lines:
         return ["N/A"]
     return [f"{line.label}：{_fmt_price(line.price)}" for line in lines]
+
+
+def _format_rsi_analysis(result: TechnicalAnalysisResult) -> str:
+    analysis = getattr(result, "rsi_analysis", None)
+    if analysis is None:
+        return "RSI：5分N/A / 時間N/A\nRSI総合：N/A"
+
+    lines = [
+        f"RSI：5分{_fmt_rsi_signal(analysis.five_min)} / 時間{_fmt_rsi_signal(analysis.hourly)}",
+    ]
+    divergence_parts = []
+    if analysis.hourly_divergence.label not in {"明確な乖離なし", "N/A"}:
+        divergence_parts.append(f"時間足 {analysis.hourly_divergence.label}")
+    if analysis.five_min_divergence.label not in {"明確な乖離なし", "N/A"}:
+        divergence_parts.append(f"5分足 {analysis.five_min_divergence.label}")
+    if divergence_parts:
+        lines.append(f"RSI乖離：{' / '.join(divergence_parts)}")
+    lines.append(f"RSI総合：{analysis.overall_label}")
+    return "\n".join(lines)
+
+
+def _fmt_rsi_signal(signal) -> str:
+    if signal.value is None:
+        return "N/A"
+    return f"{signal.value:.0f}{signal.direction_symbol} {signal.level_label}"
 
 
 def _build_resistance_lines(result: TechnicalAnalysisResult) -> tuple[TechnicalSummaryLine, ...]:

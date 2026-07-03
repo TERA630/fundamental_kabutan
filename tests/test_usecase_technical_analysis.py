@@ -104,6 +104,8 @@ def test_build_analysis_result_fetches_and_caches_histories():
     assert first.previous_intraday_snapshot["prev_vwap_source"] == "前日5分足"
     assert first.previous_intraday_snapshot["prev_am_vwap_maintained"] is True
     assert first.previous_intraday_snapshot["previous_pm_evaluation"] == "高値維持"
+    assert first.rsi_analysis is not None
+    assert first.rsi_analysis.overall_label == "N/A"
     assert second.snapshot.price.latest == 169.0
     assert calls == {"daily": 1, "intraday": 1}
     assert len(cache.set_calls) == 2

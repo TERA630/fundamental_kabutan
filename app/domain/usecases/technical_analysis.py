@@ -9,6 +9,7 @@ from typing import Any, Callable, Protocol
 import pandas as pd
 
 from app.domain.models.market_data import MarketDataBundle
+from app.domain.models.rsi_analysis import RsiAnalysis
 from app.domain.models.technical_snapshot import TechnicalSnapshot
 from app.domain.policies.market_history import (
     TECH_DAILY_HISTORY_TTL_SEC,
@@ -22,6 +23,7 @@ from app.domain.policies.market_history import (
     slice_technical_histories_for_evaluation,
 )
 from app.domain.policies.technical_indicators import build_technical_snapshot, normalize_daily_history
+from app.domain.policies.rsi_analysis import build_rsi_analysis
 from app.domain.usecases.market_data_lock import INTRADAY_MARKET_DATA_LOCK, is_intraday_history_consistent
 
 
@@ -60,6 +62,7 @@ class TechnicalAnalysisResult:
     evaluation_price: float | None
     evaluation_price_source: str
     evaluation_price_timestamp: str | None
+    rsi_analysis: RsiAnalysis | None = None
 
 
 def dataframe_to_cache_payload(
@@ -172,6 +175,7 @@ class TechnicalAnalysisService:
             else build_daily_reference_vwap_snapshot(daily_history)
         )
         previous_intraday_snapshot = build_previous_session_intraday_snapshot(daily_history, intraday_history)
+        rsi_analysis = build_rsi_analysis(intraday_history)
         evaluation_price, evaluation_price_source, evaluation_price_timestamp = _build_evaluation_price(
             daily_history=daily_history,
             intraday_history=intraday_history,
@@ -189,6 +193,7 @@ class TechnicalAnalysisService:
             evaluation_price=evaluation_price,
             evaluation_price_source=evaluation_price_source,
             evaluation_price_timestamp=evaluation_price_timestamp,
+            rsi_analysis=rsi_analysis,
         )
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:

@@ -78,6 +78,8 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
     assert "\n　支持：" not in output
     assert "抵抗：170(preH/20dH/60dH)" in output
+    assert "RSI：5分N/A / 時間N/A" in output
+    assert "RSI総合：N/A" in output
     assert "短評：A1 位置良好 リターン良好、買い候補｜" in output
     assert "｜5日線良好" in output
     assert "崩れ 1/6：候補｜買い条件は別確認" in output
