@@ -276,6 +276,58 @@ def test_default_controller_reuses_market_data_bundle_for_technical_and_summary(
     assert calls["bundle"] == 1
 
 
+def test_default_controller_bypasses_memory_cache_for_latest_technical_output(tmp_path: Path, monkeypatch):
+    calls = {"bundle": 0}
+
+    class DummyMarketDataService:
+        def fetch_bundle(self, code4):
+            calls["bundle"] += 1
+            return MarketDataBundle(
+                code4=code4,
+                daily_history=_daily_history(),
+                intraday_history=_intraday_history(),
+                snapshot=MarketSnapshot(price=169.0),
+            )
+
+    monkeypatch.setattr("app.services.stock_analysis_workflow.build_technical_output", lambda _result: "TECH")
+    controller = AnalysisApplicationService(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_market_data_service=lambda _cache: DummyMarketDataService(),
+    )
+
+    first = controller.fetch_technical_output(name="トヨタ", code4="7203")
+    second = controller.fetch_technical_output(name="トヨタ", code4="7203")
+
+    assert first == "TECH"
+    assert second == "TECH"
+    assert calls["bundle"] == 2
+
+
+def test_default_controller_bypasses_memory_cache_for_technical_timestamp_choices(tmp_path: Path):
+    calls = {"bundle": 0}
+
+    class DummyMarketDataService:
+        def fetch_bundle(self, code4):
+            calls["bundle"] += 1
+            return MarketDataBundle(
+                code4=code4,
+                daily_history=_daily_history(),
+                intraday_history=_intraday_history(),
+                snapshot=MarketSnapshot(price=169.0),
+            )
+
+    controller = AnalysisApplicationService(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_market_data_service=lambda _cache: DummyMarketDataService(),
+    )
+
+    first = controller.fetch_technical_evaluation_timestamps("7203")
+    second = controller.fetch_technical_evaluation_timestamps("7203")
+
+    assert first == second
+    assert calls["bundle"] == 2
+
+
 def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path: Path):
     technical_result = SimpleNamespace(
         snapshot=SimpleNamespace(

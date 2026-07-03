@@ -98,9 +98,9 @@ class AnalysisApplicationService:
             build_us_market_summary=build_default_us_market_summary_service().build_summary_table,
         )
 
-    def fetch_market_data_bundle(self, code4: str) -> MarketDataBundle:
+    def fetch_market_data_bundle(self, code4: str, *, use_memory_cache: bool = True) -> MarketDataBundle:
         cached = self._market_data_bundle_cache.get(code4)
-        if cached is not None:
+        if use_memory_cache and cached is not None:
             return cached
         bundle = self.build_market_data_service(self.file_cache).fetch_bundle(code4)
         self._market_data_bundle_cache[code4] = bundle
@@ -324,7 +324,7 @@ class AnalysisApplicationService:
         )
 
     def fetch_technical_evaluation_timestamps(self, code4: str) -> tuple[datetime, ...]:
-        bundle = self.fetch_market_data_bundle(code4)
+        bundle = self.fetch_market_data_bundle(code4, use_memory_cache=False)
         return build_intraday_evaluation_timestamps(bundle.intraday_history)
 
     def fetch_institutional_summary_text(
