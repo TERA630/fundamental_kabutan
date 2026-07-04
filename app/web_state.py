@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from app.domain.models.watchlist import WatchlistEntry
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
 from app.ui_state_utils import build_stock_choices, get_selected_stock
@@ -24,6 +25,7 @@ class WebUiState:
     kabutan_package_zip_path: Path | None = None
     kabutan_package_zip_signature: tuple[int, str] | tuple[int, int] | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
+    watchlist_with_sectors: list[WatchlistEntry] = field(default_factory=list)
     selected_label: str = ""
     mode: str = "technical"
     output: str = ""
@@ -47,6 +49,9 @@ class WebUiState:
         choices, _mapping = build_stock_choices(self.watchlist)
         return choices
 
+    def technical_watchlist_entries(self) -> list[tuple[str, str] | WatchlistEntry]:
+        return self.watchlist_with_sectors or self.watchlist
+
 
 class WebUiStateManager:
     def __init__(self, state: WebUiState):
@@ -58,12 +63,14 @@ class WebUiStateManager:
         if resolved_watchlist.status == "ok" and resolved_watchlist.file_path is not None:
             try:
                 state.watchlist_path = resolved_watchlist.file_path
-                state.watchlist = state.controller.fetch_watchlist_entries(resolved_watchlist.file_path)
+                state.watchlist_with_sectors = self._fetch_watchlist_entries_with_sectors(resolved_watchlist.file_path)
+                state.watchlist = [entry.as_tuple() for entry in state.watchlist_with_sectors]
                 state.status = state.view_model.build_watchlist_restored_status(len(state.watchlist))
                 self.select_first_if_needed()
             except Exception:
                 state.watchlist_path = None
                 state.watchlist = []
+                state.watchlist_with_sectors = []
 
         fetch_resolved_kabutan_html_dir = getattr(state.controller, "fetch_resolved_kabutan_html_dir", None)
         if callable(fetch_resolved_kabutan_html_dir):
@@ -108,8 +115,17 @@ class WebUiStateManager:
         _, mapping = build_stock_choices(self.state.watchlist)
         return get_selected_stock(mapping, self.state.selected_label)
 
-    def load_watchlist(self, *, watchlist: list[tuple[str, str]], path: Path) -> None:
+    def load_watchlist(
+        self,
+        *,
+        watchlist: list[tuple[str, str]],
+        path: Path,
+        watchlist_with_sectors: list[WatchlistEntry] | None = None,
+    ) -> None:
         self.state.watchlist = watchlist
+        self.state.watchlist_with_sectors = watchlist_with_sectors or [
+            WatchlistEntry(name=name, code4=code4) for name, code4 in watchlist
+        ]
         self.state.watchlist_path = path
         self.state.controller.save_watchlist_path_cache(path)
         self.state.fundamental_summary_html = ""
@@ -207,7 +223,11 @@ class WebUiStateManager:
 
         return self.state.controller.build_summary_table_for_mode(
             mode=self.state.mode,
-            watchlist_entries=self.state.watchlist,
+            watchlist_entries=(
+                self.state.technical_watchlist_entries()
+                if self.state.mode == "technical"
+                else self.state.watchlist
+            ),
             kabutan_html_dir=self.state.kabutan_html_dir,
             evaluation_at=self.technical_evaluation_at(),
         )
@@ -223,10 +243,19 @@ class WebUiStateManager:
             self.state.fundamental_summary_html = ""
             return None
         return self.state.controller.build_hybrid_summary_table(
-            watchlist_entries=self.state.watchlist,
+            watchlist_entries=self.state.technical_watchlist_entries(),
             kabutan_html_dir=self.state.kabutan_html_dir,
             evaluation_at=self.technical_evaluation_at(force=True),
         )
+
+    def _fetch_watchlist_entries_with_sectors(self, path: Path) -> list[WatchlistEntry]:
+        fetch_with_sectors = getattr(self.state.controller, "fetch_watchlist_entries_with_sectors", None)
+        if callable(fetch_with_sectors):
+            return fetch_with_sectors(path)
+        return [
+            WatchlistEntry(name=name, code4=code4)
+            for name, code4 in self.state.controller.fetch_watchlist_entries(path)
+        ]
 
     def technical_evaluation_at(self, *, force: bool = False) -> datetime | None:
         if not force and self.state.mode != "technical":

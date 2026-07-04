@@ -8,6 +8,7 @@ from typing import Callable
 
 from app.data.file_cache import FileCache
 from app.domain.models.market_data import MarketDataBundle
+from app.domain.models.watchlist import WatchlistEntry
 from app.domain.policies.market_history import build_intraday_evaluation_timestamps
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
@@ -183,6 +184,9 @@ class AnalysisApplicationService:
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
         return self.ui_resource_workflow.fetch_watchlist_entries(path)
 
+    def fetch_watchlist_entries_with_sectors(self, path: Path) -> list[WatchlistEntry]:
+        return self.ui_resource_workflow.fetch_watchlist_entries_with_sectors(path)
+
     def fetch_analysis_output(
         self,
         *,
@@ -216,7 +220,7 @@ class AnalysisApplicationService:
     def build_fundamental_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
     ):
         return self.summary_workflow.build_fundamental_summary_table(
@@ -227,7 +231,7 @@ class AnalysisApplicationService:
     def build_and_save_fundamental_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         kabutan_html_dir: Path | None = None,
         today: date | None = None,
@@ -242,7 +246,7 @@ class AnalysisApplicationService:
     def build_technical_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         evaluation_at: datetime | None = None,
     ):
         return self.summary_workflow.build_technical_summary_table(
@@ -254,7 +258,7 @@ class AnalysisApplicationService:
         self,
         *,
         mode: str,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
         evaluation_at: datetime | None = None,
     ):
@@ -268,7 +272,7 @@ class AnalysisApplicationService:
     def build_hybrid_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
         evaluation_at: datetime | None = None,
     ):
@@ -281,7 +285,7 @@ class AnalysisApplicationService:
     def build_and_save_technical_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         generated_at: datetime | None = None,
         evaluation_at: datetime | None = None,
@@ -296,7 +300,7 @@ class AnalysisApplicationService:
     def build_and_save_hybrid_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         kabutan_html_dir: Path | None = None,
         generated_at: datetime | None = None,

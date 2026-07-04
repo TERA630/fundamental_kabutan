@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from app.domain.models.cf_scoring_result import CfScoringResult
+from app.domain.models.watchlist import WatchlistEntry
 from app.ui_state_utils import (
     build_default_output_filename,
     build_stock_choices,
@@ -19,6 +20,7 @@ class GuiState:
     watchlist_path: Path | None = None
     kabutan_html_dir: Path | None = None
     watchlist: list[tuple[str, str]] = field(default_factory=list)
+    watchlist_with_sectors: list[WatchlistEntry] = field(default_factory=list)
     display_to_code: dict[str, tuple[str, str]] = field(default_factory=dict)
     scoring_cache: dict[str, CfScoringResult] = field(default_factory=dict)
     is_fetching: bool = False
@@ -28,6 +30,9 @@ class GuiState:
     technical_evaluation_date_choices: list[str] = field(default_factory=list)
     technical_evaluation_time_choices: list[str] = field(default_factory=list)
     technical_evaluation_time_choices_by_date: dict[str, list[str]] = field(default_factory=dict)
+
+    def technical_watchlist_entries(self) -> list[tuple[str, str] | WatchlistEntry]:
+        return self.watchlist_with_sectors or self.watchlist
 
 
 

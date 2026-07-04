@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 
+from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
 from app.domain.usecases.watchlist_path import ResolvedWatchlistPath
 from app.gui_state import GuiState
@@ -17,6 +18,12 @@ class FakeController:
 
     def fetch_watchlist_entries(self, _path):
         return [("トヨタ", "7203"), ("任天堂", "7974")]
+
+    def fetch_watchlist_entries_with_sectors(self, _path):
+        return [
+            WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",)),
+            WatchlistEntry(name="任天堂", code4="7974"),
+        ]
 
     def save_watchlist_path_cache(self, path):
         self.saved_watchlist_path = path
@@ -61,6 +68,9 @@ def test_load_watchlist_updates_state_choices(tmp_path: Path):
 
     assert choices == ["トヨタ (7203)", "任天堂 (7974)"]
     assert state.watchlist_path == watchlist_path
+    assert state.watchlist == [("トヨタ", "7203"), ("任天堂", "7974")]
+    assert state.watchlist_with_sectors[0].sectors == ("商社・資源",)
+    assert state.technical_watchlist_entries() == state.watchlist_with_sectors
     assert state.display_to_code["トヨタ (7203)"] == ("トヨタ", "7203")
     assert controller.saved_watchlist_path == watchlist_path
 

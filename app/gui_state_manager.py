@@ -24,22 +24,34 @@ class GuiStateManager:
         self.view_model = view_model
 
     def load_watchlist(self, path: Path) -> list[str]:
-        watchlist = self.controller.fetch_watchlist_entries(path)
+        sector_entries = self._fetch_watchlist_entries_with_sectors(path)
+        watchlist = [entry.as_tuple() for entry in sector_entries]
         self.state.watchlist_path = path
         self.controller.save_watchlist_path_cache(path)
         self.state.watchlist = watchlist
+        self.state.watchlist_with_sectors = sector_entries
         return self.rebuild_stock_choices()
 
     def restore_watchlist(self) -> tuple[Path, list[str], str] | None:
         resolved = self.controller.fetch_resolved_watchlist_path()
         if resolved.status != "ok" or resolved.file_path is None:
             return None
-        watchlist = self.controller.fetch_watchlist_entries(resolved.file_path)
+        sector_entries = self._fetch_watchlist_entries_with_sectors(resolved.file_path)
+        watchlist = [entry.as_tuple() for entry in sector_entries]
         self.state.watchlist_path = resolved.file_path
         self.state.watchlist = watchlist
+        self.state.watchlist_with_sectors = sector_entries
         choices = self.rebuild_stock_choices()
         status = self.view_model.build_watchlist_restored_status(len(watchlist))
         return resolved.file_path, choices, status
+
+    def _fetch_watchlist_entries_with_sectors(self, path: Path):
+        fetch_with_sectors = getattr(self.controller, "fetch_watchlist_entries_with_sectors", None)
+        if callable(fetch_with_sectors):
+            return fetch_with_sectors(path)
+        from app.domain.models.watchlist import WatchlistEntry
+
+        return [WatchlistEntry(name=name, code4=code4) for name, code4 in self.controller.fetch_watchlist_entries(path)]
 
     def select_kabutan_html_dir(self, path: Path) -> str:
         self.state.kabutan_html_dir = path

@@ -36,11 +36,21 @@ class WebUploadWorkflow:
         entries = self.parse_uploaded_watchlist(data)
         return entries, self.save_uploaded_watchlist(data)
 
+    def load_uploaded_watchlist_with_sectors(self, data: bytes) -> tuple[list[WatchlistEntry], Path]:
+        entries = self.parse_uploaded_watchlist_with_sectors(data)
+        return entries, self.save_uploaded_watchlist(data)
+
     def load_watchlist_from_path(self, raw_path: str) -> tuple[list[tuple[str, str]], Path]:
         if not raw_path.strip():
             raise ValueError("監視銘柄ファイルをアップロードするか、パスを入力してください。")
         path = Path(raw_path).expanduser().resolve()
         return self.watchlist_service.load_from_file(path), path
+
+    def load_watchlist_from_path_with_sectors(self, raw_path: str) -> tuple[list[WatchlistEntry], Path]:
+        if not raw_path.strip():
+            raise ValueError("監視銘柄ファイルをアップロードするか、パスを入力してください。")
+        path = Path(raw_path).expanduser().resolve()
+        return self.watchlist_service.load_from_file_with_sectors(path), path
 
     def save_uploaded_watchlist(self, data: bytes) -> Path:
         path = self.file_cache.base_dir / UPLOAD_WATCHLIST_CACHE_NAME

@@ -227,14 +227,14 @@ class FundamentalApp:
         try:
             if mode == "hybrid":
                 output_path = self.controller.build_and_save_hybrid_summary(
-                    watchlist_entries=self.state.watchlist,
+                    watchlist_entries=self.state.technical_watchlist_entries(),
                     output_dir=output_dir,
                     kabutan_html_dir=self.state.kabutan_html_dir,
                     evaluation_at=evaluation_at,
                 )
             elif mode == "technical":
                 output_path = self.controller.build_and_save_technical_summary(
-                    watchlist_entries=self.state.watchlist,
+                    watchlist_entries=self.state.technical_watchlist_entries(),
                     output_dir=output_dir,
                     evaluation_at=evaluation_at,
                 )

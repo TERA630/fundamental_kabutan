@@ -2,6 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from datetime import datetime
 
+from app.domain.models.watchlist import WatchlistEntry
 from app.web_state import WebUiState, WebUiStateManager
 
 
@@ -11,6 +12,7 @@ class FakeController:
         self.saved_kabutan_dir = None
         self.cleared_zip_cache = False
         self.fetch_call = None
+        self.summary_call = None
 
     def save_watchlist_path_cache(self, path):
         self.saved_watchlist_path = path
@@ -24,6 +26,14 @@ class FakeController:
     def fetch_output_for_mode(self, **kwargs):
         self.fetch_call = kwargs
         return SimpleNamespace(output="OUTPUT", institutional_summary="SUMMARY")
+
+    def build_summary_table_for_mode(self, **kwargs):
+        self.summary_call = kwargs
+        return "SUMMARY_TABLE"
+
+    def build_hybrid_summary_table(self, **kwargs):
+        self.summary_call = kwargs
+        return "HYBRID_TABLE"
 
 
 class FakeTechnicalTimestampController(FakeController):
@@ -42,12 +52,50 @@ def test_load_watchlist_updates_state_and_selects_first(tmp_path: Path):
     manager = WebUiStateManager(state)
     path = tmp_path / "watchlist.md"
 
-    manager.load_watchlist(watchlist=[("トヨタ", "7203"), ("任天堂", "7974")], path=path)
+    sector_entries = [
+        WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",)),
+        WatchlistEntry(name="任天堂", code4="7974"),
+    ]
+
+    manager.load_watchlist(
+        watchlist=[entry.as_tuple() for entry in sector_entries],
+        watchlist_with_sectors=sector_entries,
+        path=path,
+    )
 
     assert state.watchlist_path == path
+    assert state.watchlist_with_sectors == sector_entries
     assert state.selected_label == "トヨタ (7203)"
     assert controller.saved_watchlist_path == path
     assert "2" in state.status
+
+
+def test_technical_summary_uses_sector_watchlist_entries():
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.mode = "technical"
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    manager = WebUiStateManager(state)
+
+    assert manager.build_summary_table_for_current_mode() == "SUMMARY_TABLE"
+
+    assert controller.summary_call["mode"] == "technical"
+    assert controller.summary_call["watchlist_entries"] == state.watchlist_with_sectors
+
+
+def test_hybrid_summary_uses_sector_watchlist_entries(tmp_path: Path):
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.kabutan_html_dir = tmp_path / "html"
+    manager = WebUiStateManager(state)
+
+    assert manager.build_hybrid_summary_table() == "HYBRID_TABLE"
+
+    assert controller.summary_call["watchlist_entries"] == state.watchlist_with_sectors
+    assert controller.summary_call["kabutan_html_dir"] == tmp_path / "html"
 
 
 def test_set_kabutan_html_dir_clears_package_cache(tmp_path: Path):

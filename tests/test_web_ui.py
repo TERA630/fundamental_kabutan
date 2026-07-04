@@ -7,6 +7,7 @@ import zipfile
 
 import pytest
 
+from app.domain.models.watchlist import WatchlistEntry
 from app.web import WebUiState, build_copy_text, create_app, parse_uploaded_watchlist, resolve_existing_dir
 
 
@@ -20,6 +21,37 @@ def test_parse_uploaded_watchlist_supports_cp932_bytes():
     entries = parse_uploaded_watchlist(data)
 
     assert entries == [("トヨタ", "7203"), ("任天堂", "7974")]
+
+
+def test_watchlist_upload_keeps_sector_entries(tmp_path: Path):
+    class FakeController:
+        def __init__(self):
+            self.file_cache = SimpleNamespace(base_dir=tmp_path)
+            self.saved_path = None
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def save_watchlist_path_cache(self, path):
+            self.saved_path = path
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/watchlist",
+        data={"watchlist_file": (BytesIO("荏原 (6361) データセンター\n".encode("utf-8")), "watchlist.md")},
+        content_type="multipart/form-data",
+    ).data.decode("utf-8")
+
+    assert state.watchlist == [("荏原", "6361")]
+    assert state.watchlist_with_sectors[0].sectors == ("データセンター・電源、空調",)
+    assert controller.saved_path == tmp_path / "web_uploaded_watchlist.md"
+    assert "荏原 (6361)" in html
 
 
 def test_build_copy_text_includes_institutional_summary_panel():
@@ -676,6 +708,10 @@ def test_create_app_restores_cached_watchlist_kabutan_dir_and_package_zip(tmp_pa
             assert path == self.watchlist_path
             return [("トヨタ", "7203")]
 
+        def fetch_watchlist_entries_with_sectors(self, path):
+            assert path == self.watchlist_path
+            return [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+
         def fetch_resolved_kabutan_html_dir(self):
             return SimpleNamespace(status="ok", dir_path=self.kabutan_dir)
 
@@ -688,6 +724,7 @@ def test_create_app_restores_cached_watchlist_kabutan_dir_and_package_zip(tmp_pa
 
     assert state.watchlist_path == tmp_path / "watchlist.md"
     assert state.watchlist == [("トヨタ", "7203")]
+    assert state.watchlist_with_sectors[0].sectors == ("商社・資源",)
     assert state.selected_label == "トヨタ (7203)"
     assert state.kabutan_html_dir == tmp_path / "kabutan"
     assert state.kabutan_package_zip_path == tmp_path / "package.zip"

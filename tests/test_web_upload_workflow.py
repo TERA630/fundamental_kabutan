@@ -28,6 +28,18 @@ def test_load_uploaded_watchlist_saves_cache_file(tmp_path: Path):
     assert path.read_bytes() == data
 
 
+def test_load_uploaded_watchlist_with_sectors_keeps_sector_tags(tmp_path: Path):
+    workflow = WebUploadWorkflow(file_cache=FileCache(base_dir=tmp_path / "cache"))
+    data = "三菱商事 (8058) 商社\n荏原 (6361) データセンター\n".encode("utf-8")
+
+    entries, path = workflow.load_uploaded_watchlist_with_sectors(data)
+
+    assert [entry.as_tuple() for entry in entries] == [("三菱商事", "8058"), ("荏原", "6361")]
+    assert entries[0].sectors == ("商社・資源",)
+    assert entries[1].sectors == ("データセンター・電源、空調",)
+    assert path == tmp_path / "cache" / "web_uploaded_watchlist.md"
+
+
 def test_save_uploaded_kabutan_html_dir_filters_and_dedupes(tmp_path: Path):
     workflow = WebUploadWorkflow(file_cache=FileCache(base_dir=tmp_path / "cache"))
 

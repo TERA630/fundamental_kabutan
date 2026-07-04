@@ -67,10 +67,16 @@ def create_app(state: WebUiState | None = None) -> Flask:
             uploaded = request.files.get("watchlist_file")
             if uploaded is not None and uploaded.filename:
                 data = uploaded.read()
-                watchlist, path = upload_workflow.load_uploaded_watchlist(data)
+                sector_entries, path = upload_workflow.load_uploaded_watchlist_with_sectors(data)
             else:
-                watchlist, path = upload_workflow.load_watchlist_from_path(request.form.get("watchlist_path", ""))
-            state_manager.load_watchlist(watchlist=watchlist, path=path)
+                sector_entries, path = upload_workflow.load_watchlist_from_path_with_sectors(
+                    request.form.get("watchlist_path", "")
+                )
+            state_manager.load_watchlist(
+                watchlist=[entry.as_tuple() for entry in sector_entries],
+                watchlist_with_sectors=sector_entries,
+                path=path,
+            )
         except Exception as exc:
             ui_state.status = str(exc)
         return _render(ui_state)
