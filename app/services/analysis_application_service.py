@@ -254,6 +254,21 @@ class AnalysisApplicationService:
             evaluation_at=evaluation_at,
         )
 
+    def build_technical_sector_breadth_output(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
+        code4: str,
+        evaluation_at: datetime | None = None,
+        prebuilt_results: dict[str, object] | None = None,
+    ) -> str:
+        return self.summary_workflow.build_technical_sector_breadth_output(
+            watchlist_entries=watchlist_entries,
+            code4=code4,
+            evaluation_at=evaluation_at,
+            prebuilt_results=prebuilt_results,
+        )
+
     def build_summary_table_for_mode(
         self,
         *,
@@ -322,6 +337,19 @@ class AnalysisApplicationService:
         evaluation_at: datetime | None = None,
     ) -> str:
         return self.stock_analysis_workflow.fetch_technical_output(
+            name=name,
+            code4=code4,
+            evaluation_at=evaluation_at,
+        )
+
+    def fetch_technical_output_result(
+        self,
+        *,
+        name: str,
+        code4: str,
+        evaluation_at: datetime | None = None,
+    ):
+        return self.stock_analysis_workflow.fetch_technical_output_result(
             name=name,
             code4=code4,
             evaluation_at=evaluation_at,

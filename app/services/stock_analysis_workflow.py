@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Protocol
@@ -20,6 +21,12 @@ from app.services.institutional_summary_service import InstitutionalSummaryServi
 
 class FetchMarketDataBundle(Protocol):
     def __call__(self, code4: str, *, use_memory_cache: bool = True) -> MarketDataBundle: ...
+
+
+@dataclass(frozen=True)
+class TechnicalOutputResult:
+    output: str
+    analysis_result: TechnicalAnalysisResult
 
 
 class StockAnalysisWorkflow:
@@ -90,9 +97,25 @@ class StockAnalysisWorkflow:
         code4: str,
         evaluation_at: datetime | None = None,
     ) -> str:
-        return build_technical_output(
-            self.build_technical_summary_result(name=name, code4=code4, evaluation_at=evaluation_at)
+        return self.fetch_technical_output_result(
+            name=name,
+            code4=code4,
+            evaluation_at=evaluation_at,
+        ).output
+
+    def fetch_technical_output_result(
+        self,
+        *,
+        name: str,
+        code4: str,
+        evaluation_at: datetime | None = None,
+    ) -> TechnicalOutputResult:
+        result = self.build_technical_summary_result(
+            name=name,
+            code4=code4,
+            evaluation_at=evaluation_at,
         )
+        return TechnicalOutputResult(output=build_technical_output(result), analysis_result=result)
 
     def fetch_institutional_summary_text(
         self,
@@ -119,4 +142,4 @@ class StockAnalysisWorkflow:
         return self.build_fundamental_service(self.file_cache)
 
 
-__all__ = ["StockAnalysisWorkflow"]
+__all__ = ["StockAnalysisWorkflow", "TechnicalOutputResult"]

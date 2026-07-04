@@ -52,6 +52,16 @@ class WebUiState:
     def technical_watchlist_entries(self) -> list[tuple[str, str] | WatchlistEntry]:
         return self.watchlist_with_sectors or self.watchlist
 
+    def sectors_for_code4(self, code4: str) -> tuple[str, ...]:
+        sectors: list[str] = []
+        for entry in self.watchlist_with_sectors:
+            if entry.code4 != code4:
+                continue
+            for sector in entry.sectors:
+                if sector not in sectors:
+                    sectors.append(sector)
+        return tuple(sectors)
+
 
 class WebUiStateManager:
     def __init__(self, state: WebUiState):
@@ -194,20 +204,79 @@ class WebUiStateManager:
                 return False
 
         name, code4 = selected
-        result = self.state.controller.fetch_output_for_mode(
-            name=name,
-            code4=code4,
-            mode=self.state.mode,
-            kabutan_html_dir=self.state.kabutan_html_dir,
-            evaluation_at=self.technical_evaluation_at(),
-        )
-        self.state.output = result.output
-        self.state.institutional_summary = result.institutional_summary
+        evaluation_at = self.technical_evaluation_at()
+        technical_analysis_result = None
+        if self.state.mode == "technical":
+            fetch_technical_output_result = getattr(self.state.controller, "fetch_technical_output_result", None)
+            if callable(fetch_technical_output_result):
+                technical_detail = fetch_technical_output_result(
+                    name=name,
+                    code4=code4,
+                    evaluation_at=evaluation_at,
+                )
+                output = technical_detail.output
+                technical_analysis_result = technical_detail.analysis_result
+                institutional_summary = self.state.controller.fetch_institutional_summary_text(
+                    name=name,
+                    code4=code4,
+                    kabutan_html_dir=self.state.kabutan_html_dir,
+                )
+            else:
+                result = self.state.controller.fetch_output_for_mode(
+                    name=name,
+                    code4=code4,
+                    mode=self.state.mode,
+                    kabutan_html_dir=self.state.kabutan_html_dir,
+                    evaluation_at=evaluation_at,
+                )
+                output = result.output
+                institutional_summary = result.institutional_summary
+            output = self._append_technical_sector_breadth_output(
+                output=output,
+                code4=code4,
+                evaluation_at=evaluation_at,
+                technical_analysis_result=technical_analysis_result,
+            )
+        else:
+            result = self.state.controller.fetch_output_for_mode(
+                name=name,
+                code4=code4,
+                mode=self.state.mode,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+                evaluation_at=evaluation_at,
+            )
+            output = result.output
+            institutional_summary = result.institutional_summary
+        self.state.output = output
+        self.state.institutional_summary = institutional_summary
         status = self.state.view_model.build_generated_status(name, code4)
         if self.state.mode == "technical":
             status = f"{status} / 評価時点={self.technical_evaluation_label()}"
         self.state.status = status
         return True
+
+    def _append_technical_sector_breadth_output(
+        self,
+        *,
+        output: str,
+        code4: str,
+        evaluation_at: datetime | None,
+        technical_analysis_result: object | None = None,
+    ) -> str:
+        if not self.state.sectors_for_code4(code4):
+            return output
+        build_output = getattr(self.state.controller, "build_technical_sector_breadth_output", None)
+        if not callable(build_output):
+            return output
+        sector_output = build_output(
+            watchlist_entries=self.state.technical_watchlist_entries(),
+            code4=code4,
+            evaluation_at=evaluation_at,
+            prebuilt_results=({code4: technical_analysis_result} if technical_analysis_result is not None else None),
+        )
+        if not sector_output:
+            return output
+        return f"{output.rstrip()}\n\n{sector_output}\n"
 
     def build_summary_table_for_current_mode(self):
         if not self.state.watchlist:

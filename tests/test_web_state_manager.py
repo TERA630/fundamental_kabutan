@@ -13,6 +13,7 @@ class FakeController:
         self.cleared_zip_cache = False
         self.fetch_call = None
         self.summary_call = None
+        self.sector_output_call = None
 
     def save_watchlist_path_cache(self, path):
         self.saved_watchlist_path = path
@@ -35,6 +36,10 @@ class FakeController:
         self.summary_call = kwargs
         return "HYBRID_TABLE"
 
+    def build_technical_sector_breadth_output(self, **kwargs):
+        self.sector_output_call = kwargs
+        return "SECTOR_OUTPUT"
+
 
 class FakeTechnicalTimestampController(FakeController):
     def fetch_technical_evaluation_timestamps(self, code4):
@@ -44,6 +49,16 @@ class FakeTechnicalTimestampController(FakeController):
             datetime(2026, 5, 28, 9, 5),
             datetime(2026, 5, 29, 9, 10),
         )
+
+
+class FakeTechnicalResultController(FakeController):
+    def fetch_technical_output_result(self, **kwargs):
+        self.fetch_call = kwargs
+        return SimpleNamespace(output="OUTPUT", analysis_result=object())
+
+    def fetch_institutional_summary_text(self, **kwargs):
+        self.institutional_call = kwargs
+        return "SUMMARY"
 
 
 def test_load_watchlist_updates_state_and_selects_first(tmp_path: Path):
@@ -148,6 +163,42 @@ def test_fetch_output_for_current_selection_passes_technical_evaluation_at():
 
     assert controller.fetch_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
     assert "評価時点=2026-05-29 09:10" in state.status
+
+
+def test_fetch_output_for_current_selection_appends_sector_breadth_for_tagged_technical_stock():
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "technical"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:10"
+    manager = WebUiStateManager(state)
+
+    assert manager.fetch_output_for_current_selection() is True
+
+    assert state.output == "OUTPUT\n\nSECTOR_OUTPUT\n"
+    assert controller.sector_output_call["watchlist_entries"] == state.watchlist_with_sectors
+    assert controller.sector_output_call["code4"] == "7203"
+    assert controller.sector_output_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
+
+
+def test_fetch_output_for_current_selection_reuses_selected_technical_result_for_sector_breadth():
+    controller = FakeTechnicalResultController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "technical"
+    manager = WebUiStateManager(state)
+
+    assert manager.fetch_output_for_current_selection() is True
+
+    assert state.output == "OUTPUT\n\nSECTOR_OUTPUT\n"
+    assert controller.fetch_call["name"] == "トヨタ"
+    assert controller.sector_output_call["prebuilt_results"]["7203"] is not None
+    assert controller.sector_output_call["code4"] == "7203"
 
 
 def test_fetch_output_for_current_selection_can_keep_summary_html():

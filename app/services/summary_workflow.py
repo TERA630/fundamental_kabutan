@@ -9,6 +9,7 @@ from typing import Callable
 from app.data.file_cache import FileCache
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.domain.builders.hybrid_summary import build_hybrid_summary_markdown
+from app.domain.builders.sector_breadth_output import build_single_stock_sector_breadth_text
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
@@ -38,6 +39,31 @@ def build_hybrid_summary_filename(*, generated_at: datetime | None = None) -> st
 
 def _watchlist_tuples(watchlist_entries: list[tuple[str, str] | WatchlistEntry]) -> list[tuple[str, str]]:
     return [entry.as_tuple() if isinstance(entry, WatchlistEntry) else entry for entry in watchlist_entries]
+
+
+def _sectors_for_code4(watchlist_entries: list[tuple[str, str] | WatchlistEntry], code4: str) -> tuple[str, ...]:
+    sectors: list[str] = []
+    for entry in watchlist_entries:
+        if not isinstance(entry, WatchlistEntry) or entry.code4 != code4:
+            continue
+        for sector in entry.sectors:
+            if sector not in sectors:
+                sectors.append(sector)
+    return tuple(sectors)
+
+
+def _entries_for_sectors(
+    watchlist_entries: list[tuple[str, str] | WatchlistEntry],
+    sectors: tuple[str, ...],
+) -> list[WatchlistEntry]:
+    filtered: list[WatchlistEntry] = []
+    for entry in watchlist_entries:
+        if not isinstance(entry, WatchlistEntry):
+            continue
+        matching_sectors = tuple(sector for sector in entry.sectors if sector in sectors)
+        if matching_sectors:
+            filtered.append(WatchlistEntry(name=entry.name, code4=entry.code4, sectors=matching_sectors))
+    return filtered
 
 
 class SummaryWorkflow:
@@ -81,6 +107,42 @@ class SummaryWorkflow:
             build_us_market_summary=self.build_us_market_summary,
         )
         return service.build_summary_table(watchlist_entries)
+
+    def build_technical_sector_breadth_output(
+        self,
+        *,
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
+        code4: str,
+        evaluation_at: datetime | None = None,
+        prebuilt_results: dict[str, object] | None = None,
+    ) -> str:
+        sectors = _sectors_for_code4(watchlist_entries, code4)
+        if not sectors:
+            return ""
+        sector_entries = _entries_for_sectors(watchlist_entries, sectors)
+        if not sector_entries:
+            return ""
+        prebuilt_results = prebuilt_results or {}
+        build_result = self.build_technical_summary_result
+        if evaluation_at is not None:
+            build_result = lambda name, code4: self.build_technical_summary_result(
+                name,
+                code4,
+                evaluation_at=evaluation_at,
+            )
+
+        def build_result_with_prebuilt(name: str, code4: str):
+            if code4 in prebuilt_results:
+                return prebuilt_results[code4]
+            return build_result(name, code4)
+
+        table = TechnicalSummaryService(
+            build_result_with_prebuilt,
+            build_us_market_summary=None,
+        ).build_summary_table(
+            sector_entries,
+        )
+        return build_single_stock_sector_breadth_text(table.sector_breadth, sectors)
 
     def build_summary_table_for_mode(
         self,

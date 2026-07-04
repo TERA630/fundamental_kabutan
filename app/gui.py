@@ -212,7 +212,20 @@ class FundamentalApp:
 
     def _technical_fetch_worker(self, name: str, code4: str, evaluation_at, evaluation_label: str):
         try:
-            output = self.controller.fetch_technical_output(name=name, code4=code4, evaluation_at=evaluation_at)
+            technical_analysis_result = None
+            fetch_technical_output_result = getattr(self.controller, "fetch_technical_output_result", None)
+            if callable(fetch_technical_output_result):
+                detail = fetch_technical_output_result(name=name, code4=code4, evaluation_at=evaluation_at)
+                output = detail.output
+                technical_analysis_result = detail.analysis_result
+            else:
+                output = self.controller.fetch_technical_output(name=name, code4=code4, evaluation_at=evaluation_at)
+            output = self._append_technical_sector_breadth_output(
+                output,
+                code4,
+                evaluation_at,
+                technical_analysis_result=technical_analysis_result,
+            )
             summary = self.controller.fetch_institutional_summary_text(
                 name=name,
                 code4=code4,
@@ -222,6 +235,29 @@ class FundamentalApp:
             self.master.after(0, lambda: self._render_output_with_summary(output, summary, status, "technical"))
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
+
+    def _append_technical_sector_breadth_output(
+        self,
+        output: str,
+        code4: str,
+        evaluation_at,
+        *,
+        technical_analysis_result: object | None = None,
+    ) -> str:
+        if not self.state.sectors_for_code4(code4):
+            return output
+        build_output = getattr(self.controller, "build_technical_sector_breadth_output", None)
+        if not callable(build_output):
+            return output
+        sector_output = build_output(
+            watchlist_entries=self.state.technical_watchlist_entries(),
+            code4=code4,
+            evaluation_at=evaluation_at,
+            prebuilt_results=({code4: technical_analysis_result} if technical_analysis_result is not None else None),
+        )
+        if not sector_output:
+            return output
+        return f"{output.rstrip()}\n\n{sector_output}\n"
 
     def _summary_worker(self, output_dir: Path, mode: str, evaluation_at=None, evaluation_label: str = "最新"):
         try:

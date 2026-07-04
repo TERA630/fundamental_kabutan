@@ -34,6 +34,16 @@ class GuiState:
     def technical_watchlist_entries(self) -> list[tuple[str, str] | WatchlistEntry]:
         return self.watchlist_with_sectors or self.watchlist
 
+    def sectors_for_code4(self, code4: str) -> tuple[str, ...]:
+        sectors: list[str] = []
+        for entry in self.watchlist_with_sectors:
+            if entry.code4 != code4:
+                continue
+            for sector in entry.sectors:
+                if sector not in sectors:
+                    sectors.append(sector)
+        return tuple(sectors)
+
 
 
 

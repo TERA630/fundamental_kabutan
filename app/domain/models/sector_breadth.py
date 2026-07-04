@@ -11,7 +11,6 @@ SectorBreadthJudgement = Literal[
     "まちまち",
     "戻り売り優勢",
     "崩れ地合い",
-    "判定不可",
 ]
 
 

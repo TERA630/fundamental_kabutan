@@ -86,6 +86,8 @@ def build_sector_breadth_row(sector: str, rows: Iterable[TechnicalSummaryRow]) -
             terminal_position_median=terminal_position_median,
             collapse_score_median=collapse_score_median,
             volume_vs_avg20_median_pct=volume_vs_avg20_median_pct,
+            sample_count=len(items),
+            volume_spike_bearish_count=volume_spike_bearish_count,
         ),
     )
 
@@ -112,7 +114,7 @@ def classify_sector_breadth(
         return "戻り売り優勢"
     if _between(vwap_above_ratio, 0.40, 0.60) or _between(terminal_position_median, 0.40, 0.60):
         return "まちまち"
-    return "判定不可"
+    return "まちまち"
 
 
 def build_sector_breadth_comment(
@@ -121,6 +123,8 @@ def build_sector_breadth_comment(
     terminal_position_median: float | None,
     collapse_score_median: float | None,
     volume_vs_avg20_median_pct: float | None,
+    sample_count: int = 0,
+    volume_spike_bearish_count: int = 0,
 ) -> str:
     labels = [
         classify_vwap_above_ratio(vwap_above_ratio),
@@ -128,6 +132,12 @@ def build_sector_breadth_comment(
         classify_collapse_score_median(collapse_score_median),
         classify_volume_vs_avg20_median(volume_vs_avg20_median_pct),
     ]
+    if sample_count == 1:
+        labels.append("対象1銘柄のみ")
+    elif sample_count == 2:
+        labels.append("対象2銘柄")
+    if volume_spike_bearish_count > 0:
+        labels.append(f"出来高増下落{volume_spike_bearish_count}銘柄")
     return " / ".join(label for label in labels if label != "N/A") or "N/A"
 
 

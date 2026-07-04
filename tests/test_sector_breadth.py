@@ -1,5 +1,7 @@
 import pytest
 
+from app.domain.builders.sector_breadth_output import build_single_stock_sector_breadth_text
+from app.domain.models.sector_breadth import SectorBreadthRatio, SectorBreadthRow, SectorBreadthTable
 from app.domain.models.technical_summary import TechnicalSummaryRow
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.policies.sector_breadth import (
@@ -119,6 +121,15 @@ def test_classify_sector_breadth_prioritizes_breakdown_market():
         )
         == "戻り売り優勢"
     )
+    assert (
+        classify_sector_breadth(
+            vwap_above_ratio=None,
+            terminal_position_median=None,
+            ma25_above_ratio=None,
+            collapse_score_median=None,
+        )
+        == "まちまち"
+    )
 
 
 def test_build_sector_breadth_table_skips_tagless_entries_and_aggregates_by_sector():
@@ -177,3 +188,50 @@ def test_build_sector_breadth_table_uses_available_denominators_per_metric():
     assert row.volume_vs_avg20_median_pct == pytest.approx(120.0)
     assert row.volume_spike_bearish_count == 1
     assert row.judgement == "崩れ地合い"
+    assert "対象2銘柄" in row.comment
+    assert "出来高増下落1銘柄" in row.comment
+
+
+def test_build_sector_breadth_comment_marks_single_stock_sector():
+    watchlist = (WatchlistEntry("A", "1001", ("水処理・環境インフラ",)),)
+    rows = (_row("1001"),)
+
+    row = build_sector_breadth_table(rows=rows, watchlist_entries=watchlist).rows[0]
+
+    assert row.comment.endswith("対象1銘柄のみ")
+
+
+def test_build_single_stock_sector_breadth_text_formats_selected_sectors_only():
+    table = SectorBreadthTable(
+        rows=(
+            SectorBreadthRow(
+                sector="半導体材料・装置",
+                judgement="押し目買い優勢",
+                vwap_above=SectorBreadthRatio(count=2, total=3, ratio=2 / 3),
+                terminal_position_median=0.65,
+                ma25_above=SectorBreadthRatio(count=3, total=3, ratio=1.0),
+                collapse_score_median=2.0,
+                volume_vs_avg20_median_pct=68.0,
+                volume_spike_bearish_count=0,
+                comment="中立〜やや強い / 反発中",
+            ),
+            SectorBreadthRow(
+                sector="商社・資源",
+                judgement="まちまち",
+                vwap_above=SectorBreadthRatio(count=1, total=2, ratio=0.5),
+                terminal_position_median=0.50,
+                ma25_above=SectorBreadthRatio(count=1, total=2, ratio=0.5),
+                collapse_score_median=3.0,
+                volume_vs_avg20_median_pct=40.0,
+                volume_spike_bearish_count=0,
+                comment="まちまち",
+            ),
+        )
+    )
+
+    text = build_single_stock_sector_breadth_text(table, ("半導体材料・装置",))
+
+    assert text.startswith("■セクター地合\n半導体材料・装置：押し目買い優勢")
+    assert "VWAP上 2/3 67%" in text
+    assert "終端中央値 65%" in text
+    assert "商社・資源" not in text
