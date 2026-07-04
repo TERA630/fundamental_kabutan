@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.domain.models.sector_breadth import SectorBreadthRatio, SectorBreadthRow, SectorBreadthTable
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
 from app.domain.policies.technical_summary import RANK_LABELS, RANK_ORDER
@@ -11,6 +12,9 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
     lines = ["# Technical Summary", ""]
     if table.us_market is not None:
         lines.extend(_format_us_market_table(table.us_market))
+        lines.append("")
+    if table.sector_breadth is not None and table.sector_breadth.rows:
+        lines.extend(_format_sector_breadth_table(table.sector_breadth))
         lines.append("")
     rows_by_rank = {rank: [row for row in table.rows if row.rank == rank] for rank in RANK_ORDER}
     for rank in RANK_ORDER:
@@ -60,6 +64,30 @@ def _format_us_market_row(row: UsMarketSummaryRow) -> str:
         f"| {_fmt_pct(row.dev5_pct)} "
         f"| {_fmt_pct(row.dev25_pct)} "
         f"| {_fmt_rsi(row.rsi14)} |"
+    )
+
+
+def _format_sector_breadth_table(table: SectorBreadthTable) -> list[str]:
+    lines = [
+        "## Sector Breadth",
+        "",
+        "| セクター | 判定 | VWAP上 | 終端中央値 | 25日線上 | 崩れ中央値 | 出来高比中央値 | コメント |",
+        "|---|---|---:|---:|---:|---:|---:|---|",
+    ]
+    lines.extend(_format_sector_breadth_row(row) for row in table.rows)
+    return lines
+
+
+def _format_sector_breadth_row(row: SectorBreadthRow) -> str:
+    return (
+        f"| {row.sector} "
+        f"| {row.judgement} "
+        f"| {_fmt_breadth_ratio(row.vwap_above)} "
+        f"| {_fmt_position(row.terminal_position_median)} "
+        f"| {_fmt_breadth_ratio(row.ma25_above)} "
+        f"| {_fmt_median(row.collapse_score_median)} "
+        f"| {_fmt_pct_unsigned(row.volume_vs_avg20_median_pct)} "
+        f"| {row.comment} |"
     )
 
 
@@ -153,6 +181,18 @@ def _fmt_position(value: float | None) -> str:
     if value is None:
         return "N/A"
     return f"{value * 100:.0f}%"
+
+
+def _fmt_breadth_ratio(value: SectorBreadthRatio) -> str:
+    if value.ratio is None:
+        return "N/A"
+    return f"{value.count}/{value.total} {value.ratio * 100:.0f}%"
+
+
+def _fmt_median(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.1f}"
 
 
 def _fmt_market_price(value: float | None) -> str:

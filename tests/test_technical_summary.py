@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import pandas as pd
 
 from app.domain.builders.technical_summary import build_technical_summary_markdown
+from app.domain.models.sector_breadth import SectorBreadthRatio, SectorBreadthRow, SectorBreadthTable
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
+from app.domain.models.watchlist import WatchlistEntry
 from app.domain.policies.technical_summary import (
     build_collapse_score_brief,
     build_d1_detail,
@@ -973,6 +975,35 @@ def test_technical_summary_service_sorts_above_ma25_ranks_by_collapse_score():
     assert [row.code4 for row in table.rows if row.rank == "C2"] == ["5555", "4444"]
 
 
+def test_technical_summary_service_builds_sector_breadth_from_watchlist_entries():
+    rows_by_code = {
+        "1001": _summary_row(name="SemiA", code4="1001", rank="A1", collapse_risk_score=1),
+        "1002": _summary_row(name="SemiB", code4="1002", rank="A1", collapse_risk_score=3),
+        "1003": _summary_row(name="Tagless", code4="1003", rank="A1", collapse_risk_score=6),
+    }
+
+    class SectorService(TechnicalSummaryService):
+        def build_summary_row(self, result):
+            return result
+
+    service = SectorService(lambda _name, code4: rows_by_code[code4])
+    table = service.build_summary_table(
+        [
+            WatchlistEntry("SemiA", "1001", ("半導体材料・装置",)),
+            WatchlistEntry("SemiB", "1002", ("半導体材料・装置",)),
+            WatchlistEntry("Tagless", "1003"),
+        ]
+    )
+
+    assert table.sector_breadth is not None
+    assert len(table.sector_breadth.rows) == 1
+    row = table.sector_breadth.rows[0]
+    assert row.sector == "半導体材料・装置"
+    assert row.vwap_above.count == 2
+    assert row.vwap_above.total == 2
+    assert row.collapse_score_median == 2.0
+
+
 def test_us_market_summary_service_builds_rows_and_skips_failures():
     service = UsMarketSummaryService(
         lambda ticker: pd.DataFrame() if ticker == "^SOX" else _daily_history(),
@@ -1012,6 +1043,35 @@ def test_technical_summary_markdown_renders_us_market_section():
 
     assert "## US Market 2026-06-17 09:00" in markdown
     assert "| NASDAQ総合 | 100.00 | +1.2% | +2.3% | +4.5% | 55.60 |" in markdown
+
+
+def test_technical_summary_markdown_renders_sector_breadth_before_rank_tables():
+    table = TechnicalSummaryTable(
+        rows=(
+            _summary_row(name="AIテスト", code4="1234", rank="A1", collapse_risk_score=2),
+        ),
+        sector_breadth=SectorBreadthTable(
+            rows=(
+                SectorBreadthRow(
+                    sector="半導体材料・装置",
+                    judgement="押し目買い優勢",
+                    vwap_above=SectorBreadthRatio(count=2, total=3, ratio=2 / 3),
+                    terminal_position_median=0.65,
+                    ma25_above=SectorBreadthRatio(count=3, total=3, ratio=1.0),
+                    collapse_score_median=2.0,
+                    volume_vs_avg20_median_pct=68.0,
+                    volume_spike_bearish_count=0,
+                    comment="中立〜やや強い / 反発中",
+                ),
+            ),
+        ),
+    )
+
+    markdown = build_technical_summary_markdown(table)
+
+    assert "## Sector Breadth" in markdown
+    assert "| 半導体材料・装置 | 押し目買い優勢 | 2/3 67% | 65% | 3/3 100% | 2.0 | 68% | 中立〜やや強い / 反発中 |" in markdown
+    assert markdown.index("## Sector Breadth") < markdown.index("## A1 位置良好")
 
 
 def test_technical_summary_html_does_not_render_headline_table():
@@ -1096,6 +1156,34 @@ def test_technical_summary_html_renders_us_market_section():
     assert "US Market 2026-06-17 09:00" in html
     assert "NASDAQ総合" in html
     assert "+4.5%" in html
+
+
+def test_technical_summary_html_renders_sector_breadth_section():
+    table = TechnicalSummaryTable(
+        rows=(),
+        sector_breadth=SectorBreadthTable(
+            rows=(
+                SectorBreadthRow(
+                    sector="防衛・重工",
+                    judgement="強い上昇地合い",
+                    vwap_above=SectorBreadthRatio(count=4, total=5, ratio=0.8),
+                    terminal_position_median=0.72,
+                    ma25_above=SectorBreadthRatio(count=5, total=5, ratio=1.0),
+                    collapse_score_median=1.0,
+                    volume_vs_avg20_median_pct=63.0,
+                    volume_spike_bearish_count=0,
+                    comment="セクター買い優勢 / 健全",
+                ),
+            ),
+        ),
+    )
+
+    html = build_technical_summary_html(table)
+
+    assert "Sector Breadth" in html
+    assert "防衛・重工" in html
+    assert "4/5 80%" in html
+    assert "強い上昇地合い" in html
 
 
 def _summary_row(

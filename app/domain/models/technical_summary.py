@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from app.domain.models.sector_breadth import SectorBreadthTable
 from app.domain.models.signal_atom import SignalAtom
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
@@ -89,12 +90,14 @@ class TechnicalSummaryTable:
     rows: tuple[TechnicalSummaryRow, ...]
     skipped: tuple[SkippedTechnicalSummaryStock, ...] = ()
     us_market: UsMarketSummaryTable | None = None
+    sector_breadth: SectorBreadthTable | None = None
 
 
 __all__ = [
     "CollapseRiskLevel",
     "HoldJudgement",
     "SkippedTechnicalSummaryStock",
+    "SectorBreadthTable",
     "TechnicalHeadlineSummary",
     "TechnicalPositionAssessment",
     "TechnicalSummaryLine",

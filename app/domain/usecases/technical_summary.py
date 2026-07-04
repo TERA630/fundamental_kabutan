@@ -10,6 +10,8 @@ from app.domain.models.technical_summary import (
     TechnicalSummaryTable,
 )
 from app.domain.models.us_market_summary import UsMarketSummaryTable
+from app.domain.models.watchlist import WatchlistEntry
+from app.domain.policies.sector_breadth import build_sector_breadth_table
 from app.domain.policies.technical_summary import (
     RANK_ORDER,
     build_nearby_resistance_lines,
@@ -34,17 +36,26 @@ class TechnicalSummaryService:
         self.build_analysis_result = build_analysis_result
         self.build_us_market_summary = build_us_market_summary
 
-    def build_summary_table(self, watchlist_entries: Iterable[tuple[str, str]]) -> TechnicalSummaryTable:
+    def build_summary_table(self, watchlist_entries: Iterable[tuple[str, str] | WatchlistEntry]) -> TechnicalSummaryTable:
         rows: list[TechnicalSummaryRow] = []
         skipped: list[SkippedTechnicalSummaryStock] = []
-        for name, code4 in watchlist_entries:
+        entries = tuple(_normalize_watchlist_entry(entry) for entry in watchlist_entries)
+        for entry in entries:
+            name, code4 = entry.name, entry.code4
             try:
                 result = self.build_analysis_result(name, code4)
                 rows.append(self.build_summary_row(result))
             except Exception as exc:
                 skipped.append(SkippedTechnicalSummaryStock(name=name, code4=code4, reason=str(exc)))
+        sorted_rows = _sort_rows_by_rank_and_collapse_score(rows)
         us_market = self.build_us_market_summary() if self.build_us_market_summary is not None else None
-        return TechnicalSummaryTable(rows=_sort_rows_by_rank_and_collapse_score(rows), skipped=tuple(skipped), us_market=us_market)
+        sector_breadth = build_sector_breadth_table(rows=sorted_rows, watchlist_entries=entries)
+        return TechnicalSummaryTable(
+            rows=sorted_rows,
+            skipped=tuple(skipped),
+            us_market=us_market,
+            sector_breadth=sector_breadth if sector_breadth.rows else None,
+        )
 
     def build_summary_row(self, result: TechnicalAnalysisResult) -> TechnicalSummaryRow:
         snapshot = result.snapshot
@@ -285,6 +296,13 @@ def _volume_spike_bearish(
 
 _COLLAPSE_SCORE_SORT_RANKS = frozenset(("B2", "B1", "A2", "A1", "A1弱", "C2", "C1"))
 _RANK_ORDER_INDEX = {rank: index for index, rank in enumerate(RANK_ORDER)}
+
+
+def _normalize_watchlist_entry(entry: tuple[str, str] | WatchlistEntry) -> WatchlistEntry:
+    if isinstance(entry, WatchlistEntry):
+        return entry
+    name, code4 = entry
+    return WatchlistEntry(name=name, code4=code4)
 
 
 def _sort_rows_by_rank_and_collapse_score(rows: list[TechnicalSummaryRow]) -> tuple[TechnicalSummaryRow, ...]:

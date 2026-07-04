@@ -7,18 +7,21 @@ from typing import Callable
 
 from app.domain.builders.technical_summary import (
     _fmt_atr,
+    _fmt_breadth_ratio,
     _fmt_collapse_score,
     _fmt_current,
     _fmt_day_range,
     _fmt_dev25,
     _fmt_lines,
     _fmt_market_price,
+    _fmt_median,
     _fmt_pct,
     _fmt_pct_unsigned,
     _fmt_position,
     _fmt_rsi,
     _fmt_vwap,
 )
+from app.domain.models.sector_breadth import SectorBreadthRow, SectorBreadthTable
 from app.domain.models.technical_summary import TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.models.us_market_summary import UsMarketSummaryRow, UsMarketSummaryTable
 from app.domain.policies.technical_summary import RANK_LABELS, RANK_ORDER
@@ -37,6 +40,8 @@ def build_technical_summary_html(
     ]
     if table.us_market is not None:
         sections.append(_build_us_market_html(table.us_market))
+    if table.sector_breadth is not None and table.sector_breadth.rows:
+        sections.append(_build_sector_breadth_html(table.sector_breadth))
     for rank in RANK_ORDER:
         rows = [row for row in table.rows if row.rank == rank]
         if not rows:
@@ -90,6 +95,36 @@ def _build_us_market_row_html(row: UsMarketSummaryRow) -> str:
         _fmt_pct(row.dev5_pct),
         _fmt_pct(row.dev25_pct),
         _fmt_rsi(row.rsi14),
+    )
+    cells = "".join(f"<td>{escape(value)}</td>" for value in values)
+    return f"<tr>{cells}</tr>"
+
+
+def _build_sector_breadth_html(table: SectorBreadthTable) -> str:
+    rows = "".join(_build_sector_breadth_row_html(row) for row in table.rows)
+    return (
+        '<h3 class="summary-rank-heading">Sector Breadth</h3>'
+        '<div class="table-scroll">'
+        '<table class="fundamental-table summary-table technical-summary-table sector-breadth-table">'
+        "<thead><tr>"
+        "<th>セクター</th><th>判定</th><th>VWAP上</th><th>終端中央値</th><th>25日線上</th>"
+        "<th>崩れ中央値</th><th>出来高比中央値</th><th>コメント</th>"
+        "</tr></thead><tbody>"
+        f"{rows}"
+        "</tbody></table></div>"
+    )
+
+
+def _build_sector_breadth_row_html(row: SectorBreadthRow) -> str:
+    values = (
+        row.sector,
+        row.judgement,
+        _fmt_breadth_ratio(row.vwap_above),
+        _fmt_position(row.terminal_position_median),
+        _fmt_breadth_ratio(row.ma25_above),
+        _fmt_median(row.collapse_score_median),
+        _fmt_pct_unsigned(row.volume_vs_avg20_median_pct),
+        row.comment,
     )
     cells = "".join(f"<td>{escape(value)}</td>" for value in values)
     return f"<tr>{cells}</tr>"

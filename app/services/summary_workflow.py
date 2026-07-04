@@ -10,6 +10,7 @@ from app.data.file_cache import FileCache
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
 from app.domain.builders.hybrid_summary import build_hybrid_summary_markdown
 from app.domain.builders.technical_summary import build_technical_summary_markdown
+from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
 from app.domain.usecases.hybrid_summary import HybridSummaryService
@@ -35,6 +36,10 @@ def build_hybrid_summary_filename(*, generated_at: datetime | None = None) -> st
     return f"{HYBRID_SUMMARY_FILENAME_PREFIX}_{target.strftime('%m-%d-%H-%M')}.md"
 
 
+def _watchlist_tuples(watchlist_entries: list[tuple[str, str] | WatchlistEntry]) -> list[tuple[str, str]]:
+    return [entry.as_tuple() if isinstance(entry, WatchlistEntry) else entry for entry in watchlist_entries]
+
+
 class SummaryWorkflow:
     def __init__(
         self,
@@ -52,16 +57,16 @@ class SummaryWorkflow:
     def build_fundamental_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
     ):
         service = FundamentalSummaryService(self.build_fundamental_service(self.file_cache))
-        return service.build_summary_table(watchlist_entries, kabutan_html_dir=kabutan_html_dir)
+        return service.build_summary_table(_watchlist_tuples(watchlist_entries), kabutan_html_dir=kabutan_html_dir)
 
     def build_technical_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         evaluation_at: datetime | None = None,
     ):
         build_result = self.build_technical_summary_result
@@ -81,7 +86,7 @@ class SummaryWorkflow:
         self,
         *,
         mode: str,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
         evaluation_at: datetime | None = None,
     ):
@@ -98,7 +103,7 @@ class SummaryWorkflow:
     def build_hybrid_summary_table(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         kabutan_html_dir: Path | None = None,
         evaluation_at: datetime | None = None,
     ):
@@ -118,7 +123,7 @@ class SummaryWorkflow:
     def build_and_save_fundamental_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         kabutan_html_dir: Path | None = None,
         today: date | None = None,
@@ -135,7 +140,7 @@ class SummaryWorkflow:
     def build_and_save_technical_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         generated_at: datetime | None = None,
         evaluation_at: datetime | None = None,
@@ -152,7 +157,7 @@ class SummaryWorkflow:
     def build_and_save_hybrid_summary(
         self,
         *,
-        watchlist_entries: list[tuple[str, str]],
+        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
         output_dir: Path,
         kabutan_html_dir: Path | None = None,
         generated_at: datetime | None = None,
