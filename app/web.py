@@ -17,7 +17,6 @@ except ModuleNotFoundError:  # pragma: no cover - allows helper tests without Fl
 
 from app.presentation.web_fundamental_output import WebTextBlock, build_fundamental_web_blocks
 from app.presentation.web_fundamental_summary import build_fundamental_summary_html
-from app.presentation.web_hybrid_summary import build_hybrid_summary_html
 from app.presentation.web_technical_summary import build_technical_summary_html
 from app.data.file_cache import FileCache
 from app.services.web_upload_workflow import WebUploadWorkflow
@@ -173,8 +172,8 @@ def create_app(state: WebUiState | None = None) -> Flask:
         finally:
             ui_state.market_data_operation_lock.release()
 
-    @app.post("/hybrid-summary")
-    def build_hybrid_summary() -> str:
+    @app.post("/hybrid-evaluation")
+    def build_hybrid_evaluation() -> str:
         if not ui_state.market_data_operation_lock.acquire(blocking=False):
             ui_state.status = "市場データ取得中です。完了後に再実行してください。"
             return _render(ui_state)
@@ -187,17 +186,43 @@ def create_app(state: WebUiState | None = None) -> Flask:
             )
             state_manager.refresh_technical_evaluation_choices(force=True)
             try:
-                table = state_manager.build_hybrid_summary_table()
-                if table is None:
+                output = state_manager.build_hybrid_evaluation_output_for_current_selection()
+                if output is None:
                     return _render(ui_state)
-                ui_state.fundamental_summary_html = build_hybrid_summary_html(
-                    table,
-                    detail_url_builder=build_detail_url,
-                )
-                ui_state.status = f"Hybridサマリを表示しました。 / 評価時点={state_manager.technical_evaluation_label(force=True)}"
-            except Exception as exc:
-                ui_state.status = f"{ui_state.view_model.build_summary_failed_status()} {exc}"
+                ui_state.output = _append_output(ui_state.output, output)
+                ui_state.mode = "technical"
                 ui_state.fundamental_summary_html = ""
+                ui_state.status = f"Hybrid評価を追加しました。 / 評価時点={state_manager.technical_evaluation_label(force=True)}"
+            except Exception as exc:
+                ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
+            return _render(ui_state)
+        finally:
+            ui_state.market_data_operation_lock.release()
+
+    @app.post("/sector-breadth")
+    def build_sector_breadth() -> str:
+        if not ui_state.market_data_operation_lock.acquire(blocking=False):
+            ui_state.status = "市場データ取得中です。完了後に再実行してください。"
+            return _render(ui_state)
+        try:
+            state_manager.sync_form_selection(
+                request.form.get("selected_stock", ui_state.selected_label),
+                request.form.get("mode", ui_state.mode),
+                request.form.get("technical_evaluation_date"),
+                request.form.get("technical_evaluation_time"),
+            )
+            state_manager.refresh_technical_evaluation_choices(force=True)
+            try:
+                output = state_manager.build_sector_breadth_output_for_current_selection()
+                if output is None:
+                    return _render(ui_state)
+                if output:
+                    ui_state.output = _append_output(ui_state.output, output)
+                    ui_state.mode = "technical"
+                    ui_state.fundamental_summary_html = ""
+                    ui_state.status = f"地合評価を追加しました。 / 評価時点={state_manager.technical_evaluation_label(force=True)}"
+            except Exception as exc:
+                ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
             return _render(ui_state)
         finally:
             ui_state.market_data_operation_lock.release()
@@ -248,6 +273,12 @@ def _render(state: WebUiState) -> str:
         output_blocks=output_blocks,
         summary_html=state.fundamental_summary_html,
     )
+
+
+def _append_output(base_output: str, addition: str) -> str:
+    if base_output.strip():
+        return f"{base_output.rstrip()}\n\n{addition.strip()}\n"
+    return addition
 
 
 def main() -> None:

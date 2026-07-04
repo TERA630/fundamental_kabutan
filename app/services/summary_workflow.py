@@ -8,17 +8,19 @@ from typing import Callable
 
 from app.data.file_cache import FileCache
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
-from app.domain.builders.hybrid_summary import build_hybrid_summary_markdown
+from app.domain.builders.hybrid_evaluation_output import (
+    build_hybrid_evaluation_text,
+    build_hybrid_evaluation_unavailable_text,
+)
 from app.domain.builders.sector_breadth_output import build_single_stock_sector_breadth_text
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
-from app.domain.usecases.hybrid_summary import HybridSummaryService
+from app.domain.usecases.hybrid_evaluation import HybridEvaluationService
 from app.domain.usecases.technical_summary import TechnicalSummaryService
 
 FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
-HYBRID_SUMMARY_FILENAME_PREFIX = "hybrid_summary"
 TECHNICAL_SUMMARY_FILENAME_PREFIX = "technical_summary"
 
 
@@ -30,11 +32,6 @@ def build_fundamental_summary_filename(*, today: date | None = None) -> str:
 def build_technical_summary_filename(*, generated_at: datetime | None = None) -> str:
     target = generated_at or datetime.now()
     return f"{TECHNICAL_SUMMARY_FILENAME_PREFIX}_{target.strftime('%m-%d-%H-%M')}.md"
-
-
-def build_hybrid_summary_filename(*, generated_at: datetime | None = None) -> str:
-    target = generated_at or datetime.now()
-    return f"{HYBRID_SUMMARY_FILENAME_PREFIX}_{target.strftime('%m-%d-%H-%M')}.md"
 
 
 def _watchlist_tuples(watchlist_entries: list[tuple[str, str] | WatchlistEntry]) -> list[tuple[str, str]]:
@@ -144,6 +141,46 @@ class SummaryWorkflow:
         )
         return build_single_stock_sector_breadth_text(table.sector_breadth, sectors)
 
+    def build_single_stock_hybrid_evaluation_output(
+        self,
+        *,
+        name: str,
+        code4: str,
+        kabutan_html_dir: Path | None = None,
+        evaluation_at: datetime | None = None,
+    ) -> str:
+        fundamental_row = FundamentalSummaryService(
+            self.build_fundamental_service(self.file_cache)
+        ).build_summary_row(
+            name=name,
+            code4=code4,
+            kabutan_html_dir=kabutan_html_dir,
+        )
+        if fundamental_row is None:
+            return build_hybrid_evaluation_unavailable_text(
+                name=name,
+                code4=code4,
+                reason="Fundamental総合スコア作成不可",
+            )
+
+        build_result = self.build_technical_summary_result
+        if evaluation_at is not None:
+            build_result = lambda name, code4: self.build_technical_summary_result(
+                name,
+                code4,
+                evaluation_at=evaluation_at,
+            )
+        technical_result = build_result(name, code4)
+        technical_row = TechnicalSummaryService(
+            build_result,
+            build_us_market_summary=None,
+        ).build_summary_row(technical_result)
+        evaluation = HybridEvaluationService().build_evaluation(
+            fundamental_row=fundamental_row,
+            technical_row=technical_row,
+        )
+        return build_hybrid_evaluation_text(evaluation)
+
     def build_summary_table_for_mode(
         self,
         *,
@@ -160,26 +197,6 @@ class SummaryWorkflow:
         return self.build_fundamental_summary_table(
             watchlist_entries=watchlist_entries,
             kabutan_html_dir=kabutan_html_dir,
-        )
-
-    def build_hybrid_summary_table(
-        self,
-        *,
-        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
-        kabutan_html_dir: Path | None = None,
-        evaluation_at: datetime | None = None,
-    ):
-        fundamental_table = self.build_fundamental_summary_table(
-            watchlist_entries=watchlist_entries,
-            kabutan_html_dir=kabutan_html_dir,
-        )
-        technical_table = self.build_technical_summary_table(
-            watchlist_entries=watchlist_entries,
-            evaluation_at=evaluation_at,
-        )
-        return HybridSummaryService().build_summary_table(
-            fundamental_table=fundamental_table,
-            technical_table=technical_table,
         )
 
     def build_and_save_fundamental_summary(
@@ -216,32 +233,11 @@ class SummaryWorkflow:
         output_path.write_text(markdown, encoding="utf-8")
         return output_path
 
-    def build_and_save_hybrid_summary(
-        self,
-        *,
-        watchlist_entries: list[tuple[str, str] | WatchlistEntry],
-        output_dir: Path,
-        kabutan_html_dir: Path | None = None,
-        generated_at: datetime | None = None,
-        evaluation_at: datetime | None = None,
-    ) -> Path:
-        table = self.build_hybrid_summary_table(
-            watchlist_entries=watchlist_entries,
-            kabutan_html_dir=kabutan_html_dir,
-            evaluation_at=evaluation_at,
-        )
-        markdown = build_hybrid_summary_markdown(table)
-        output_path = output_dir / build_hybrid_summary_filename(generated_at=generated_at)
-        output_path.write_text(markdown, encoding="utf-8")
-        return output_path
-
 
 __all__ = [
     "FUNDAMENTAL_SUMMARY_FILENAME_PREFIX",
-    "HYBRID_SUMMARY_FILENAME_PREFIX",
     "TECHNICAL_SUMMARY_FILENAME_PREFIX",
     "SummaryWorkflow",
     "build_fundamental_summary_filename",
-    "build_hybrid_summary_filename",
     "build_technical_summary_filename",
 ]

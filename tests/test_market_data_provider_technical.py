@@ -318,12 +318,7 @@ def test_build_previous_session_intraday_snapshot():
     assert snapshot["prev_am_vwap_maintained"] is True
     assert snapshot["prev_pm_vwap_maintained"] is True
     assert snapshot["previous_pm_vwap_position"] == "上"
-    assert snapshot["previous_pm_evaluation"] == "後場上昇"
-    assert snapshot["pm_open"] == 102.0
-    assert snapshot["pm_high"] == 105.0
-    assert snapshot["pm_low"] == 101.0
-    assert snapshot["pm_return_pct"] == pytest.approx((104.0 / 102.0 - 1) * 100)
-    assert snapshot["pm_close_position"] == pytest.approx(0.75)
+    assert "previous_pm_evaluation" not in snapshot
 
 
 def test_build_previous_session_intraday_snapshot_returns_na_when_previous_bars_missing():
@@ -342,7 +337,7 @@ def test_build_previous_session_intraday_snapshot_returns_na_when_previous_bars_
 
     assert snapshot["prev_vwap"] is None
     assert snapshot["previous_pm_vwap_position"] == "N/A"
-    assert snapshot["previous_pm_evaluation"] == "N/A"
+    assert "previous_pm_evaluation" not in snapshot
 
 
 def test_build_daily_reference_vwap_snapshot():

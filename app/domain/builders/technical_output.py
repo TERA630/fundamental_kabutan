@@ -106,7 +106,6 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     latest = _evaluation_price(result)
     vwap = _as_float(vwap_snapshot.get("vwap"))
     vwap_diff = latest - vwap if latest is not None and vwap is not None else None
-    vwap_diff_pct = ((latest / vwap) - 1) * 100 if latest is not None and vwap not in (None, 0) else None
     vwap_diff_atr = _safe_div(vwap_diff, snapshot.range.atr14)
     vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
     volume_vs_avg20_pct = _ratio_pct(_evaluation_volume(result), snapshot.price.volume_avg20)
@@ -116,7 +115,7 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
         f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(_price_change(result))}円：{_fmt_pct(_price_change_pct(result))}）（終端位置{_fmt_position_pct(_range_position(latest, _evaluation_low(result), _evaluation_high(result)))}）"
         f" | 出来高比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)})",
         f"　位置：25日線{_fmt_pct(_evaluation_dev25_pct(result))}/{_fmt_atr_distance(_evaluation_ma25_distance_atr(result))}"
-        f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_pct(vwap_diff_pct)}/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
+        f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
         f"　下値目安：{_format_opening_supports(result)}",
         f"　抵抗：{_format_opening_resistances(result)}",
@@ -409,7 +408,6 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
     prev_close = snapshot.price.prev_close
     prev_vwap = _as_float(intraday.get("prev_vwap"))
     prev_vwap_diff = prev_close - prev_vwap if prev_close is not None and prev_vwap is not None else None
-    pm_evaluation = intraday.get("previous_pm_evaluation")
     return "\n".join(
         [
             "■前日評価",
@@ -417,7 +415,6 @@ def _format_previous_session(result: TechnicalAnalysisResult) -> str:
             f"　終端位置：{_fmt_position_pct(previous.prev_close_position)}　{_format_previous_candle(previous.candle_body_label, previous.wick_label)}"
             f"（レンジ{_fmt_price_compact(previous.prev_low)}－{_fmt_price_compact(previous.prev_high)}）",
             f"前日出来高：20日平均比　{_fmt_pct_unsigned(previous.prev_volume_vs_avg20_pct)}",
-            f"後場評価：{_fmt_text(pm_evaluation)}",
         ]
     )
 

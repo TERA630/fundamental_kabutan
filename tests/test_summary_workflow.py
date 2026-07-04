@@ -8,7 +8,6 @@ from app.domain.models.watchlist import WatchlistEntry
 from app.services.summary_workflow import (
     SummaryWorkflow,
     build_fundamental_summary_filename,
-    build_hybrid_summary_filename,
     build_technical_summary_filename,
 )
 
@@ -16,7 +15,6 @@ from app.services.summary_workflow import (
 def test_summary_filename_builders():
     assert build_fundamental_summary_filename(today=date(2026, 5, 30)) == "fundamental_summary-2026-05-30.md"
     assert build_technical_summary_filename(generated_at=datetime(2026, 5, 30, 14, 5)) == "technical_summary_05-30-14-05.md"
-    assert build_hybrid_summary_filename(generated_at=datetime(2026, 5, 30, 14, 5)) == "hybrid_summary_05-30-14-05.md"
 
 
 def test_build_summary_table_for_mode_dispatches(monkeypatch, tmp_path: Path):
@@ -231,53 +229,74 @@ def test_build_technical_sector_breadth_output_skips_tagless_stock(tmp_path: Pat
     )
 
 
-def test_build_and_save_hybrid_summary_merges_existing_summary_tables(monkeypatch, tmp_path: Path):
+def test_build_single_stock_hybrid_evaluation_output_uses_existing_summary_rows(monkeypatch, tmp_path: Path):
+    calls = []
+
     class DummyFundamentalSummaryService:
         def __init__(self, service):
             self.service = service
 
-        def build_summary_table(self, watchlist_entries, *, kabutan_html_dir=None):
-            assert watchlist_entries == [("トヨタ", "7203")]
-            assert kabutan_html_dir == tmp_path / "html"
-            return "FUND_TABLE"
+        def build_summary_row(self, *, name, code4, kabutan_html_dir=None):
+            assert (name, code4, kabutan_html_dir) == ("トヨタ", "7203", tmp_path / "html")
+            return "FUND_ROW"
 
     class DummyTechnicalSummaryService:
         def __init__(self, build_result, build_us_market_summary=None):
             self.build_result = build_result
 
-        def build_summary_table(self, watchlist_entries):
-            assert watchlist_entries == [("トヨタ", "7203")]
-            self.build_result("トヨタ", "7203")
-            return "TECH_TABLE"
+        def build_summary_row(self, result):
+            assert result == "TECH_RESULT"
+            return "TECH_ROW"
 
-    class DummyHybridSummaryService:
-        def build_summary_table(self, *, fundamental_table, technical_table):
-            assert fundamental_table == "FUND_TABLE"
-            assert technical_table == "TECH_TABLE"
-            return "HYBRID_TABLE"
+    class DummyHybridEvaluationService:
+        def build_evaluation(self, *, fundamental_row, technical_row):
+            assert fundamental_row == "FUND_ROW"
+            assert technical_row == "TECH_ROW"
+            return "HYBRID_EVAL"
 
-    calls = []
     monkeypatch.setattr("app.services.summary_workflow.FundamentalSummaryService", DummyFundamentalSummaryService)
     monkeypatch.setattr("app.services.summary_workflow.TechnicalSummaryService", DummyTechnicalSummaryService)
-    monkeypatch.setattr("app.services.summary_workflow.HybridSummaryService", DummyHybridSummaryService)
-    monkeypatch.setattr("app.services.summary_workflow.build_hybrid_summary_markdown", lambda table: f"HYBRID:{table}\n")
+    monkeypatch.setattr("app.services.summary_workflow.HybridEvaluationService", DummyHybridEvaluationService)
+    monkeypatch.setattr("app.services.summary_workflow.build_hybrid_evaluation_text", lambda evaluation: f"{evaluation}\n")
     evaluation_at = datetime(2026, 5, 29, 9, 10)
     workflow = SummaryWorkflow(
         file_cache=FileCache(base_dir=tmp_path / "cache"),
         build_fundamental_service=lambda _cache: object(),
         build_technical_summary_result=lambda name, code4, *, evaluation_at=None: calls.append(
             (name, code4, evaluation_at)
-        ) or object(),
+        ) or "TECH_RESULT",
     )
 
-    output = workflow.build_and_save_hybrid_summary(
-        watchlist_entries=[("トヨタ", "7203")],
-        output_dir=tmp_path,
+    output = workflow.build_single_stock_hybrid_evaluation_output(
+        name="トヨタ",
+        code4="7203",
         kabutan_html_dir=tmp_path / "html",
-        generated_at=datetime(2026, 5, 29, 9, 20),
         evaluation_at=evaluation_at,
     )
 
-    assert output == tmp_path / "hybrid_summary_05-29-09-20.md"
+    assert output == "HYBRID_EVAL\n"
     assert calls == [("トヨタ", "7203", evaluation_at)]
-    assert output.read_text(encoding="utf-8") == "HYBRID:HYBRID_TABLE\n"
+
+
+def test_build_single_stock_hybrid_evaluation_output_handles_missing_fundamental_score(monkeypatch, tmp_path: Path):
+    class DummyFundamentalSummaryService:
+        def __init__(self, service):
+            self.service = service
+
+        def build_summary_row(self, *, name, code4, kabutan_html_dir=None):
+            return None
+
+    monkeypatch.setattr("app.services.summary_workflow.FundamentalSummaryService", DummyFundamentalSummaryService)
+    workflow = SummaryWorkflow(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_fundamental_service=lambda _cache: object(),
+        build_technical_summary_result=lambda _name, _code4: object(),
+    )
+
+    output = workflow.build_single_stock_hybrid_evaluation_output(
+        name="トヨタ",
+        code4="7203",
+    )
+
+    assert "■Hybrid評価" in output
+    assert "評価不可：Fundamental総合スコア作成不可" in output

@@ -98,8 +98,9 @@
         </label>
 
         <button id="fetch-button" formaction="/fetch" type="submit">取得</button>
+        <button id="hybrid-evaluation-button" formaction="/hybrid-evaluation" type="submit">Hybrid評価</button>
+        <button id="sector-breadth-button" formaction="/sector-breadth" type="submit">地合評価</button>
         <button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>
-        <button id="hybrid-summary-button" formaction="/hybrid-summary" type="submit">Hybridサマリ</button>
         <button id="copy-button" type="button">コピー</button>
         <a class="button-link" href="/download">保存</a>
       </section>
@@ -162,7 +163,8 @@
     const copyButton = document.getElementById("copy-button");
     const copySource = document.getElementById("copy-source");
     const summaryButton = document.getElementById("summary-button");
-    const hybridSummaryButton = document.getElementById("hybrid-summary-button");
+    const hybridEvaluationButton = document.getElementById("hybrid-evaluation-button");
+    const sectorBreadthButton = document.getElementById("sector-breadth-button");
     const fetchButton = document.getElementById("fetch-button");
     const kabutanPackageImportButton = document.getElementById("kabutan-package-import-button");
     const modeInputs = document.querySelectorAll('input[name="mode"]');
@@ -183,11 +185,12 @@
     updateSummaryButton();
 
     document.querySelector("form.work-area").addEventListener("submit", (event) => {
-      if (event.submitter !== summaryButton && event.submitter !== hybridSummaryButton && event.submitter !== fetchButton) {
+      if (event.submitter !== summaryButton && event.submitter !== hybridEvaluationButton && event.submitter !== sectorBreadthButton && event.submitter !== fetchButton) {
         return;
       }
       summaryButton.disabled = true;
-      hybridSummaryButton.disabled = true;
+      hybridEvaluationButton.disabled = true;
+      sectorBreadthButton.disabled = true;
       fetchButton.disabled = true;
     });
 

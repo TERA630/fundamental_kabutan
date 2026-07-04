@@ -61,7 +61,8 @@ class FundamentalApp:
             on_open_kabutan_dir=self.open_kabutan_html_dir,
             on_build_kabutan_package=self.build_kabutan_html_package,
             on_summary=self.generate_summary,
-            on_hybrid_summary=self.generate_hybrid_summary,
+            on_hybrid_evaluation=self.generate_hybrid_evaluation,
+            on_sector_breadth=self.generate_sector_breadth,
             on_tab_changed=self.on_tab_changed,
             on_refresh_technical_evaluation=self.refresh_technical_evaluation_choices,
             on_technical_evaluation_date_changed=self.on_technical_evaluation_date_changed,
@@ -157,6 +158,14 @@ class FundamentalApp:
         self.institutional_summary_var.set(summary)
         self._render_output(output, status, mode=mode)
 
+    def _render_appended_output(self, base_output: str, addition: str, status: str, mode: str):
+        output = (
+            f"{base_output.rstrip()}\n\n{addition.strip()}\n"
+            if base_output.strip()
+            else addition
+        )
+        self._render_output(output, status, mode=mode)
+
     def _sync_technical_evaluation_selection(self) -> None:
         self.state_manager.set_technical_evaluation_selection(
             date_text=self.technical_evaluation_date_var.get(),
@@ -212,20 +221,12 @@ class FundamentalApp:
 
     def _technical_fetch_worker(self, name: str, code4: str, evaluation_at, evaluation_label: str):
         try:
-            technical_analysis_result = None
             fetch_technical_output_result = getattr(self.controller, "fetch_technical_output_result", None)
             if callable(fetch_technical_output_result):
                 detail = fetch_technical_output_result(name=name, code4=code4, evaluation_at=evaluation_at)
                 output = detail.output
-                technical_analysis_result = detail.analysis_result
             else:
                 output = self.controller.fetch_technical_output(name=name, code4=code4, evaluation_at=evaluation_at)
-            output = self._append_technical_sector_breadth_output(
-                output,
-                code4,
-                evaluation_at,
-                technical_analysis_result=technical_analysis_result,
-            )
             summary = self.controller.fetch_institutional_summary_text(
                 name=name,
                 code4=code4,
@@ -236,39 +237,63 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
-    def _append_technical_sector_breadth_output(
+    def _sector_breadth_worker(
         self,
-        output: str,
+        name: str,
         code4: str,
         evaluation_at,
-        *,
-        technical_analysis_result: object | None = None,
-    ) -> str:
-        if not self.state.sectors_for_code4(code4):
-            return output
-        build_output = getattr(self.controller, "build_technical_sector_breadth_output", None)
-        if not callable(build_output):
-            return output
-        sector_output = build_output(
-            watchlist_entries=self.state.technical_watchlist_entries(),
-            code4=code4,
-            evaluation_at=evaluation_at,
-            prebuilt_results=({code4: technical_analysis_result} if technical_analysis_result is not None else None),
-        )
-        if not sector_output:
-            return output
-        return f"{output.rstrip()}\n\n{sector_output}\n"
+        evaluation_label: str,
+        base_output: str,
+    ):
+        try:
+            if not self.state.sectors_for_code4(code4):
+                self.master.after(
+                    0,
+                    lambda: self.set_busy(False, f"{name}({code4}) は地合評価対象のセクターがありません。"),
+                )
+                return
+            output = self.controller.build_technical_sector_breadth_output(
+                watchlist_entries=self.state.technical_watchlist_entries(),
+                code4=code4,
+                evaluation_at=evaluation_at,
+            )
+            if not output:
+                self.master.after(0, lambda: self.set_busy(False, "地合評価を作成できませんでした。"))
+                return
+            status = f"地合評価を追加しました。 / 評価時点={evaluation_label}"
+            self.master.after(
+                0,
+                lambda: self._render_appended_output(base_output, output, status, "technical"),
+            )
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
+
+    def _hybrid_evaluation_worker(
+        self,
+        name: str,
+        code4: str,
+        evaluation_at,
+        evaluation_label: str,
+        base_output: str,
+    ):
+        try:
+            output = self.controller.build_single_stock_hybrid_evaluation_output(
+                name=name,
+                code4=code4,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+                evaluation_at=evaluation_at,
+            )
+            status = f"Hybrid評価を追加しました。 / 評価時点={evaluation_label}"
+            self.master.after(
+                0,
+                lambda: self._render_appended_output(base_output, output, status, "technical"),
+            )
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
     def _summary_worker(self, output_dir: Path, mode: str, evaluation_at=None, evaluation_label: str = "最新"):
         try:
-            if mode == "hybrid":
-                output_path = self.controller.build_and_save_hybrid_summary(
-                    watchlist_entries=self.state.technical_watchlist_entries(),
-                    output_dir=output_dir,
-                    kabutan_html_dir=self.state.kabutan_html_dir,
-                    evaluation_at=evaluation_at,
-                )
-            elif mode == "technical":
+            if mode == "technical":
                 output_path = self.controller.build_and_save_technical_summary(
                     watchlist_entries=self.state.technical_watchlist_entries(),
                     output_dir=output_dir,
@@ -281,7 +306,7 @@ class FundamentalApp:
                     kabutan_html_dir=self.state.kabutan_html_dir,
                 )
             status = self.view_model.build_saved_status(str(output_path))
-            if mode in {"technical", "hybrid"}:
+            if mode == "technical":
                 status = f"{status} / 評価時点={evaluation_label}"
             self.master.after(0, lambda: self.set_busy(False, status))
         except Exception as exc:
@@ -375,24 +400,46 @@ class FundamentalApp:
         )
         thread.start()
 
-    def generate_hybrid_summary(self):
+    def generate_hybrid_evaluation(self):
         if self.state.is_fetching:
             return
 
-        if not self.state.watchlist:
-            self.status_var.set(self.view_model.build_missing_stock_status())
+        selected = self._require_selected_stock()
+        if selected is None:
             return
         if not self._require_kabutan_html_dir():
             return
 
-        output_dir = self.state.watchlist_path.parent if self.state.watchlist_path is not None else Path.cwd()
+        name, code4 = selected
         self._sync_technical_evaluation_selection()
         evaluation_at = self.state_manager.technical_evaluation_at()
         evaluation_label = self.state_manager.technical_evaluation_label()
-        self.set_busy(True, self.view_model.build_summary_running_status())
+        base_output = self.view.text_widget_for_mode("technical").get("1.0", tk.END).strip()
+        self.set_busy(True, f"Hybrid評価を作成中... / 評価時点={evaluation_label}")
         thread = threading.Thread(
-            target=self._summary_worker,
-            args=(output_dir, "hybrid", evaluation_at, evaluation_label),
+            target=self._hybrid_evaluation_worker,
+            args=(name, code4, evaluation_at, evaluation_label, base_output),
+            daemon=True,
+        )
+        thread.start()
+
+    def generate_sector_breadth(self):
+        if self.state.is_fetching:
+            return
+
+        selected = self._require_selected_stock()
+        if selected is None:
+            return
+
+        name, code4 = selected
+        self._sync_technical_evaluation_selection()
+        evaluation_at = self.state_manager.technical_evaluation_at()
+        evaluation_label = self.state_manager.technical_evaluation_label()
+        base_output = self.view.text_widget_for_mode("technical").get("1.0", tk.END).strip()
+        self.set_busy(True, f"地合評価を作成中... / 評価時点={evaluation_label}")
+        thread = threading.Thread(
+            target=self._sector_breadth_worker,
+            args=(name, code4, evaluation_at, evaluation_label, base_output),
             daemon=True,
         )
         thread.start()

@@ -1,7 +1,9 @@
 from app.domain.builders.hybrid_summary import build_hybrid_summary_markdown
+from app.domain.builders.hybrid_evaluation_output import build_hybrid_evaluation_text
 from app.domain.models.fundamental_summary import FundamentalSummaryRow, FundamentalSummaryTable
 from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
 from app.domain.policies.hybrid_classification import classify_hybrid_candidate
+from app.domain.usecases.hybrid_evaluation import HybridEvaluationService
 from app.domain.usecases.hybrid_summary import HybridSummaryService
 from app.presentation.web_hybrid_summary import build_hybrid_summary_html
 
@@ -144,6 +146,44 @@ def test_hybrid_summary_html_links_stock_name_to_technical_detail():
     )
 
     assert '<a href="/stock/1234?mode=technical">候補(1234)</a>' in html
+
+
+def test_hybrid_evaluation_text_renders_single_stock_classification():
+    fundamental_row = FundamentalSummaryRow(
+        name="候補",
+        code4="1234",
+        total_score=72,
+        quality_score=44,
+        growth_score=None,
+        valuation_score=None,
+        operating_margin=None,
+        operating_profit_cagr_3y=None,
+        roic=None,
+        cash_conversion=None,
+        per=None,
+        investment_rate=None,
+    )
+    technical_row = _technical_row(
+        name="候補",
+        code4="1234",
+        dev25_pct=-4.0,
+        vwap=100.0,
+        vwap_diff_pct=2.0,
+        high_breakout_count=1,
+        low_lower_count=1,
+        volume_vs_avg20_pct=85.0,
+    )
+
+    evaluation = HybridEvaluationService().build_evaluation(
+        fundamental_row=fundamental_row,
+        technical_row=technical_row,
+    )
+    text = build_hybrid_evaluation_text(evaluation)
+
+    assert "■Hybrid評価" in text
+    assert "分類：F1 高ファンダ深押し反転候補" in text
+    assert "F：72 / Q：44 / Tech：D3 底打ち初動" in text
+    assert "理由：F72 / 高値更新1 / 安値切下げ1 / 出来高85%" in text
 
 
 def _technical_row(

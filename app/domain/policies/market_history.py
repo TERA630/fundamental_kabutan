@@ -234,11 +234,6 @@ def build_previous_session_intraday_snapshot(
     am_vwap = _calc_vwap(am)
     pm_vwap = _calc_vwap(pm)
     am_close = _safe_float(am.iloc[-1]["Close"])
-    pm_open = _safe_float(pm.iloc[0]["Open"])
-    pm_high = _safe_float(pm["High"].max())
-    pm_low = _safe_float(pm["Low"].min())
-    pm_return_pct = ((prev_close / pm_open) - 1) * 100 if prev_close is not None and pm_open not in (None, 0) else None
-    pm_close_position = (prev_close - pm_low) / (pm_high - pm_low) if prev_close is not None and pm_high is not None and pm_low is not None and pm_high > pm_low else None
     return {
         "prev_vwap": prev_vwap,
         "prev_vwap_source": "前日5分足",
@@ -247,18 +242,6 @@ def build_previous_session_intraday_snapshot(
         "prev_am_vwap_maintained": None if am_close is None or am_vwap is None else am_close >= am_vwap,
         "prev_pm_vwap_maintained": None if prev_close is None or pm_vwap is None else prev_close >= pm_vwap,
         "previous_pm_vwap_position": "N/A" if prev_close is None or pm_vwap is None else ("上" if prev_close > pm_vwap else "下"),
-        "previous_pm_evaluation": _classify_previous_pm_evaluation(
-            pm_open=pm_open,
-            pm_high=pm_high,
-            pm_low=pm_low,
-            close=prev_close,
-            vwap=pm_vwap,
-        ),
-        "pm_open": pm_open,
-        "pm_high": pm_high,
-        "pm_low": pm_low,
-        "pm_return_pct": pm_return_pct,
-        "pm_close_position": pm_close_position,
     }
 
 
@@ -303,12 +286,6 @@ def _empty_previous_session_intraday_snapshot() -> dict[str, float | str | bool 
         "prev_am_vwap_maintained": None,
         "prev_pm_vwap_maintained": None,
         "previous_pm_vwap_position": "N/A",
-        "previous_pm_evaluation": "N/A",
-        "pm_open": None,
-        "pm_high": None,
-        "pm_low": None,
-        "pm_return_pct": None,
-        "pm_close_position": None,
     }
 
 
@@ -371,35 +348,6 @@ def _confirmed_intraday_bars(frame: pd.DataFrame) -> pd.DataFrame:
     timestamps = pd.DatetimeIndex(frame.index)
     confirmed_mask = timestamps + pd.Timedelta(minutes=5) <= now_jst
     return frame.loc[confirmed_mask]
-
-
-def _classify_previous_pm_evaluation(
-    *,
-    pm_open: float | None,
-    pm_high: float | None,
-    pm_low: float | None,
-    close: float | None,
-    vwap: float | None,
-) -> str:
-    if None in (pm_open, pm_high, pm_low, close, vwap) or pm_high <= pm_low:
-        return "N/A"
-    pm_return_pct = ((close / pm_open) - 1) * 100 if pm_open != 0 else None
-    pm_close_position = (close - pm_low) / (pm_high - pm_low)
-    if pm_return_pct is None:
-        return "N/A"
-    if close <= vwap:
-        return "後場VWAP割"
-    if pm_return_pct < -1 or pm_close_position < 0.30:
-        return "失速もVWAP維持"
-    if close > pm_open and pm_close_position >= 0.70:
-        return "後場上昇"
-    if pm_close_position >= 0.50 and -1 <= pm_return_pct <= 1:
-        return "高値維持"
-    if 0.30 <= pm_close_position < 0.50 and -1 <= pm_return_pct <= 1:
-        return "横ばいVWAP維持"
-    if pm_return_pct > 1:
-        return "後場上昇"
-    return "横ばいVWAP維持"
 
 
 __all__ = [

@@ -205,7 +205,6 @@ class WebUiStateManager:
 
         name, code4 = selected
         evaluation_at = self.technical_evaluation_at()
-        technical_analysis_result = None
         if self.state.mode == "technical":
             fetch_technical_output_result = getattr(self.state.controller, "fetch_technical_output_result", None)
             if callable(fetch_technical_output_result):
@@ -215,7 +214,6 @@ class WebUiStateManager:
                     evaluation_at=evaluation_at,
                 )
                 output = technical_detail.output
-                technical_analysis_result = technical_detail.analysis_result
                 institutional_summary = self.state.controller.fetch_institutional_summary_text(
                     name=name,
                     code4=code4,
@@ -231,12 +229,6 @@ class WebUiStateManager:
                 )
                 output = result.output
                 institutional_summary = result.institutional_summary
-            output = self._append_technical_sector_breadth_output(
-                output=output,
-                code4=code4,
-                evaluation_at=evaluation_at,
-                technical_analysis_result=technical_analysis_result,
-            )
         else:
             result = self.state.controller.fetch_output_for_mode(
                 name=name,
@@ -255,28 +247,27 @@ class WebUiStateManager:
         self.state.status = status
         return True
 
-    def _append_technical_sector_breadth_output(
-        self,
-        *,
-        output: str,
-        code4: str,
-        evaluation_at: datetime | None,
-        technical_analysis_result: object | None = None,
-    ) -> str:
+    def build_sector_breadth_output_for_current_selection(self) -> str | None:
+        if not self.state.watchlist:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            return None
+        selected = self.selected_stock()
+        if selected is None:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            return None
+        name, code4 = selected
         if not self.state.sectors_for_code4(code4):
-            return output
+            self.state.status = f"{name}({code4}) は地合評価対象のセクターがありません。"
+            return ""
         build_output = getattr(self.state.controller, "build_technical_sector_breadth_output", None)
         if not callable(build_output):
-            return output
-        sector_output = build_output(
+            self.state.status = "地合評価を作成できませんでした。"
+            return ""
+        return build_output(
             watchlist_entries=self.state.technical_watchlist_entries(),
             code4=code4,
-            evaluation_at=evaluation_at,
-            prebuilt_results=({code4: technical_analysis_result} if technical_analysis_result is not None else None),
+            evaluation_at=self.technical_evaluation_at(force=True),
         )
-        if not sector_output:
-            return output
-        return f"{output.rstrip()}\n\n{sector_output}\n"
 
     def build_summary_table_for_current_mode(self):
         if not self.state.watchlist:
@@ -301,8 +292,13 @@ class WebUiStateManager:
             evaluation_at=self.technical_evaluation_at(),
         )
 
-    def build_hybrid_summary_table(self):
+    def build_hybrid_evaluation_output_for_current_selection(self) -> str | None:
         if not self.state.watchlist:
+            self.state.status = self.state.view_model.build_missing_stock_status()
+            self.state.fundamental_summary_html = ""
+            return None
+        selected = self.selected_stock()
+        if selected is None:
             self.state.status = self.state.view_model.build_missing_stock_status()
             self.state.fundamental_summary_html = ""
             return None
@@ -311,8 +307,10 @@ class WebUiStateManager:
             self.state.status = self.state.view_model.build_kabutan_dir_restore_required_status()
             self.state.fundamental_summary_html = ""
             return None
-        return self.state.controller.build_hybrid_summary_table(
-            watchlist_entries=self.state.technical_watchlist_entries(),
+        name, code4 = selected
+        return self.state.controller.build_single_stock_hybrid_evaluation_output(
+            name=name,
+            code4=code4,
             kabutan_html_dir=self.state.kabutan_html_dir,
             evaluation_at=self.technical_evaluation_at(force=True),
         )

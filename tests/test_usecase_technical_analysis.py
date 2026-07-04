@@ -103,7 +103,7 @@ def test_build_analysis_result_fetches_and_caches_histories():
     assert first.vwap_snapshot["vwap_source"] == "本日5分足"
     assert first.previous_intraday_snapshot["prev_vwap_source"] == "前日5分足"
     assert first.previous_intraday_snapshot["prev_am_vwap_maintained"] is True
-    assert first.previous_intraday_snapshot["previous_pm_evaluation"] == "高値維持"
+    assert "previous_pm_evaluation" not in first.previous_intraday_snapshot
     assert first.rsi_analysis is not None
     assert first.rsi_analysis.overall_label == "N/A"
     assert second.snapshot.price.latest == 169.0
@@ -123,7 +123,7 @@ def test_build_analysis_result_falls_back_to_daily_reference_vwap():
     assert result.vwap_snapshot["vwap_source"] == "日足参考値"
     assert result.vwap_snapshot["latest_bar_time"] == "終値"
     assert result.intraday_price_timestamp == "2026-04-08 終値"
-    assert result.previous_intraday_snapshot["previous_pm_evaluation"] == "N/A"
+    assert "previous_pm_evaluation" not in result.previous_intraday_snapshot
 
 
 def test_build_analysis_result_uses_same_day_intraday_evaluation_price():

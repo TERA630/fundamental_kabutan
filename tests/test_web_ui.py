@@ -99,6 +99,9 @@ def test_index_renders_technical_output_as_pre_text_not_visible_textarea():
     assert '<pre class="text-block">Technical output</pre>' in html
     assert '<textarea readonly' not in html
     assert '<button id="summary-button" formaction="/summary" type="submit">サマリ表示</button>' in html
+    assert '<button id="hybrid-evaluation-button" formaction="/hybrid-evaluation" type="submit">Hybrid評価</button>' in html
+    assert '<button id="sector-breadth-button" formaction="/sector-breadth" type="submit">地合評価</button>' in html
+    assert 'formaction="/hybrid-summary"' not in html
 
 
 def test_web_ui_defaults_to_technical_mode():
@@ -254,10 +257,10 @@ def test_technical_summary_post_renders_summary_html_without_kabutan_dir(monkeyp
     assert state.status == "Technicalサマリを表示しました。 / 評価時点=最新"
 
 
-def test_hybrid_summary_post_renders_hybrid_html_with_kabutan_dir(monkeypatch, tmp_path: Path):
+def test_hybrid_evaluation_post_appends_single_stock_output(tmp_path: Path):
     class FakeController:
         def __init__(self):
-            self.evaluation_at = object()
+            self.call = None
 
         def fetch_resolved_watchlist_path(self):
             return SimpleNamespace(status="missing", file_path=None)
@@ -269,23 +272,22 @@ def test_hybrid_summary_post_renders_hybrid_html_with_kabutan_dir(monkeypatch, t
             assert code4 == "7203"
             return (datetime(2026, 5, 29, 9, 10),)
 
-        def build_hybrid_summary_table(self, *, watchlist_entries, kabutan_html_dir=None, evaluation_at=None):
-            assert watchlist_entries == [("トヨタ", "7203")]
-            assert kabutan_html_dir == tmp_path / "html"
-            assert evaluation_at == datetime(2026, 5, 29, 9, 10)
-            return "HYBRID_TABLE"
+        def build_single_stock_hybrid_evaluation_output(self, **kwargs):
+            self.call = kwargs
+            return "■Hybrid評価\n分類：F1 高ファンダ深押し反転候補\n"
 
-    monkeypatch.setattr("app.web.build_hybrid_summary_html", lambda table, **_kwargs: f"<section>{table}</section>")
-
-    state = WebUiState(controller=FakeController())
+    controller = FakeController()
+    state = WebUiState(controller=controller)
     state.mode = "fundamental"
     state.watchlist = [("トヨタ", "7203")]
     state.selected_label = "トヨタ (7203)"
     state.kabutan_html_dir = tmp_path / "html"
+    state.output = "既存出力"
+    state.fundamental_summary_html = "<section>OLD SUMMARY</section>"
     client = create_app(state).test_client()
 
     html = client.post(
-        "/hybrid-summary",
+        "/hybrid-evaluation",
         data={
             "selected_stock": "トヨタ (7203)",
             "mode": "fundamental",
@@ -294,9 +296,66 @@ def test_hybrid_summary_post_renders_hybrid_html_with_kabutan_dir(monkeypatch, t
         },
     ).data.decode("utf-8")
 
-    assert "<section>HYBRID_TABLE</section>" in html
-    assert state.fundamental_summary_html == "<section>HYBRID_TABLE</section>"
-    assert state.status == "Hybridサマリを表示しました。 / 評価時点=2026-05-29 09:10"
+    assert "既存出力" in html
+    assert "分類：F1 高ファンダ深押し反転候補" in html
+    assert state.output == "既存出力\n\n■Hybrid評価\n分類：F1 高ファンダ深押し反転候補\n"
+    assert state.mode == "technical"
+    assert state.fundamental_summary_html == ""
+    assert state.status == "Hybrid評価を追加しました。 / 評価時点=2026-05-29 09:10"
+    assert controller.call["name"] == "トヨタ"
+    assert controller.call["code4"] == "7203"
+    assert controller.call["kabutan_html_dir"] == tmp_path / "html"
+    assert controller.call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
+
+
+def test_sector_breadth_post_appends_single_stock_output():
+    class FakeController:
+        def __init__(self):
+            self.call = None
+
+        def fetch_resolved_watchlist_path(self):
+            return SimpleNamespace(status="missing", file_path=None)
+
+        def fetch_resolved_kabutan_html_dir(self):
+            return SimpleNamespace(status="missing", dir_path=None)
+
+        def fetch_technical_evaluation_timestamps(self, code4):
+            assert code4 == "7203"
+            return (datetime(2026, 5, 29, 9, 10),)
+
+        def build_technical_sector_breadth_output(self, **kwargs):
+            self.call = kwargs
+            return "■セクター地合\n商社・資源：強い上昇地合い\n"
+
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.mode = "fundamental"
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.selected_label = "トヨタ (7203)"
+    state.output = "既存出力"
+    state.fundamental_summary_html = "<section>OLD SUMMARY</section>"
+    client = create_app(state).test_client()
+
+    html = client.post(
+        "/sector-breadth",
+        data={
+            "selected_stock": "トヨタ (7203)",
+            "mode": "fundamental",
+            "technical_evaluation_date": "2026-05-29",
+            "technical_evaluation_time": "09:10",
+        },
+    ).data.decode("utf-8")
+
+    assert "既存出力" in html
+    assert "商社・資源：強い上昇地合い" in html
+    assert state.output == "既存出力\n\n■セクター地合\n商社・資源：強い上昇地合い\n"
+    assert state.mode == "technical"
+    assert state.fundamental_summary_html == ""
+    assert state.status == "地合評価を追加しました。 / 評価時点=2026-05-29 09:10"
+    assert controller.call["watchlist_entries"] == state.watchlist_with_sectors
+    assert controller.call["code4"] == "7203"
+    assert controller.call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
 
 
 def test_technical_summary_status_includes_selected_evaluation_at(monkeypatch):

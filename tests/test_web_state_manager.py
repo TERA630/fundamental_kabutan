@@ -14,6 +14,7 @@ class FakeController:
         self.fetch_call = None
         self.summary_call = None
         self.sector_output_call = None
+        self.hybrid_evaluation_call = None
 
     def save_watchlist_path_cache(self, path):
         self.saved_watchlist_path = path
@@ -32,13 +33,13 @@ class FakeController:
         self.summary_call = kwargs
         return "SUMMARY_TABLE"
 
-    def build_hybrid_summary_table(self, **kwargs):
-        self.summary_call = kwargs
-        return "HYBRID_TABLE"
-
     def build_technical_sector_breadth_output(self, **kwargs):
         self.sector_output_call = kwargs
         return "SECTOR_OUTPUT"
+
+    def build_single_stock_hybrid_evaluation_output(self, **kwargs):
+        self.hybrid_evaluation_call = kwargs
+        return "HYBRID_EVALUATION"
 
 
 class FakeTechnicalTimestampController(FakeController):
@@ -99,18 +100,23 @@ def test_technical_summary_uses_sector_watchlist_entries():
     assert controller.summary_call["watchlist_entries"] == state.watchlist_with_sectors
 
 
-def test_hybrid_summary_uses_sector_watchlist_entries(tmp_path: Path):
+def test_hybrid_evaluation_uses_selected_stock_and_forced_technical_evaluation(tmp_path: Path):
     controller = FakeController()
     state = WebUiState(controller=controller)
+    state.mode = "fundamental"
     state.watchlist = [("トヨタ", "7203")]
-    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.selected_label = "トヨタ (7203)"
     state.kabutan_html_dir = tmp_path / "html"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:10"
     manager = WebUiStateManager(state)
 
-    assert manager.build_hybrid_summary_table() == "HYBRID_TABLE"
+    assert manager.build_hybrid_evaluation_output_for_current_selection() == "HYBRID_EVALUATION"
 
-    assert controller.summary_call["watchlist_entries"] == state.watchlist_with_sectors
-    assert controller.summary_call["kabutan_html_dir"] == tmp_path / "html"
+    assert controller.hybrid_evaluation_call["name"] == "トヨタ"
+    assert controller.hybrid_evaluation_call["code4"] == "7203"
+    assert controller.hybrid_evaluation_call["kabutan_html_dir"] == tmp_path / "html"
+    assert controller.hybrid_evaluation_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
 
 
 def test_set_kabutan_html_dir_clears_package_cache(tmp_path: Path):
@@ -165,7 +171,7 @@ def test_fetch_output_for_current_selection_passes_technical_evaluation_at():
     assert "評価時点=2026-05-29 09:10" in state.status
 
 
-def test_fetch_output_for_current_selection_appends_sector_breadth_for_tagged_technical_stock():
+def test_fetch_output_for_current_selection_does_not_append_sector_breadth_by_default():
     controller = FakeController()
     state = WebUiState(controller=controller)
     state.watchlist = [("トヨタ", "7203")]
@@ -178,13 +184,29 @@ def test_fetch_output_for_current_selection_appends_sector_breadth_for_tagged_te
 
     assert manager.fetch_output_for_current_selection() is True
 
-    assert state.output == "OUTPUT\n\nSECTOR_OUTPUT\n"
+    assert state.output == "OUTPUT"
+    assert controller.sector_output_call is None
+
+
+def test_sector_breadth_output_uses_selected_stock_sector_and_evaluation_at():
+    controller = FakeController()
+    state = WebUiState(controller=controller)
+    state.watchlist = [("トヨタ", "7203")]
+    state.watchlist_with_sectors = [WatchlistEntry(name="トヨタ", code4="7203", sectors=("商社・資源",))]
+    state.selected_label = "トヨタ (7203)"
+    state.mode = "fundamental"
+    state.technical_evaluation_date = "2026-05-29"
+    state.technical_evaluation_time = "09:10"
+    manager = WebUiStateManager(state)
+
+    assert manager.build_sector_breadth_output_for_current_selection() == "SECTOR_OUTPUT"
+
     assert controller.sector_output_call["watchlist_entries"] == state.watchlist_with_sectors
     assert controller.sector_output_call["code4"] == "7203"
     assert controller.sector_output_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
 
 
-def test_fetch_output_for_current_selection_reuses_selected_technical_result_for_sector_breadth():
+def test_fetch_output_for_current_selection_with_technical_result_does_not_append_sector_breadth():
     controller = FakeTechnicalResultController()
     state = WebUiState(controller=controller)
     state.watchlist = [("トヨタ", "7203")]
@@ -195,10 +217,9 @@ def test_fetch_output_for_current_selection_reuses_selected_technical_result_for
 
     assert manager.fetch_output_for_current_selection() is True
 
-    assert state.output == "OUTPUT\n\nSECTOR_OUTPUT\n"
+    assert state.output == "OUTPUT"
     assert controller.fetch_call["name"] == "トヨタ"
-    assert controller.sector_output_call["prebuilt_results"]["7203"] is not None
-    assert controller.sector_output_call["code4"] == "7203"
+    assert controller.sector_output_call is None
 
 
 def test_fetch_output_for_current_selection_can_keep_summary_html():

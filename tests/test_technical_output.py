@@ -71,6 +71,8 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "位置：25日線" in output
     assert "傾き：" not in output
     assert "VWAP" in output
+    assert "VWAP+1.47円/0.29ATR" in output
+    assert "VWAP+1.47円/+0.9%/0.29ATR" not in output
     assert "Vmap" not in output
     assert "需給（VWAP）：当日前場／後場　◯／◯　前日前場／後場　◯／◯" in output
     assert "出来高比　101%(前日比+0.1%)" in output
@@ -117,8 +119,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "高値更新 〇 / 安値維持 〇" not in output
     assert "前日出来高：20日平均比　100.9%" in output
     assert "前々日比" not in output
-    assert "後場評価：高値維持" in output
-    assert "後場評価：高値維持 / VWAP上" not in output
+    assert "後場評価：" not in output
     assert "■支持線" not in output
     assert "■節目・ブレイクライン" not in output
     assert "■流れ" not in output
@@ -295,7 +296,7 @@ def test_build_technical_output_marks_previous_session_intraday_na_when_missing(
     assert "需給（VWAP）：当日 N/A　前日前場／後場　N/A／N/A" in output
     assert "前日Vwap(前・後場)" not in output
     assert "高値更新 〇 / 安値維持 〇" not in output
-    assert "後場評価：N/A" in output
+    assert "後場評価：" not in output
     assert "/ VWAPN/A" not in output
 
 
