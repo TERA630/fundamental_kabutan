@@ -1,24 +1,24 @@
-"""Classification policy for Hybrid Summary candidate tags."""
+"""Classification policy for Hybrid evaluation candidate tags."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain.models.hybrid_summary import HybridSummaryTag
+from app.domain.models.hybrid_evaluation import HybridEvaluationTag
 
-TAG_LABELS: dict[HybridSummaryTag, str] = {
+TAG_LABELS: dict[HybridEvaluationTag, str] = {
     "F1": "高ファンダ深押し反転候補",
     "F2": "高Quality再評価候補",
     "M1": "過熱継続候補",
     "M2": "過熱危険",
 }
 
-TAG_ORDER: tuple[HybridSummaryTag, ...] = ("M2", "M1", "F1", "F2")
+TAG_ORDER: tuple[HybridEvaluationTag, ...] = ("M2", "M1", "F1", "F2")
 
 
 @dataclass(frozen=True)
 class HybridClassification:
-    tag: HybridSummaryTag
+    tag: HybridEvaluationTag
     tag_label: str
     reasons: tuple[str, ...]
 
@@ -39,7 +39,7 @@ def classify_hybrid_candidate(
     resistance_upside_pct: float | None,
     volume_spike_bearish: bool | None,
 ) -> HybridClassification | None:
-    """Return the first matching Hybrid Summary tag by risk-first priority."""
+    """Return the first matching Hybrid evaluation tag by risk-first priority."""
 
     vwap_up = latest is not None and vwap is not None and latest > vwap
     vwap_down = latest is not None and vwap is not None and latest < vwap
@@ -122,7 +122,7 @@ def classify_hybrid_candidate(
     return None
 
 
-def _classification(tag: HybridSummaryTag, reasons: tuple[str, ...]) -> HybridClassification:
+def _classification(tag: HybridEvaluationTag, reasons: tuple[str, ...]) -> HybridClassification:
     return HybridClassification(tag=tag, tag_label=TAG_LABELS[tag], reasons=reasons)
 
 

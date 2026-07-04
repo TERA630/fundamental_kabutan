@@ -10,6 +10,8 @@
 - Fundamental / Technical の出力
 - 機関投資サマリ固定パネル
 - 監視銘柄 Fundamental / Technical サマリ
+- 単一銘柄 Hybrid評価
+- 単一銘柄 地合評価
 - Data / Domain / UseCase / 画面・表示 の責務
 
 ## 2. 全体構成
@@ -52,7 +54,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 
 複数の独立条件を合算する採点、または成立理由を保持する必要がある複合判定には `SignalAtom` を使う。各 Atom は識別子、成立可否、加点、必要に応じたグループ上限を持つ。優先順位を持つ分岐、例外処理、他指標依存の補正は、Atom/RangeTableへ無理に押し込めず Domain Policy で明示する。
 
-### 4.2 主要モデル
+### 4.3 主要モデル
 
 | モデル | 内容 |
 |---|---|
@@ -69,8 +71,9 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 | `FundamentalSummaryRow` / `FundamentalSummaryTable` | 監視銘柄サマリ出力 |
 | `TechnicalSummaryRow` / `TechnicalSummaryTable` | 監視銘柄Technicalサマリ出力 |
 | `UsMarketSummaryRow` / `UsMarketSummaryTable` | Technical Summary 冒頭のUS Market指標出力 |
+| `HybridEvaluation` | 単一銘柄Hybrid評価出力 |
 
-### 4.3 UseCase
+### 4.4 UseCase
 
 | UseCase | 責務 |
 |---|---|
@@ -80,11 +83,12 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 | `FundamentalSummaryService` | 監視銘柄を順に分析し、サマリ用テーブルを作る |
 | `TechnicalSummaryService` | 監視銘柄を順にTechnical分析し、ランク別サマリ用テーブルを作る |
 | `UsMarketSummaryService` | yFinanceの日足からUS Market指標の直近値、前日騰落、5日乖離、25日乖離、RSI14を作る |
+| `HybridEvaluationService` | 単一銘柄のFundamental行とTechnical行からHybrid分類を作る |
 | `BuildQuarterlyFinancialTableUseCase` | 四半期実績からYoYメトリクスを作る |
 | `FetchKabutanForecastUseCase` | 株探業績取得をRepository越しに行う |
 | `ResolveKabutanHtmlDirUseCase` / `ResolveWatchlistPathUseCase` | キャッシュ済みパスの有効性を判定する |
 
-### 4.4 Fundamental 計算
+### 4.5 Fundamental 計算
 
 主な計算は次の通り。
 
@@ -98,7 +102,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 - ROIC水準分類
 - 四半期YoY成長率
 
-### 4.5 rankCF 採点
+### 4.6 rankCF 採点
 
 rankCF は `calculate_cf_score()` で計算する。
 
@@ -110,7 +114,7 @@ rankCF は `calculate_cf_score()` で計算する。
 
 欠損指標は原則0点として扱う。総合スコアから `S` / `A` / `B` / `C` の判定を作る。
 
-### 4.6 Technical 計算
+### 4.7 Technical 計算
 
 Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を参照する。
 
@@ -133,7 +137,7 @@ Technical 指標の計算定義は `docs/technical_ranking_spec.md` 第2章を�
 詳細な定義式はすべて `technical_ranking_spec.md` に記載されており、
 本書ではリスト形式で概要のみ記載する。
 
-### 4.7 Technical Summary ランク
+### 4.8 Technical Summary ランク
 
 ランキング分類条件の正本は `docs/technical_ranking_spec.md` とする。
 D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、
@@ -154,7 +158,7 @@ D1 / D2 / D3、VWAP15分維持、D1a / D1b、D3強弱、
 - ATR14と支持線が取得できる場合は指値帯を価格へ展開し、RRを表示する
 - 必要値の欠損時は `指値算出不可` または `RR算出不可` とする
 
-### 4.8 Technical Summary US Market
+### 4.9 Technical Summary US Market
 
 Technical Summary の冒頭には US Market セクションを表示する。
 
@@ -167,7 +171,33 @@ Technical Summary の冒頭には US Market セクションを表示する。
 - 取得失敗時は Technical Summary 全体の失敗にしない
 - 取得できない指標は skipped として理由を保持し、表示可能な指標だけを出力
 
-### 4.9 前日VWAPと後場評価
+### 4.10 単一銘柄Hybrid評価
+
+単一銘柄画面では `Hybrid評価` ボタンを押した場合のみ、選択銘柄の本文末尾へ Hybrid評価を追記する。
+監視銘柄全体を対象にした Hybrid 一覧サマリファイルや一覧表は生成しない。
+
+**実装要件：**
+
+- Fundamental Summary 相当の `FundamentalSummaryRow` と Technical Summary 相当の `TechnicalSummaryRow` を選択銘柄1件について作る
+- `classify_hybrid_candidate()` を使い、M2 / M1 / F1 / F2 の優先順で最大1分類を採用する
+- 分類条件に一致しない場合は `分類：該当なし` と表示する
+- Fundamental総合スコアが作れない場合は `評価不可` として理由を表示する
+- 評価時点の指定がある場合は、Technical側の行作成に同じ評価時点を渡す
+
+### 4.11 単一銘柄セクター地合評価
+
+単一銘柄画面では `地合評価` ボタンを押した場合のみ、選択銘柄に紐づくセクター地合を本文末尾へ追記する。
+Technical の `取得` ボタンではセクター地合を自動追記しない。
+Technical Summary 一覧では、従来どおり US Market セクション後、ランク別テーブル前に `Sector Breadth` を表示する。
+
+**実装要件：**
+
+- 監視銘柄ファイルのセクタータグから対象セクターを決める
+- タグなし銘柄、または該当セクターの集計結果が作れない場合は単一銘柄本文へ追記しない
+- 単一銘柄のTechnicalランクや戦略判定は変更しない
+- 評価時点の指定がある場合は、セクター集計対象銘柄のTechnical行作成にも同じ評価時点を渡す
+
+### 4.12 前日VWAPと後場評価
 
 前日5分足から計算する指標の詳細は `docs/technical_ranking_spec.md` 第3章を参照する。
 
@@ -180,7 +210,7 @@ Technical Summary の冒頭には US Market セクションを表示する。
 - 前日終値の後場VWAP位置
 - 後場評価
 
-### 4.10 ローソク足型とヒゲ
+### 4.13 ローソク足型とヒゲ
 
 ローソク足型とヒゲの判定定義は `docs/technical_ranking_spec.md` 第4章を参照する。
 

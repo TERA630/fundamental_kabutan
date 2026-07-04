@@ -1,11 +1,8 @@
-from app.domain.builders.hybrid_summary import build_hybrid_summary_markdown
 from app.domain.builders.hybrid_evaluation_output import build_hybrid_evaluation_text
-from app.domain.models.fundamental_summary import FundamentalSummaryRow, FundamentalSummaryTable
-from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow, TechnicalSummaryTable
+from app.domain.models.fundamental_summary import FundamentalSummaryRow
+from app.domain.models.technical_summary import TechnicalSummaryLine, TechnicalSummaryRow
 from app.domain.policies.hybrid_classification import classify_hybrid_candidate
 from app.domain.usecases.hybrid_evaluation import HybridEvaluationService
-from app.domain.usecases.hybrid_summary import HybridSummaryService
-from app.presentation.web_hybrid_summary import build_hybrid_summary_html
 
 
 def test_hybrid_classification_treats_missing_resistance_as_f2_upside():
@@ -50,102 +47,6 @@ def test_hybrid_classification_prioritizes_m2_and_uses_150pct_bearish_volume():
     assert result is not None
     assert result.tag == "M2"
     assert "出来高150%以上陰線" in result.reasons
-
-
-def test_hybrid_summary_service_merges_fundamental_and_technical_rows():
-    table = HybridSummaryService().build_summary_table(
-        fundamental_table=FundamentalSummaryTable(
-            rows=(
-                FundamentalSummaryRow(
-                    name="候補",
-                    code4="1234",
-                    total_score=72,
-                    quality_score=44,
-                    growth_score=None,
-                    valuation_score=None,
-                    operating_margin=None,
-                    operating_profit_cagr_3y=None,
-                    roic=None,
-                    cash_conversion=None,
-                    per=None,
-                    investment_rate=None,
-                ),
-            )
-        ),
-        technical_table=TechnicalSummaryTable(
-            rows=(
-                _technical_row(
-                    name="候補",
-                    code4="1234",
-                    dev25_pct=-4.0,
-                    vwap=100.0,
-                    vwap_diff_pct=2.0,
-                    high_breakout_count=1,
-                    low_lower_count=1,
-                    volume_vs_avg20_pct=85.0,
-                ),
-            )
-        ),
-    )
-
-    assert len(table.rows) == 1
-    row = table.rows[0]
-    assert row.tag == "F1"
-    assert row.fundamental_score == 72
-    assert row.quality_score == 44
-    assert row.technical_rank == "D3"
-
-    markdown = build_hybrid_summary_markdown(table)
-    html = build_hybrid_summary_html(table)
-
-    assert "## F1 高ファンダ深押し反転候補" in markdown
-    assert "| F1 高ファンダ深押し反転候補 | 候補(1234) | 72 | 44 | D3 底打ち初動 |" in markdown
-    assert "Hybrid Summary" in html
-    assert "候補(1234)" in html
-
-
-def test_hybrid_summary_html_links_stock_name_to_technical_detail():
-    table = HybridSummaryService().build_summary_table(
-        fundamental_table=FundamentalSummaryTable(
-            rows=(
-                FundamentalSummaryRow(
-                    name="候補",
-                    code4="1234",
-                    total_score=72,
-                    quality_score=44,
-                    growth_score=None,
-                    valuation_score=None,
-                    operating_margin=None,
-                    operating_profit_cagr_3y=None,
-                    roic=None,
-                    cash_conversion=None,
-                    per=None,
-                    investment_rate=None,
-                ),
-            )
-        ),
-        technical_table=TechnicalSummaryTable(
-            rows=(
-                _technical_row(
-                    name="候補",
-                    code4="1234",
-                    dev25_pct=-4.0,
-                    vwap=100.0,
-                    vwap_diff_pct=2.0,
-                    high_breakout_count=1,
-                    low_lower_count=1,
-                    volume_vs_avg20_pct=85.0,
-                ),
-            )
-        ),
-    )
-
-    html = build_hybrid_summary_html(
-        table,
-        detail_url_builder=lambda code4, mode: f"/stock/{code4}?mode={mode}",
-    )
-
-    assert '<a href="/stock/1234?mode=technical">候補(1234)</a>' in html
 
 
 def test_hybrid_evaluation_text_renders_single_stock_classification():

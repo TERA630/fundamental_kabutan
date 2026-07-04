@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
-from app.domain.models.hybrid_summary import HybridSummaryTag
+
+HybridEvaluationTag = Literal["F1", "F2", "M1", "M2"]
 
 
 @dataclass(frozen=True)
 class HybridEvaluation:
     name: str
     code4: str
-    tag: HybridSummaryTag | None
+    tag: HybridEvaluationTag | None
     tag_label: str | None
     fundamental_score: int
     quality_score: int | None
@@ -31,4 +33,4 @@ class HybridEvaluation:
         return self.tag is not None
 
 
-__all__ = ["HybridEvaluation"]
+__all__ = ["HybridEvaluation", "HybridEvaluationTag"]
