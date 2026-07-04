@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.data.watchlist_repository import fetch_watchlist_entries, parse_watchlist_text
+from app.data.watchlist_repository import (
+    fetch_watchlist_entries,
+    fetch_watchlist_entries_with_sectors,
+    parse_watchlist_entries_with_sectors,
+    parse_watchlist_text,
+)
+from app.domain.models.watchlist import WatchlistEntry
 from app.services.cache_service import CacheService
 
 
@@ -15,8 +21,19 @@ class WatchlistService:
     def load_from_file(self, path: Path) -> list[tuple[str, str]]:
         return fetch_watchlist_entries(path)
 
+    def load_from_file_with_sectors(self, path: Path) -> list[WatchlistEntry]:
+        return fetch_watchlist_entries_with_sectors(path)
+
     def parse_uploaded(self, data: bytes) -> list[tuple[str, str]]:
         entries = parse_watchlist_text(self._decode_watchlist_upload(data))
+        if not entries:
+            raise ValueError(
+                "監視銘柄ファイルから銘柄を抽出できませんでした。対応形式例: '銘柄名 (1234)', '1234  銘柄名', '銘柄名,1234'"
+            )
+        return entries
+
+    def parse_uploaded_with_sectors(self, data: bytes) -> list[WatchlistEntry]:
+        entries = parse_watchlist_entries_with_sectors(self._decode_watchlist_upload(data))
         if not entries:
             raise ValueError(
                 "監視銘柄ファイルから銘柄を抽出できませんでした。対応形式例: '銘柄名 (1234)', '1234  銘柄名', '銘柄名,1234'"

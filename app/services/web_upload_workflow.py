@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.data.file_cache import FileCache
+from app.domain.models.watchlist import WatchlistEntry
 from app.services.watchlist_service import WatchlistService
 
 UPLOAD_WATCHLIST_CACHE_NAME = "web_uploaded_watchlist.md"
@@ -27,6 +28,9 @@ class WebUploadWorkflow:
 
     def parse_uploaded_watchlist(self, data: bytes) -> list[tuple[str, str]]:
         return self.watchlist_service.parse_uploaded(data)
+
+    def parse_uploaded_watchlist_with_sectors(self, data: bytes) -> list[WatchlistEntry]:
+        return self.watchlist_service.parse_uploaded_with_sectors(data)
 
     def load_uploaded_watchlist(self, data: bytes) -> tuple[list[tuple[str, str]], Path]:
         entries = self.parse_uploaded_watchlist(data)

@@ -19,13 +19,16 @@ def build_workflow(tmp_path: Path) -> UiResourceWorkflow:
 def test_watchlist_cache_resolution_and_loading(tmp_path):
     workflow = build_workflow(tmp_path)
     watchlist_path = tmp_path / "watchlist.md"
-    watchlist_path.write_text("トヨタ (7203)\n任天堂,7974\n", encoding="utf-8")
+    watchlist_path.write_text("トヨタ (7203) 商社\n任天堂,7974\n", encoding="utf-8")
 
     workflow.save_watchlist_path_cache(watchlist_path)
     resolved = workflow.fetch_resolved_watchlist_path()
 
     assert resolved.file_path == watchlist_path
     assert workflow.fetch_watchlist_entries(resolved.file_path) == [("トヨタ", "7203"), ("任天堂", "7974")]
+    sector_entries = workflow.fetch_watchlist_entries_with_sectors(resolved.file_path)
+    assert sector_entries[0].sectors == ("商社・資源",)
+    assert sector_entries[1].sectors == ()
 
 
 def test_kabutan_package_zip_cache_requires_existing_file(tmp_path):

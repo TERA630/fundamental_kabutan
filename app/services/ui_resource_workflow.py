@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
+from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.watchlist_path import ResolveWatchlistPathUseCase, ResolvedWatchlistPath
 from app.services.cache_service import CacheService
 from app.services.kabutan_html_dir_service import KabutanHtmlDirService
@@ -51,6 +52,9 @@ class UiResourceWorkflow:
 
     def fetch_watchlist_entries(self, path: Path) -> list[tuple[str, str]]:
         return self.watchlist_service.load_from_file(path)
+
+    def fetch_watchlist_entries_with_sectors(self, path: Path) -> list[WatchlistEntry]:
+        return self.watchlist_service.load_from_file_with_sectors(path)
 
 
 __all__ = ["UiResourceWorkflow"]
