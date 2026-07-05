@@ -62,6 +62,7 @@ class TechnicalAnalysisResult:
     evaluation_price: float | None
     evaluation_price_source: str
     evaluation_price_timestamp: str | None
+    evaluation_at: datetime | None = None
     rsi_analysis: RsiAnalysis | None = None
 
 
@@ -193,6 +194,7 @@ class TechnicalAnalysisService:
             evaluation_price=evaluation_price,
             evaluation_price_source=evaluation_price_source,
             evaluation_price_timestamp=evaluation_price_timestamp,
+            evaluation_at=evaluation_at,
             rsi_analysis=rsi_analysis,
         )
 

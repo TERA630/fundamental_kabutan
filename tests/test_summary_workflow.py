@@ -299,4 +299,5 @@ def test_build_single_stock_hybrid_evaluation_output_handles_missing_fundamental
     )
 
     assert "■Hybrid評価" in output
+    assert "トヨタ(7203)" not in output
     assert "評価不可：Fundamental総合スコア作成不可" in output

@@ -210,7 +210,7 @@ Technical Summary 一覧の Markdown / Web UI に、短評専用テーブルは�
 　株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（終端位置{day_close_position}） | 出来高比　{volume_vs_avg20_pct}(前日比{volume_vs_previous_pct})
 　位置：25日線{dev25_pct}/{ma25_distance_atr} | VWAP{vwap_diff_price}円/{vwap_diff_pct}/{vwap_diff_atr}{vwap_source_suffix} | 60日レンジ　{recent60_range_position} |
 　下値目安：{downside_target_levels}
-　抵抗：{resistance_levels}
+　抵抗：{resistance_levels} / 抵抗余地：{resistance_upside}
 　需給（VWAP）：当日前場／後場　{current_am_mark}／{current_pm_mark}　前日前場／後場　{previous_am_mark}／{previous_pm_mark}
 
 短評：{headline_summary}
@@ -241,11 +241,8 @@ Hybrid評価は Fundamental Summary 相当のスコア行と Technical Summary �
 
 ```text
 ■Hybrid評価
-候補(1234)
 分類：F1 高ファンダ深押し反転候補
-F：72 / Q：44 / Tech：D3 底打ち初動
-現在値：1,020円 / 25ME dev：-4.0% / VWAP：+2.0%
-終端：67% / 出来高：85% / 崩れ：1 / 抵抗余地：7.8%
+F：72 / Q：44
 理由：F72 / 高値更新1 / 安値切下げ1 / 出来高85%
 ```
 

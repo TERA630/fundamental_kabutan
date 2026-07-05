@@ -83,7 +83,15 @@ def test_hybrid_evaluation_text_renders_single_stock_classification():
 
     assert "■Hybrid評価" in text
     assert "分類：F1 高ファンダ深押し反転候補" in text
-    assert "F：72 / Q：44 / Tech：D3 底打ち初動" in text
+    assert "F：72 / Q：44" in text
+    assert "Tech：" not in text
+    assert "現在値：" not in text
+    assert "25ME dev：" not in text
+    assert "VWAP：" not in text
+    assert "終端：" not in text
+    assert "出来高：" not in text
+    assert "崩れ：" not in text
+    assert "抵抗余地：" not in text
     assert "理由：F72 / 高値更新1 / 安値切下げ1 / 出来高85%" in text
 
 

@@ -2,6 +2,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 from app.domain.builders.technical_output import _build_resistance_lines, build_technical_output
+from app.domain.models.rsi_analysis import RsiAnalysis, RsiDivergence, RsiSignal
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
 import pandas as pd
 
@@ -75,11 +76,13 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "VWAP+1.47円/+0.9%/0.29ATR" not in output
     assert "Vmap" not in output
     assert "需給（VWAP）：当日前場／後場　◯／◯　前日前場／後場　◯／◯" in output
-    assert "出来高比　101%(前日比+0.1%)" in output
+    assert "出来高：20日平均比 101% / 前日比100%" in output
     assert "60日レンジ　98.4% |" in output
     assert "下値目安：165(preL)→157(25ME)→146(20dL)" in output
+    assert "下値余地：前場VWAP-1.1% / 後場VWAP-0.7% / 25日線-7.1%" in output
+    assert "リスクリターン：RR0.82" in output
     assert "\n　支持：" not in output
-    assert "抵抗：170(preH/20dH/60dH)" in output
+    assert "抵抗：170(preH/20dH/60dH) / 抵抗余地：0.6%" in output
     assert "RSI：5分N/A / 時間N/A" in output
     assert "RSI総合：N/A" in output
     assert "短評：A1 位置良好 リターン良好、買い候補｜" in output
@@ -125,6 +128,60 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■流れ" not in output
     assert "トレンド：" not in output
     assert output.index("■重要価格") < output.index("■前日評価")
+
+
+def test_build_technical_output_filters_strategy_by_evaluation_time():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+
+    preopen = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 08:30").to_pydatetime()))
+    assert "前場深押し○：" in preopen
+    assert "前場VWAP回復◎：" in preopen
+    assert "ホールド銘柄の指値売：" in preopen
+    assert "後場VWAP回復◎：" not in preopen
+
+    am = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 09:10").to_pydatetime()))
+    assert "前場深押し" not in am
+    assert "前場VWAP回復◎：" in am
+    assert "後場VWAP回復" not in am
+
+    lunch = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 11:45").to_pydatetime()))
+    assert "前場VWAP回復" not in lunch
+    assert "後場VWAP回復◎：" in lunch
+
+    pm = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 13:00").to_pydatetime()))
+    assert "後場VWAP維持/利確/持ち越し判定：" in pm
+    assert "前場VWAP回復" not in pm
+
+    closing = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 15:10").to_pydatetime()))
+    assert "持ち越し/利確：" in closing
+    assert "後場VWAP維持/利確/持ち越し判定" not in closing
+
+
+def test_build_technical_output_renames_rsi_divergence():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(name="Sample", code4="1234")
+    signal = RsiSignal(55.0, 3.0, "↑", "上昇中", "中立")
+    rsi_analysis = RsiAnalysis(
+        five_min=signal,
+        hourly=signal,
+        five_min_divergence=RsiDivergence("明確な乖離なし", ""),
+        hourly_divergence=RsiDivergence("上昇鈍化", "価格高値更新 / RSI未更新"),
+        overall_label="上昇鈍化警戒",
+    )
+
+    output = build_technical_output(replace(result, rsi_analysis=rsi_analysis))
+
+    assert "RSIダイバージェンス：時間足 上昇鈍化" in output
+    assert "RSI乖離" not in output
 
 
 def test_build_technical_output_appends_three_axis_collapse_reason():

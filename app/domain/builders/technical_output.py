@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time
+
 from app.domain.models.technical_summary import TechnicalSummaryLine
 from app.domain.policies.technical_summary import (
     build_collapse_score_brief,
@@ -65,7 +67,7 @@ def _format_rsi_analysis(result: TechnicalAnalysisResult) -> str:
     if analysis.five_min_divergence.label not in {"明確な乖離なし", "N/A"}:
         divergence_parts.append(f"5分足 {analysis.five_min_divergence.label}")
     if divergence_parts:
-        lines.append(f"RSI乖離：{' / '.join(divergence_parts)}")
+        lines.append(f"RSIダイバージェンス：{' / '.join(divergence_parts)}")
     lines.append(f"RSI総合：{analysis.overall_label}")
     return "\n".join(lines)
 
@@ -113,12 +115,12 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
         f"取得時刻：{_fmt_text(result.evaluation_price_timestamp)}",
         f"【銘柄】{result.name} ({result.code4})",
         f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(_price_change(result))}円：{_fmt_pct(_price_change_pct(result))}）（終端位置{_fmt_position_pct(_range_position(latest, _evaluation_low(result), _evaluation_high(result)))}）"
-        f" | 出来高比　{_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)}(前日比{_fmt_pct(snapshot.price.volume_vs_previous_pct)})",
+        f" | 出来高：20日平均比 {_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)} / 前日比{_fmt_pct_ratio_no_decimal(snapshot.price.volume_vs_previous_pct)}",
         f"　位置：25日線{_fmt_pct(_evaluation_dev25_pct(result))}/{_fmt_atr_distance(_evaluation_ma25_distance_atr(result))}"
         f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
-        f"　下値目安：{_format_opening_supports(result)}",
-        f"　抵抗：{_format_opening_resistances(result)}",
+        f"　下値目安：{_format_opening_supports(result)} / 下値余地：{_format_downside_room(result)} / リスクリターン：{_format_current_risk_reward(result)}",
+        f"　抵抗：{_format_opening_resistances(result)} / 抵抗余地：{_format_resistance_upside(result)}",
         f"　需給（VWAP）：{_format_vwap_supply_marks(result)}",
     ]
     return "\n".join(lines)
@@ -151,6 +153,61 @@ def _format_opening_resistances(result: TechnicalAnalysisResult) -> str:
         ("60dH", snapshot.breakline.recent60_high),
     )
     return _format_grouped_price_levels(candidates, latest=latest, ascending=True)
+
+
+def _format_resistance_upside(result: TechnicalAnalysisResult) -> str:
+    latest = _evaluation_price(result)
+    if latest in (None, 0):
+        return "N/A"
+    lines = _build_resistance_lines(result)
+    if not lines:
+        return "Open"
+    return _fmt_pct_unsigned(_pct_change(lines[0].price, latest))
+
+
+def _format_downside_room(result: TechnicalAnalysisResult) -> str:
+    snapshot = result.snapshot
+    current = result.vwap_snapshot
+    targets = (
+        ("前場VWAP", _as_float(current.get("current_am_vwap"))),
+        ("後場VWAP", _as_float(current.get("current_pm_vwap"))),
+        ("25日線", snapshot.moving_average.ma25),
+    )
+    return " / ".join(
+        f"{label}{_fmt_pct(_pct_change(value, _evaluation_price(result)))}"
+        for label, value in targets
+    )
+
+
+def _format_current_risk_reward(result: TechnicalAnalysisResult) -> str:
+    latest = _evaluation_price(result)
+    if latest in (None, 0):
+        return "N/A"
+    resistance_lines = _build_resistance_lines(result)
+    if not resistance_lines:
+        return "Open"
+    downside = _nearest_downside_target(result)
+    if downside is None:
+        return "N/A"
+    risk = latest - downside
+    reward = resistance_lines[0].price - latest
+    if risk <= 0 or reward <= 0:
+        return "N/A"
+    return f"RR{reward / risk:.2f}"
+
+
+def _nearest_downside_target(result: TechnicalAnalysisResult) -> float | None:
+    latest = _evaluation_price(result)
+    if latest is None:
+        return None
+    current = result.vwap_snapshot
+    targets = (
+        _as_float(current.get("current_am_vwap")),
+        _as_float(current.get("current_pm_vwap")),
+        result.snapshot.moving_average.ma25,
+    )
+    below = [target for target in targets if target is not None and target < latest]
+    return max(below) if below else None
 
 
 def _format_grouped_price_levels(
@@ -299,7 +356,88 @@ def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:
         vwap_pullback_range=vwap_pullback_range,
         risk_reward=risk_reward,
     )
+    strategy_lines = _filter_strategy_lines_for_time(strategy_lines, result)
     return "\n".join(("戦略判定：", *strategy_lines))
+
+
+def _filter_strategy_lines_for_time(
+    strategy_lines: tuple[str, ...],
+    result: TechnicalAnalysisResult,
+) -> tuple[str, ...]:
+    phase = _strategy_phase(result)
+    if phase is None or strategy_lines == ("N/A（判定基準未設定）",):
+        return strategy_lines
+
+    deep = _line_starting_with(strategy_lines, "前場深押し")
+    am_vwap = _line_starting_with(strategy_lines, "前場VWAP回復")
+    pm_vwap = _line_starting_with(strategy_lines, "後場VWAP回復")
+
+    if phase == "preopen":
+        return tuple(
+            line
+            for line in (
+                deep,
+                am_vwap,
+                _format_hold_limit_sell_line(result),
+            )
+            if line is not None
+        )
+    if phase == "am":
+        return (am_vwap,) if am_vwap is not None else ()
+    if phase == "lunch":
+        return (pm_vwap,) if pm_vwap is not None else ()
+    if phase == "pm":
+        return (_replace_strategy_label(pm_vwap, "後場VWAP維持/利確/持ち越し判定"),) if pm_vwap is not None else ()
+    if phase == "closing":
+        return (_replace_strategy_label(pm_vwap, "持ち越し/利確"),) if pm_vwap is not None else ()
+    return strategy_lines
+
+
+def _line_starting_with(lines: tuple[str, ...], prefix: str) -> str | None:
+    return next((line for line in lines if line.startswith(prefix)), None)
+
+
+def _replace_strategy_label(line: str | None, label: str) -> str | None:
+    if line is None:
+        return None
+    _, separator, body = line.partition("：")
+    return line if not separator else f"{label}：{body}"
+
+
+def _format_hold_limit_sell_line(result: TechnicalAnalysisResult) -> str:
+    lines = _build_resistance_lines(result)
+    target = _fmt_price_compact(lines[0].price) if lines else "N/A"
+    return f"ホールド銘柄の指値売：抵抗線 {target}円 付近で部分利確・逆指値管理を確認。"
+
+
+def _strategy_phase(result: TechnicalAnalysisResult) -> str | None:
+    value = getattr(result, "evaluation_at", None)
+    if isinstance(value, datetime):
+        target = value.time()
+    else:
+        target = _time_from_timestamp_text(result.evaluation_price_timestamp)
+    if target is None:
+        return None
+    if target < time(9, 0):
+        return "preopen"
+    if target < time(11, 30):
+        return "am"
+    if target < time(12, 30):
+        return "lunch"
+    if target < time(15, 0):
+        return "pm"
+    if target < time(15, 30):
+        return "closing"
+    return "closing"
+
+
+def _time_from_timestamp_text(value: str | None) -> time | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d %H:%M").time()
+    except ValueError:
+        return None
 
 
 def _strategy_detail_code(result: TechnicalAnalysisResult, rank: str) -> str | None:
@@ -609,6 +747,10 @@ def _fmt_pct_unsigned(value: float | None) -> str:
 
 def _fmt_pct_unsigned_no_decimal(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.0f}%"
+
+
+def _fmt_pct_ratio_no_decimal(change_pct: float | None) -> str:
+    return "N/A" if change_pct is None else f"{100 + change_pct:.0f}%"
 
 
 def _fmt_position_pct(value: float | None) -> str:
