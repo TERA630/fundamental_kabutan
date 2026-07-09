@@ -18,6 +18,9 @@ from app.domain.policies.technical_summary import (
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
+RISK_REWARD_NEAR_ATR_MULTIPLE = 0.20
+RISK_REWARD_NEAR_PCT = 0.3
+
 
 def build_technical_output(result: TechnicalAnalysisResult) -> str:
     snapshot = result.snapshot
@@ -118,63 +121,50 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
         f" | 出来高：20日平均比 {_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)} / 前日比{_fmt_pct_ratio_no_decimal(snapshot.price.volume_vs_previous_pct)}",
         f"　位置：25日線{_fmt_pct(_evaluation_dev25_pct(result))}/{_fmt_atr_distance(_evaluation_ma25_distance_atr(result))}"
         f" | VWAP{_fmt_price_signed(vwap_diff)}円/{_fmt_atr_distance(vwap_diff_atr)}{vwap_source_suffix}"
+        f" | {_format_current_session_vwap_position(result)}"
         f" | 60日レンジ　{_fmt_position_pct(snapshot.breakline.recent60_range_position)} |",
-        f"　下値目安：{_format_opening_supports(result)} / 下値余地：{_format_downside_room(result)} / リスクリターン：{_format_current_risk_reward(result)}",
-        f"　抵抗：{_format_opening_resistances(result)} / 抵抗余地：{_format_resistance_upside(result)}",
+        f"　リスクリターン：{_format_current_risk_reward(result)}",
+        f"　下値：{_format_opening_supports(result)}",
+        f"　抵抗：{_format_opening_resistances(result)}",
         f"　需給（VWAP）：{_format_vwap_supply_marks(result)}",
     ]
     return "\n".join(lines)
 
 
 def _format_opening_supports(result: TechnicalAnalysisResult) -> str:
-    snapshot = result.snapshot
     latest = _evaluation_price(result)
     if latest is None:
         return "N/A"
-    candidates = (
-        ("preL", snapshot.previous_session.prev_low),
-        ("25ME", snapshot.moving_average.ma25),
-        ("20dL", snapshot.breakline.recent20_low),
-        ("60dL", snapshot.breakline.recent60_low),
-        ("75ME", snapshot.moving_average.ma75),
+    return _format_grouped_price_levels_with_room(
+        _opening_support_candidates(result),
+        latest=latest,
+        ascending=False,
+        max_levels=3,
+        direction="down",
     )
-    return _format_grouped_price_levels(candidates, latest=latest, ascending=False, max_levels=3)
 
 
 def _format_opening_resistances(result: TechnicalAnalysisResult) -> str:
-    snapshot = result.snapshot
     latest = _evaluation_price(result)
     if latest is None:
         return "N/A"
-    candidates = (
-        ("preH", snapshot.previous_session.prev_high),
-        ("25ME", snapshot.moving_average.ma25),
-        ("20dH", snapshot.breakline.recent20_high),
-        ("60dH", snapshot.breakline.recent60_high),
+    return _format_grouped_price_levels_with_room(
+        _opening_resistance_candidates(result),
+        latest=latest,
+        ascending=True,
+        direction="up",
     )
-    return _format_grouped_price_levels(candidates, latest=latest, ascending=True)
 
 
-def _format_resistance_upside(result: TechnicalAnalysisResult) -> str:
-    latest = _evaluation_price(result)
-    if latest in (None, 0):
-        return "N/A"
-    lines = _build_resistance_lines(result)
-    if not lines:
-        return "Open"
-    return _fmt_pct_unsigned(_pct_change(lines[0].price, latest))
-
-
-def _format_downside_room(result: TechnicalAnalysisResult) -> str:
-    snapshot = result.snapshot
+def _format_current_session_vwap_position(result: TechnicalAnalysisResult) -> str:
     current = result.vwap_snapshot
+    latest = _evaluation_price(result)
     targets = (
         ("前場VWAP", _as_float(current.get("current_am_vwap"))),
         ("後場VWAP", _as_float(current.get("current_pm_vwap"))),
-        ("25日線", snapshot.moving_average.ma25),
     )
-    return " / ".join(
-        f"{label}{_fmt_pct(_pct_change(value, _evaluation_price(result)))}"
+    return " ".join(
+        f"{label}{_fmt_pct(_pct_distance_from_current(latest, value))}"
         for label, value in targets
     )
 
@@ -183,54 +173,146 @@ def _format_current_risk_reward(result: TechnicalAnalysisResult) -> str:
     latest = _evaluation_price(result)
     if latest in (None, 0):
         return "N/A"
-    resistance_lines = _build_resistance_lines(result)
-    if not resistance_lines:
-        return "Open"
-    downside = _nearest_downside_target(result)
-    if downside is None:
+    downside = _select_risk_reward_level(
+        latest=latest,
+        atr14=result.snapshot.range.atr14,
+        levels=_opening_support_prices(result),
+    )
+    resistance = _select_risk_reward_level(
+        latest=latest,
+        atr14=result.snapshot.range.atr14,
+        levels=_opening_resistance_prices(result),
+    )
+    if downside is None or resistance is None:
         return "N/A"
     risk = latest - downside
-    reward = resistance_lines[0].price - latest
+    reward = resistance - latest
     if risk <= 0 or reward <= 0:
         return "N/A"
     return f"RR{reward / risk:.2f}"
 
 
-def _nearest_downside_target(result: TechnicalAnalysisResult) -> float | None:
+def _select_risk_reward_level(
+    *,
+    latest: float,
+    atr14: float | None,
+    levels: tuple[float, ...],
+) -> float | None:
+    for level in levels:
+        if not _is_too_near_for_risk_reward(latest=latest, level=level, atr14=atr14):
+            return level
+    return None
+
+
+def _is_too_near_for_risk_reward(
+    *,
+    latest: float,
+    level: float,
+    atr14: float | None,
+) -> bool:
+    distance = abs(latest - level)
+    distance_pct = _safe_div(distance, latest)
+    near_by_pct = distance_pct is not None and distance_pct * 100 < RISK_REWARD_NEAR_PCT
+    near_by_atr = atr14 not in (None, 0) and distance < RISK_REWARD_NEAR_ATR_MULTIPLE * atr14
+    return near_by_pct or near_by_atr
+
+
+def _opening_support_prices(result: TechnicalAnalysisResult) -> tuple[float, ...]:
     latest = _evaluation_price(result)
     if latest is None:
-        return None
-    current = result.vwap_snapshot
-    targets = (
-        _as_float(current.get("current_am_vwap")),
-        _as_float(current.get("current_pm_vwap")),
-        result.snapshot.moving_average.ma25,
+        return ()
+    return tuple(
+        price
+        for price, _labels in _group_price_levels(
+            _opening_support_candidates(result),
+            latest=latest,
+            ascending=False,
+        )
     )
-    below = [target for target in targets if target is not None and target < latest]
-    return max(below) if below else None
 
 
-def _format_grouped_price_levels(
+def _opening_resistance_prices(result: TechnicalAnalysisResult) -> tuple[float, ...]:
+    latest = _evaluation_price(result)
+    if latest is None:
+        return ()
+    return tuple(
+        price
+        for price, _labels in _group_price_levels(
+            _opening_resistance_candidates(result),
+            latest=latest,
+            ascending=True,
+        )
+    )
+
+
+def _opening_support_candidates(result: TechnicalAnalysisResult) -> tuple[tuple[str, float | None], ...]:
+    snapshot = result.snapshot
+    return (
+        ("preL", snapshot.previous_session.prev_low),
+        ("25ME", snapshot.moving_average.ma25),
+        ("20dL", snapshot.breakline.recent20_low),
+        ("60dL", snapshot.breakline.recent60_low),
+        ("75ME", snapshot.moving_average.ma75),
+    )
+
+
+def _opening_resistance_candidates(result: TechnicalAnalysisResult) -> tuple[tuple[str, float | None], ...]:
+    snapshot = result.snapshot
+    return (
+        ("preH", snapshot.previous_session.prev_high),
+        ("25ME", snapshot.moving_average.ma25),
+        ("20dH", snapshot.breakline.recent20_high),
+        ("60dH", snapshot.breakline.recent60_high),
+    )
+
+
+def _format_grouped_price_levels_with_room(
+    candidates: tuple[tuple[str, float | None], ...],
+    *,
+    latest: float,
+    ascending: bool,
+    direction: str,
+    max_levels: int | None = None,
+) -> str:
+    levels = _group_price_levels(candidates, latest=latest, ascending=ascending, max_levels=max_levels)
+    if not levels:
+        return "N/A"
+    return "→".join(
+        f"{_fmt_level_price(price)}({'/'.join(labels)})：{_fmt_pct_unsigned(_level_room_pct(price, latest, direction))}"
+        for price, labels in levels
+    )
+
+
+def _level_room_pct(price: float, latest: float, direction: str) -> float | None:
+    if direction == "down":
+        return _safe_div(latest - price, latest) * 100 if latest else None
+    return _safe_div(price - latest, latest) * 100 if latest else None
+
+
+def _group_price_levels(
     candidates: tuple[tuple[str, float | None], ...],
     *,
     latest: float,
     ascending: bool,
     max_levels: int | None = None,
-) -> str:
+) -> tuple[tuple[float, tuple[str, ...]], ...]:
     grouped: dict[float, list[str]] = {}
     for label, price in candidates:
         if price is None or (price <= latest if ascending else price >= latest):
             continue
         grouped.setdefault(price, []).append(label)
     if not grouped:
-        return "N/A"
+        return ()
     prices = sorted(grouped, reverse=not ascending)
     if max_levels is not None:
         prices = prices[:max_levels]
-    return "→".join(
-        f"{_fmt_level_price(price)}({'/'.join(grouped[price])})"
-        for price in prices
-    )
+    return tuple((price, tuple(grouped[price])) for price in prices)
+
+
+def _pct_distance_from_current(current: float | int | None, reference: float | int | None) -> float | None:
+    if current in (None, 0) or reference is None:
+        return None
+    return ((float(current) - float(reference)) / float(current)) * 100
 
 
 def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
