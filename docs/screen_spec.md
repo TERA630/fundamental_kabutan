@@ -165,7 +165,7 @@ EPS CAGR           {eps_cagr_value}({rank})
 
 Technical 出力は `app/domain/builders/technical_output.py` が組み立てる。表示順は、取得時刻、銘柄ヘッダと先頭サマリ、冒頭短評、崩れ警戒・底打ち初動・ホールド判定、戦略判定、`■モメンタム`、`■当日位置・レンジ`、`■重要価格`、`■前日評価` とする。`Hybrid評価` と `地合評価` はボタン押下時だけ、Technical 出力欄の本文末尾へ追記する。
 
-先頭サマリは、取得時刻、銘柄名とコード、現在値、前日比、終端位置、出来高比、25日線乖離、VWAP差分、60日レンジ位置、下値目安、抵抗線、当日前後場VWAP判定を7行に圧縮して表示する。下値目安は前日安値、25日線、20日安値、60日安値、75日線のうち現在値未満の価格を近い順に最大3価格表示する。下値目安と抵抗線は同価格のラベルを `/` で併記し、現在値に近い順に `→` で連結する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻には、スクリプト起動時刻ではなく取得した日中値に紐づく日時を使う。
+先頭サマリは、取得時刻、銘柄名とコード、現在値、前日比、終端位置、出来高比、25日線乖離、VWAP差分、前後場VWAP位置、60日レンジ位置、リスクリターン、下値、抵抗線、当日前後場VWAP判定を8行に圧縮して表示する。下値は前日安値、25日線、20日安値、60日安値、75日線のうち現在値未満の価格を近い順に最大3価格表示する。抵抗は前日高値、25日線、20日高値、60日高値のうち現在値より上の価格を近い順に表示する。下値と抵抗は同価格のラベルを `/` で併記し、現在値に近い順に `→` で連結する。各下値・抵抗には現在値基準の余地を正のパーセントで併記する。25日線傾きと前後場VWAP価格は先頭サマリへ表示しない。取得時刻には、スクリプト起動時刻ではなく取得した日中値に紐づく日時を使う。
 
 ### 11.1 Technical 短評と戦略判定
 
@@ -208,9 +208,10 @@ Technical Summary 一覧の Markdown / Web UI に、短評専用テーブルは�
 取得時刻：{intraday_price_timestamp}
 【銘柄】{name} ({code4})
 　株価：{latest}円（前日比{day_change_price}円：{day_change_pct}）（終端位置{day_close_position}） | 出来高比　{volume_vs_avg20_pct}(前日比{volume_vs_previous_pct})
-　位置：25日線{dev25_pct}/{ma25_distance_atr} | VWAP{vwap_diff_price}円/{vwap_diff_pct}/{vwap_diff_atr}{vwap_source_suffix} | 60日レンジ　{recent60_range_position} |
-　下値目安：{downside_target_levels}
-　抵抗：{resistance_levels} / 抵抗余地：{resistance_upside}
+　位置：25日線{dev25_pct}/{ma25_distance_atr} | VWAP{vwap_diff_price}円/{vwap_diff_atr}{vwap_source_suffix} | 前場VWAP{current_am_vwap_position_pct} 後場VWAP{current_pm_vwap_position_pct} | 60日レンジ　{recent60_range_position} |
+　リスクリターン：{risk_reward}
+　下値：{downside_target_levels_with_room}
+　抵抗：{resistance_levels_with_room}
 　需給（VWAP）：当日前場／後場　{current_am_mark}／{current_pm_mark}　前日前場／後場　{previous_am_mark}／{previous_pm_mark}
 
 短評：{headline_summary}
@@ -219,7 +220,9 @@ Technical Summary 一覧の Markdown / Web UI に、短評専用テーブルは�
 ホールド判定：{hold_judgement}
 ```
 
-実装上の本文は `■前日評価` までを返す。VWAP が日足参考値なら `Vwap` 行の末尾に `(日足参考値)` を付ける。日中値の日時が取得できない場合は `取得時刻：N/A`、日足参考値なら日足データの日付と `終値` を使う。25日線のATR比は25日線からの距離の大きさ、VWAPのATR比は `(latest - vwap) / atr14` の符号付き値とする。
+実装上の本文は `■前日評価` までを返す。VWAP が日足参考値なら `Vwap` 行の末尾に `(日足参考値)` を付ける。日中値の日時が取得できない場合は `取得時刻：N/A`、日足参考値なら日足データの日付と `終値` を使う。25日線のATR比は25日線からの距離の大きさ、VWAPのATR比は `(latest - vwap) / atr14` の符号付き値とする。前場VWAP・後場VWAP位置は既存互換の現在値基準とし、`(現在値 - 対象VWAP) / 現在値 * 100` で表示する。現在値が対象VWAPより上なら `+`、下なら `-` とする。
+
+リスクリターンは、現在値より下の下値候補と現在値より上の抵抗候補から、現在値に近い有効な1本ずつを選び、`(抵抗 - 現在値) / (現在値 - 下値)` で算出する。ただしRR算出用に限り、現在値からの距離が `0.20ATR` 未満、または `0.3%` 未満の下値・抵抗は近すぎる節目として除外し、次の節目を使う。表示上の下値・抵抗一覧には近すぎる節目も残す。有効な下値または抵抗がない場合は `N/A` とする。
 
 前後場VWAPは日中5分足の代表価格 `(High + Low + Close) / 3` を出来高加重平均して求める。出来高が0または対象時間帯の足が不足する場合は `N/A` とする。前場は `09:00` 以上 `12:30` 未満、後場は `12:30` 以降を対象とする。
 
