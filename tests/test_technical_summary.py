@@ -23,6 +23,7 @@ from app.domain.policies.technical_summary import (
     build_technical_position_assessment,
     build_technical_strategy_lines,
     build_volume_comment,
+    classify_ma25_position_band,
     classify_technical_summary_rank,
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
@@ -133,12 +134,14 @@ def test_build_d_strategy_lines_cover_detail_classifications():
 
 
 def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
-    assert classify_technical_summary_rank(dev25_pct=12.0, latest=112, vwap=100) == "B2"
+    assert classify_technical_summary_rank(dev25_pct=14.0, latest=114, vwap=100) == "B2"
+    assert classify_technical_summary_rank(dev25_pct=13.999, latest=114, vwap=100) == "B1"
     assert classify_technical_summary_rank(dev25_pct=10.0, latest=110, vwap=100) == "B1"
-    assert classify_technical_summary_rank(dev25_pct=8.5, latest=108.5, vwap=100) == "A2"
-    assert classify_technical_summary_rank(dev25_pct=6.5, latest=106.5, vwap=100) == "A1"
-    assert classify_technical_summary_rank(dev25_pct=4.5, latest=104.5, vwap=100) == "A1弱"
-    assert classify_technical_summary_rank(dev25_pct=3.5, latest=103.5, vwap=100) == "C1"
+    assert classify_technical_summary_rank(dev25_pct=8.0, latest=108, vwap=100) == "A2"
+    assert classify_technical_summary_rank(dev25_pct=6.0, latest=106, vwap=100) == "A1"
+    assert classify_technical_summary_rank(dev25_pct=4.0, latest=104, vwap=100) == "A1弱"
+    assert classify_technical_summary_rank(dev25_pct=2.0, latest=102, vwap=100) == "A1"
+    assert classify_technical_summary_rank(dev25_pct=0.0, latest=100, vwap=100) == "C1"
     assert (
         classify_technical_summary_rank(
             dev25_pct=8.5,
@@ -146,7 +149,7 @@ def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
             vwap=100,
             recent60_range_position=0.85,
         )
-        == "B1"
+        == "A2"
     )
     assert (
         classify_technical_summary_rank(
@@ -159,7 +162,7 @@ def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
     )
 
 
-def test_a2_label_describes_mild_overheat():
+def test_a2_label_describes_high_momentum():
     headline = build_technical_headline_summary(
         dev25_pct=8.5,
         latest=108.5,
@@ -167,7 +170,41 @@ def test_a2_label_describes_mild_overheat():
     )
 
     assert headline.rank == "A2"
-    assert headline.rank_label == "やや過熱"
+    assert headline.rank_label == "高モメンタム"
+    assert headline.ma25_position_label == "高モメンタム帯"
+
+
+def test_ma25_position_band_marks_overheat_without_changing_a2_rank():
+    headline = build_technical_headline_summary(
+        dev25_pct=8.5,
+        latest=108.5,
+        vwap=100.0,
+        recent60_range_position=0.85,
+    )
+
+    assert headline.rank == "A2"
+    assert headline.ma25_position_label == "高モメンタム帯（過熱兆候あり）"
+
+
+def test_ma25_position_band_uses_revised_boundaries():
+    assert classify_ma25_position_band(14).label == "極端乖離帯"
+    assert classify_ma25_position_band(10).label == "高収益・高リスク帯"
+    assert classify_ma25_position_band(8).label == "高モメンタム帯"
+    assert classify_ma25_position_band(6).label == "中期モメンタム帯"
+    assert classify_ma25_position_band(4).label == "初期逆行注意帯"
+    assert classify_ma25_position_band(2).label == "安定上昇帯"
+    assert classify_ma25_position_band(0).label == "25日線接近帯"
+    assert classify_ma25_position_band(-2).label == "25日線直下・統計的不利"
+    assert classify_ma25_position_band(-2.001).label == "25日線下"
+
+
+def test_short_comment_warns_when_price_is_just_below_ma25():
+    comment = build_technical_short_comment(
+        rank="D1",
+        ma25_position_label="25日線直下・統計的不利",
+    )
+
+    assert "25日線奪回待ち。上値確認中。｜25日線直下・統計的不利｜" in comment
 
 
 def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
@@ -328,9 +365,9 @@ def test_c2_short_comment_shows_fall_reason():
 
 def test_b_ranks_keep_rank_even_when_collapse_condition_is_strong():
     b2 = build_technical_headline_summary(
-        dev25_pct=12.0,
-        latest=112.0,
-        vwap=113.0,
+        dev25_pct=14.0,
+        latest=114.0,
+        vwap=115.0,
         atr14=2.0,
         day_close_position=0.3,
     )
@@ -443,7 +480,8 @@ def test_ma5_slope_short_comment_follows_score_details():
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
-    assert classify_technical_summary_rank(dev25_pct=3.0, latest=103, vwap=100) == "C1"
+    assert classify_technical_summary_rank(dev25_pct=1.0, latest=101, vwap=100) == "C1"
+    assert classify_technical_summary_rank(dev25_pct=3.0, latest=103, vwap=100) == "A1"
     assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100) == "D1"
     assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100) == "E"
 
@@ -935,13 +973,14 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert table.rows[0].rank == "A1弱"
     assert table.rows[0].previous_vwap_maintained is False
     assert table.rows[0].collapse_risk_score == 0
-    assert table.rows[0].headline_comment == "良好だが、短期逆行も多い。"
-    assert "## A1弱 押し目候補" in markdown
+    assert table.rows[0].headline_comment == "中期上昇余地はあるが、短期下振れに注意。"
+    assert table.rows[0].ma25_position_label == "初期逆行注意帯"
+    assert "## A1弱 初期逆行注意" in markdown
     assert "## 冒頭短評" not in markdown
-    assert "A1弱 押し目候補｜良好だが、短期逆行も多い。" not in markdown
+    assert "A1弱 初期逆行注意｜中期上昇余地はあるが、短期下振れに注意。" not in markdown
     assert "崩れスコア" in markdown
     assert "前日VWAP維持" not in markdown
-    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) | 120% | 0 |" in markdown
+    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) / 初期逆行注意帯 | 120% | 0 |" in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown
@@ -1071,7 +1110,7 @@ def test_technical_summary_markdown_renders_sector_breadth_before_rank_tables():
 
     assert "## Sector Breadth" in markdown
     assert "| 半導体材料・装置 | 押し目買い優勢 | 2/3 67% | 65% | 3/3 100% | 2.0 | 68% | 中立〜やや強い / 反発中 |" in markdown
-    assert markdown.index("## Sector Breadth") < markdown.index("## A1 位置良好")
+    assert markdown.index("## Sector Breadth") < markdown.index("## A1 上昇優位")
 
 
 def test_technical_summary_html_does_not_render_headline_table():

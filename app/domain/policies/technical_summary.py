@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from app.domain.models.signal_atom import SignalAtom, score_signal_atoms
 from app.domain.models.technical_summary import (
+    Ma25PositionBandCode,
     TechnicalHeadlineSummary,
     TechnicalPositionAssessment,
     TechnicalSummaryLine,
@@ -14,11 +15,11 @@ from app.domain.models.technical_summary import (
 from app.domain.policies.range_table import RangeBand, RangeTable
 
 RANK_LABELS: dict[TechnicalSummaryRank, str] = {
-    "B2": "過熱極大",
-    "B1": "過熱後半",
-    "A2": "やや過熱",
-    "A1": "位置良好",
-    "A1弱": "押し目候補",
+    "B2": "極端乖離",
+    "B1": "高収益・高リスク",
+    "A2": "高モメンタム",
+    "A1": "上昇優位",
+    "A1弱": "初期逆行注意",
     "C2": "崩れ警戒",
     "C1": "25日線接近",
     "D1": "戻り途中",
@@ -43,10 +44,10 @@ RANK_ORDER: tuple[TechnicalSummaryRank, ...] = (
 
 HEADLINE_COMMENTS: dict[TechnicalSummaryRank, str] = {
     "B2": "新規買い非推奨。利確優先。",
-    "B1": "過熱後半。高値追い注意。",
-    "A2": "やや過熱。追随は小さく。",
+    "B1": "上昇余地はあるが逆行リスクも高い。",
+    "A2": "高モメンタム。上昇継続を確認。",
     "A1": "順張り候補。位置良好。",
-    "A1弱": "良好だが、短期逆行も多い。",
+    "A1弱": "中期上昇余地はあるが、短期下振れに注意。",
     "C2": "25日線割れ警戒。買いは待ち。",
     "C1": "方向未確定。",
     "D1": "25日線奪回待ち。上値確認中。",
@@ -57,10 +58,10 @@ HEADLINE_COMMENTS: dict[TechnicalSummaryRank, str] = {
 
 SINGLE_STOCK_POSITION_DESCRIPTIONS: dict[TechnicalSummaryRank, str] = {
     "B2": "上値余地より、逆行リスクが高い位置",
-    "B1": "上昇トレンドはのこるが、逆行率高い。",
-    "A2": "やや過熱。追随より押し目待ち。",
-    "A1": "リターン良好、買い候補",
-    "A1弱": "良好だが、短期逆行も多い。",
+    "B1": "高収益を狙えるが、逆行リスクも高い。",
+    "A2": "高モメンタム。上昇継続候補。",
+    "A1": "安定上昇または中期モメンタムの買い候補",
+    "A1弱": "中期上昇余地はあるが、初期逆行に注意。",
     "C1": "方向未確定",
     "C2": "監視のみ",
     "D1": HEADLINE_COMMENTS["D1"],
@@ -72,7 +73,7 @@ SINGLE_STOCK_POSITION_DESCRIPTIONS: dict[TechnicalSummaryRank, str] = {
 NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
     "B2": "短期監視のみ。追加買い不可。",
     "B1": "高値追い注意。深押し待ち。",
-    "A2": "追随は小さく、押し目待ち。",
+    "A2": "高値追いは抑え、VWAP維持を確認。",
     "A1": "支持線・VWAP維持を確認。",
     "A1弱": "VWAP回復・支持線維持を確認。",
     "C2": "VWAP回復後も15分維持を確認。追加買い不可。",
@@ -82,6 +83,32 @@ NEXT_ACTIONS: dict[TechnicalSummaryRank, str] = {
     "D3": "小さく入れる候補。通常サイズは25日線奪回後。",
     "E": "監視のみ。新規買い不可。",
 }
+
+
+@dataclass(frozen=True)
+class Ma25PositionBand:
+    code: Ma25PositionBandCode
+    label: str
+    comment: str
+
+
+_MA25_POSITION_BAND_TABLE = RangeTable[Ma25PositionBand](
+    bands=(
+        RangeBand(14, Ma25PositionBand("extreme", "極端乖離帯", "上値余地より逆行リスクを優先。")),
+        RangeBand(10, Ma25PositionBand("high_risk", "高収益・高リスク帯", "上昇余地はあるが逆行リスクも高い。")),
+        RangeBand(8, Ma25PositionBand("high_momentum", "高モメンタム帯", "高モメンタム。上昇継続を確認。")),
+        RangeBand(6, Ma25PositionBand("medium_momentum", "中期モメンタム帯", "中期上昇優位の順張り候補。")),
+        RangeBand(4, Ma25PositionBand("initial_pullback_risk", "初期逆行注意帯", "中期上昇余地はあるが、短期下振れに注意。")),
+        RangeBand(2, Ma25PositionBand("stable", "安定上昇帯", "短期逆行が比較的少ない安定型の買い候補。")),
+        RangeBand(0, Ma25PositionBand("near_ma25", "25日線接近帯", "短期のみ微優位。方向確認を優先。")),
+        RangeBand(-2, Ma25PositionBand("just_below", "25日線直下・統計的不利", "25日線直下は統計的に不利。反転確認を優先。")),
+    ),
+    default=Ma25PositionBand("below", "25日線下", "25日線奪回または反転確認を優先。"),
+)
+
+
+def classify_ma25_position_band(dev25_pct: float) -> Ma25PositionBand:
+    return _MA25_POSITION_BAND_TABLE.resolve(dev25_pct)
 
 D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
     "D1a": "監視優先。D3化なら小さく可",
@@ -436,16 +463,10 @@ def classify_technical_summary_rank(
     vwap_up = latest > vwap
     close_position_pct = _position_pct(day_close_position)
 
-    if dev25_pct >= 12 or (dev25_pct >= 10 and _gt(ma25_distance_atr, 3.0)):
+    if dev25_pct >= 14 or (dev25_pct >= 10 and _gt(ma25_distance_atr, 3.0)):
         return "B2"
 
-    overheated = _has_b1_overheat_condition(
-        three_session_change_pct=three_session_change_pct,
-        recent60_range_position=recent60_range_position,
-        rsi14=rsi14,
-        day_close_position=day_close_position,
-    )
-    if 10 <= dev25_pct < 12 or (8 <= dev25_pct < 10 and overheated):
+    if 10 <= dev25_pct < 14:
         return "B1"
 
     if dev25_pct >= 0:
@@ -482,6 +503,8 @@ def classify_technical_summary_rank(
             return "A1"
         if dev25_pct >= 4:
             return "A1弱"
+        if dev25_pct >= 2:
+            return "A1"
         return "C1"
 
     if vwap_up:
@@ -579,7 +602,17 @@ def build_technical_headline_summary(
         low_highers=low_highers,
         high_breakouts=high_breakouts,
     )
-    comment = HEADLINE_COMMENTS[rank]
+    position_band = classify_ma25_position_band(dev25_pct)
+    overheated = _has_b1_overheat_condition(
+        three_session_change_pct=three_session_change_pct,
+        recent60_range_position=recent60_range_position,
+        rsi14=rsi14,
+        day_close_position=day_close_position,
+    )
+    position_label = position_band.label
+    if 8 <= dev25_pct < 10 and overheated:
+        position_label += "（過熱兆候あり）"
+    comment = position_band.comment if dev25_pct >= 0 and rank != "C2" else HEADLINE_COMMENTS[rank]
     next_action = NEXT_ACTIONS[rank]
     collapse_state_label = None
     c2_fall_reason = None
@@ -617,6 +650,7 @@ def build_technical_headline_summary(
         rank_label=RANK_LABELS[rank],
         comment=comment,
         next_action=next_action,
+        ma25_position_label=position_label,
         collapse_state_label=collapse_state_label,
         c2_fall_reason=c2_fall_reason,
     )
@@ -755,6 +789,7 @@ def build_collapse_score_brief(score: int | None) -> CollapseScoreBrief:
 def build_technical_short_comment(
     *,
     rank: TechnicalSummaryRank,
+    ma25_position_label: str | None = None,
     collapse_state_label: str | None = None,
     c2_fall_reason: str | None = None,
     ma5_slope: float | None = None,
@@ -767,7 +802,17 @@ def build_technical_short_comment(
         ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
     c2_reason_part = _format_c2_reason_part(rank, c2_fall_reason)
-    return f"{rank} {RANK_LABELS[rank]} {SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]}{c2_reason_part}｜{ma5_comment}"
+    position = (
+        ma25_position_label
+        if ma25_position_label and rank not in {"C2", "D1", "D2", "D3", "E"}
+        else SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]
+    )
+    below_ma25_warning = (
+        "｜25日線直下・統計的不利"
+        if ma25_position_label == "25日線直下・統計的不利" and rank in {"D1", "D2", "D3", "E"}
+        else ""
+    )
+    return f"{rank} {RANK_LABELS[rank]} {position}{c2_reason_part}{below_ma25_warning}｜{ma5_comment}"
 
 
 def _format_c2_reason_part(rank: TechnicalSummaryRank, c2_fall_reason: str | None) -> str:
@@ -1468,5 +1513,6 @@ __all__ = [
     "build_technical_strategy_lines",
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",
+    "classify_ma25_position_band",
     "classify_technical_summary_rank",
 ]

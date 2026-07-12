@@ -116,7 +116,8 @@ def _fmt_day_range(row: TechnicalSummaryRow) -> str:
 
 
 def _fmt_dev25(row: TechnicalSummaryRow) -> str:
-    return f"{_fmt_pct(row.dev25_pct)}({_fmt_atr(row.ma25_distance_atr)})"
+    position = f" / {row.ma25_position_label}" if row.ma25_position_label else ""
+    return f"{_fmt_pct(row.dev25_pct)}({_fmt_atr(row.ma25_distance_atr)}){position}"
 
 
 def _fmt_vwap(row: TechnicalSummaryRow) -> str:

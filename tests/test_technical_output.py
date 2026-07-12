@@ -88,7 +88,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "抵抗余地：" not in output
     assert "RSI：5分N/A / 時間N/A" in output
     assert "RSI総合：N/A" in output
-    assert "短評：A1 位置良好 リターン良好、買い候補｜" in output
+    assert "短評：A1 上昇優位 中期モメンタム帯｜" in output
     assert "｜5日線良好" in output
     assert "崩れ 1/6：候補｜買い条件は別確認" in output
     assert "底打ち初動判定：" not in output
@@ -96,7 +96,7 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "戦略判定：\n前場深押し○：支持線付近" in output
     assert "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。" in output
     assert "後場VWAP回復◎：後場VWAP上維持ならエントリー可。" in output
-    assert output.index("短評：A1 位置良好 リターン良好、買い候補｜") < output.index("■モメンタム")
+    assert output.index("短評：A1 上昇優位 中期モメンタム帯｜") < output.index("■モメンタム")
     assert output.index("崩れ 1/6：候補｜買い条件は別確認") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output

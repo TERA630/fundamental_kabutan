@@ -194,6 +194,7 @@ class TechnicalSummaryService:
                 ma25=moving_average.ma25,
             ),
             recent60_range_position=breakline.recent60_range_position,
+            ma25_position_label=headline.ma25_position_label,
             collapse_risk_score=position_assessment.collapse_risk_score,
             headline_comment=headline.comment,
             next_action=headline.next_action,
