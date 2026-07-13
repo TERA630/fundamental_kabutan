@@ -7,14 +7,12 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from app.gui_state import (
-    GuiState,
-    build_default_output_filename,
-)
+from app.gui_state import GuiState
 from app.gui_state_manager import GuiStateManager
 from app.gui_view import FundamentalView
 from app.gui_view_model import GuiViewModel
 from app.services.analysis_application_service import AnalysisApplicationService
+from app.ui_state_utils import build_default_output_filename
 
 
 class FundamentalApp:

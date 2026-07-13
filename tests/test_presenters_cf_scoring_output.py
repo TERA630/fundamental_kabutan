@@ -2,7 +2,7 @@ import pytest
 
 from app.domain.models.analyst_estimates import AnalystEstimates, EpsRevisionPeriod
 from app.domain.models.cf_scoring_result import CategoryScore, CfScoringResult, MetricScore, TotalScore
-from app.domain.builders.fundamental_output import build_fundamental_output_sections
+from app.presentation.fundamental_sections import build_fundamental_output_sections
 from app.domain.models.display_sections import (
     DisplaySections,
     OpeningSummarySection,
@@ -14,7 +14,8 @@ from app.domain.models.display_sections import (
     ValuationTableSection,
 )
 from app.presentation.display_formatter import format_sections
-from app.presenters import build_cf_scoring_sections, build_cf_scoring_summary_text, build_fundamental_output
+from app.presentation.cf_scoring_output import build_cf_scoring_sections, build_cf_scoring_summary_text
+from app.presentation.fundamental_output import build_fundamental_output
 
 
 def _sample_scoring() -> CfScoringResult:

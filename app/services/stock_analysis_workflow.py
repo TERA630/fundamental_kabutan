@@ -10,12 +10,9 @@ from typing import Callable, Protocol
 from app.data.file_cache import FileCache
 from app.domain.builders.technical_output import build_technical_output
 from app.domain.models.market_data import MarketDataBundle
-from app.domain.usecases.fundamental_analysis import (
-    FundamentalAnalysisService,
-    build_output_from_analysis_result,
-)
-from app.domain.usecases.technical_analysis import TechnicalAnalysisService
-from app.presenters import build_fundamental_output
+from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
+from app.domain.usecases.technical_analysis import TechnicalAnalysisResult, TechnicalAnalysisService
+from app.presentation.fundamental_output import build_fundamental_output_from_result
 from app.services.institutional_summary_service import InstitutionalSummaryService
 
 
@@ -63,16 +60,8 @@ class StockAnalysisWorkflow:
         kabutan_html_dir: Path | None = None,
     ) -> str:
         service = self._build_fundamental_service(code4)
-        build_analysis_result = getattr(service, "build_analysis_result", None)
-        if callable(build_analysis_result):
-            result = build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
-            return build_output_from_analysis_result(result, build_fundamental_output)
-        return service.build_analysis_output(
-                name,
-                code4,
-                build_output_fn=build_fundamental_output,
-                kabutan_html_dir=kabutan_html_dir,
-            )
+        result = service.build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
+        return build_fundamental_output_from_result(result)
 
     def build_technical_summary_result(
         self,

@@ -11,6 +11,7 @@ from app.services.analysis_application_service import (
     build_fundamental_summary_filename,
     build_technical_summary_filename,
 )
+from app.services import stock_analysis_workflow as stock_analysis_module
 from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 
 
@@ -47,12 +48,13 @@ class DummyService:
     def __init__(self):
         self.calls = []
 
-    def build_analysis_output(self, name, code4, build_output_fn, kabutan_html_dir=None):
+    def build_analysis_result(self, name, code4, kabutan_html_dir=None):
         self.calls.append((name, code4, kabutan_html_dir))
         return f"OUT:{name}:{code4}:{kabutan_html_dir}"
 
 
-def test_fetch_analysis_output_rebuilds_output_each_time(tmp_path: Path):
+def test_fetch_analysis_output_rebuilds_output_each_time(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(stock_analysis_module, "build_fundamental_output_from_result", lambda result: result)
     dummy_service = DummyService()
 
     def build_service(_cache):

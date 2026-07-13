@@ -1,6 +1,6 @@
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 from app.domain.models.financial_snapshot import FinancialMetricInputRow
-from app.presenters import build_kabutan_forecast_output
+from app.presentation.kabutan_output import build_kabutan_forecast_output
 from app.domain.builders.kabutan_output import build_kabutan_forecast_sections
 from app.domain.models.display_sections import (
     CashflowTimelineSection,

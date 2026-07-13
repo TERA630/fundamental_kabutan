@@ -1,14 +1,10 @@
-"""Fundamental output formatting orchestration."""
+"""Fundamental-analysis output orchestration."""
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
-from app.domain.builders.fundamental_output import (
-    build_fundamental_output_sections,
-    build_fundamental_output_text,
-)
+from app.domain.usecases.fundamental_analysis import FundamentalAnalysisResult
 from app.presentation.kabutan_output import build_kabutan_forecast_output
 from app.domain.models.analyst_estimates import AnalystEstimates
 from app.domain.models.cf_scoring_result import CfScoringResult
@@ -18,9 +14,7 @@ from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.quarterly_financials import QuarterlyMetricRow
 from app.presentation.cf_scoring_output import merge_scoring_sections
 from app.presentation.display_formatter import format_sections
-from app.presentation.legacy_fallback import append_scoring_fallback
-
-logger = logging.getLogger(__name__)
+from app.presentation.fundamental_sections import build_fundamental_output_sections
 
 
 def build_base_fundamental_output(
@@ -41,7 +35,7 @@ def build_base_fundamental_output(
     roic_level: str | None = None,
     operating_profit_cagr_3y: float | None = None,
 ) -> str:
-    base_output = build_fundamental_output_text(
+    sections = build_fundamental_output_sections(
         name=name,
         code4=code4,
         master=master,
@@ -50,33 +44,19 @@ def build_base_fundamental_output(
         market_snapshot=market_snapshot,
         analyst_estimates=analyst_estimates,
         kabutan_forecast_pair=kabutan_forecast_pair,
+        kabutan_cashflow_rows=kabutan_cashflow_rows,
+        financial_metric_rows=financial_metric_rows,
     )
-    try:
-        sections = build_fundamental_output_sections(
-            name=name,
-            code4=code4,
-            master=master,
-            price=price,
-            market_cap=market_cap,
-            market_snapshot=market_snapshot,
-            analyst_estimates=analyst_estimates,
-            kabutan_forecast_pair=kabutan_forecast_pair,
-            kabutan_cashflow_rows=kabutan_cashflow_rows,
-            financial_metric_rows=financial_metric_rows,
+    if cf_scoring_result is not None:
+        sections = merge_scoring_sections(
+            sections,
+            cf_scoring_result,
+            growth_phase=growth_phase,
+            operating_profit_cagr_3y=operating_profit_cagr_3y,
+            per_level=per_level,
+            roic_level=roic_level,
         )
-        if cf_scoring_result is not None:
-            sections = merge_scoring_sections(
-                sections,
-                cf_scoring_result,
-                growth_phase=growth_phase,
-                operating_profit_cagr_3y=operating_profit_cagr_3y,
-                per_level=per_level,
-                roic_level=roic_level,
-            )
-        return format_sections(sections)
-    except Exception:
-        logger.debug("DTO formatting path failed, using legacy text builder", exc_info=True)
-    return append_scoring_fallback(base_output, cf_scoring_result)
+    return format_sections(sections)
 
 
 def build_fundamental_output(
@@ -131,4 +111,37 @@ def build_fundamental_output(
         cf_scoring_result,
         False,
     )
+
+
+def build_fundamental_output_from_result(result: FundamentalAnalysisResult) -> str:
+    """Render a domain analysis result at the presentation boundary."""
+    fetched = result.kabutan_fetch_result
+    return build_fundamental_output(
+        name=result.name,
+        code4=result.code4,
+        master=result.master,
+        price=result.price_snapshot.get("price"),
+        market_cap=result.price_snapshot.get("market_cap"),
+        market_snapshot=result.price_snapshot,
+        analyst_estimates=result.analyst_estimates,
+        kabutan_forecast_pair=fetched.pair,
+        kabutan_source=fetched.source,
+        kabutan_source_message=fetched.message,
+        kabutan_cashflow_rows=fetched.cashflow_rows,
+        financial_metric_rows=result.financial_metric_rows,
+        quarterly_metric_rows=result.quarterly_metric_rows,
+        quarterly_message=fetched.quarterly_message,
+        cf_scoring_result=result.cf_scoring_result,
+        growth_phase=result.growth_phase,
+        per_level=result.per_level,
+        roic_level=result.roic_level,
+        operating_profit_cagr_3y=result.operating_profit_cagr_3y,
+    )
+
+
+__all__ = [
+    "build_base_fundamental_output",
+    "build_fundamental_output",
+    "build_fundamental_output_from_result",
+]
 

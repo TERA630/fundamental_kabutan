@@ -1,8 +1,8 @@
-from app.domain.builders.fundamental_output import build_fundamental_output_text
+from app.presentation.fundamental_output import build_base_fundamental_output
 from app.domain.models.kabutan_forecast import KabutanForecastPair, KabutanForecastRow
 
 def test_build_output_shows_indicator_when_fy_missing():
-    text = build_fundamental_output_text(
+    text = build_base_fundamental_output(
         name='住友', code4='5802', master=None, price=4850.0, market_cap=8_029_950_000_000.0,
         market_snapshot={
             'price':4850.0,'market_cap':8_029_950_000_000.0,'pbr':3.28,'industry':'非鉄金属','payout_ratio':30.30
@@ -18,7 +18,7 @@ def test_build_output_shows_indicator_when_fy_missing():
     assert '■指標' not in text
     assert '株価：4,850円' in text
     assert '時価総額：80,299.5億円(大型主役)' in text
-    assert '■バリュエーション' in text
+    assert '■株価評価・資本効率' in text
     assert '年度|2025年(実績)|2026年(実績)|2027年(予)' in text
     assert 'PER|24.2倍|22.0倍|19.4倍' in text
     assert '配当利回り|1.44%|1.65%|1.86%' in text
@@ -26,7 +26,7 @@ def test_build_output_shows_indicator_when_fy_missing():
 
 
 def test_build_output_keeps_per_when_dividend_missing():
-    text = build_fundamental_output_text(
+    text = build_base_fundamental_output(
         name='無配株', code4='9999', master=None, price=1000.0, market_cap=1_000_000_000.0,
         market_snapshot={'pbr': 1.2, 'industry': 'サービス'},
         kabutan_forecast_pair=KabutanForecastPair(
@@ -43,7 +43,7 @@ def test_build_output_keeps_per_when_dividend_missing():
 
 
 def test_build_output_uses_market_per_when_forecast_eps_missing():
-    text = build_fundamental_output_text(
+    text = build_base_fundamental_output(
         name='EPS欠損', code4='8888', master=None, price=1000.0, market_cap=1_000_000_000.0,
         market_snapshot={'per': 18.6, 'industry': 'サービス'},
         kabutan_forecast_pair=KabutanForecastPair(

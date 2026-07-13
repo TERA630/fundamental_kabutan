@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 from pathlib import Path
 import re
-import inspect
 
 from app.domain.models.kabutan_forecast import KabutanForecastPair
 from app.domain.models.kabutan_cashflow import KabutanCashflowRow
@@ -95,32 +94,8 @@ class FundamentalAnalysisResult:
     roic_level: RoicLevel | None
     operating_profit_cagr_3y: float | None
 
-    def to_output_context(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "code4": self.code4,
-            "master": self.master,
-            "price": self.price_snapshot.get("price"),
-            "market_cap": self.price_snapshot.get("market_cap"),
-            "market_snapshot": self.price_snapshot,
-            "analyst_estimates": self.analyst_estimates,
-            "kabutan_forecast_pair": self.kabutan_fetch_result.pair,
-            "kabutan_cashflow_rows": self.kabutan_fetch_result.cashflow_rows,
-            "kabutan_source": self.kabutan_fetch_result.source,
-            "kabutan_source_message": self.kabutan_fetch_result.message,
-            "financial_metric_rows": self.financial_metric_rows,
-            "quarterly_metric_rows": self.quarterly_metric_rows,
-            "quarterly_message": self.kabutan_fetch_result.quarterly_message,
-            "cf_scoring_result": self.cf_scoring_result,
-            "growth_phase": self.growth_phase,
-            "per_level": self.per_level,
-            "roic_level": self.roic_level,
-            "operating_profit_cagr_3y": self.operating_profit_cagr_3y,
-        }
-
-
 class FundamentalAnalysisService:
-    """ドメイン層ユースケース: 分析出力の組み立て実行を担当。"""
+    """ドメイン層ユースケース: ファンダメンタル分析結果を組み立てる。"""
 
     def __init__(
         self,
@@ -220,22 +195,6 @@ class FundamentalAnalysisService:
             roic_level=self.build_roic_level(cf_scoring_input),
             operating_profit_cagr_3y=calculations.calculate_operating_profit_cagr_3y(kabutan_fetch_result.pair),
         )
-
-    def build_analysis_output(
-        self,
-        name: str,
-        code4: str,
-        build_output_fn: Callable[..., str],
-        kabutan_html_dir: Path | None = None,
-    ) -> str:
-        """Compatibility wrapper around ``build_analysis_result``.
-
-        New callers should prefer building a FundamentalAnalysisResult and formatting it
-        explicitly with build_output_from_analysis_result.
-        """
-
-        result = self.build_analysis_result(name, code4, kabutan_html_dir=kabutan_html_dir)
-        return build_output_from_analysis_result(result, build_output_fn)
 
     @staticmethod
     def resolve_cf_scoring_as_of(
@@ -395,27 +354,8 @@ class FundamentalAnalysisService:
         return candidates
 
 
-def build_output_from_analysis_result(
-    result: FundamentalAnalysisResult,
-    build_output_fn: Callable[..., str],
-) -> str:
-    output_context = result.to_output_context()
-    signature = inspect.signature(build_output_fn)
-    accepts_var_keyword = any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD
-        for parameter in signature.parameters.values()
-    )
-    if accepts_var_keyword:
-        return build_output_fn(**output_context)
-
-    accepted_params = signature.parameters
-    safe_context = {key: value for key, value in output_context.items() if key in accepted_params}
-    return build_output_fn(**safe_context)
-
-
 __all__ = [
     "FundamentalAnalysisResult",
     "FundamentalAnalysisService",
     "KabutanFetchResult",
-    "build_output_from_analysis_result",
 ]
