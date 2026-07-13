@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -1154,6 +1155,8 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "崩れスコア" in html
     assert "前日VWAP維持" not in html
     assert "<td>2</td>" in html
+    assert 'class="technical-rank-section" data-summary-rank="A1"' in html
+    assert 'data-vwap-secured="true"' in html
 
 
 def test_technical_summary_html_links_stock_name_to_technical_detail():
@@ -1169,6 +1172,23 @@ def test_technical_summary_html_links_stock_name_to_technical_detail():
     )
 
     assert '<a href="/stock/1234?mode=technical">AIテスト(1234)</a>' in html
+
+
+def test_technical_summary_html_marks_vwap_not_secured_and_unknown():
+    base = _summary_row(name="確保", code4="1234", rank="A1", collapse_risk_score=1)
+    table = TechnicalSummaryTable(
+        rows=(
+            base,
+            replace(base, name="未確保", code4="2345", vwap_diff_pct=-0.01),
+            replace(base, name="不明", code4="3456", vwap_diff_pct=None),
+        )
+    )
+
+    html = build_technical_summary_html(table)
+
+    assert html.count('data-vwap-secured="true"') == 1
+    assert html.count('data-vwap-secured="false"') == 1
+    assert html.count('data-vwap-secured="unknown"') == 1
 
 
 def test_technical_summary_html_renders_us_market_section():

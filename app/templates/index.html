@@ -106,8 +106,34 @@
       </section>
     </form>
 
-    <section class="summary-panel" aria-label="機関投資サマリ">
+    <section class="summary-panel institutional-summary-panel" aria-label="機関投資サマリ">
       <pre>{{ state.institutional_summary }}</pre>
+      {% if summary_html and state.mode == 'technical' %}
+      <aside class="technical-summary-filters" aria-label="Technicalサマリフィルタ">
+        <label>
+          <span>ランキング</span>
+          <select id="technical-rank-filter">
+            <option value="all">すべて</option>
+            <option value="B2">B2</option>
+            <option value="B1">B1</option>
+            <option value="A2">A2</option>
+            <option value="A1">A1</option>
+            <option value="A1弱">A1弱</option>
+            <option value="C2">C2</option>
+            <option value="C1">C1</option>
+            <option value="D1">D1</option>
+            <option value="D2">D2</option>
+            <option value="D3">D3</option>
+            <option value="E">E</option>
+          </select>
+        </label>
+        <label class="technical-vwap-filter">
+          <input id="technical-vwap-filter" type="checkbox">
+          <span>VWAP確保のみ</span>
+        </label>
+        <output id="technical-filter-count" aria-live="polite"></output>
+      </aside>
+      {% endif %}
     </section>
 
     {% if summary_html %}
@@ -171,6 +197,9 @@
     const technicalEvaluationDate = document.getElementById("technical-evaluation-date");
     const technicalEvaluationTime = document.getElementById("technical-evaluation-time");
     const technicalTimesByDate = {{ state.technical_evaluation_time_choices_by_date | tojson }};
+    const technicalRankFilter = document.getElementById("technical-rank-filter");
+    const technicalVwapFilter = document.getElementById("technical-vwap-filter");
+    const technicalFilterCount = document.getElementById("technical-filter-count");
 
     function updateSummaryButton() {
       const technicalSelected = Array.from(modeInputs).some(
@@ -232,6 +261,38 @@
     if (technicalEvaluationDate) {
       technicalEvaluationDate.addEventListener("change", rebuildTechnicalTimeOptions);
       rebuildTechnicalTimeOptions();
+    }
+
+    function applyTechnicalSummaryFilters() {
+      if (!technicalRankFilter || !technicalVwapFilter || !technicalFilterCount) {
+        return;
+      }
+      const selectedRank = technicalRankFilter.value;
+      const requireVwap = technicalVwapFilter.checked;
+      let visibleCount = 0;
+      let totalCount = 0;
+      document.querySelectorAll(".technical-rank-section").forEach((section) => {
+        const rankMatches = selectedRank === "all" || section.dataset.summaryRank === selectedRank;
+        let sectionVisibleCount = 0;
+        section.querySelectorAll("tbody tr[data-vwap-secured]").forEach((row) => {
+          totalCount += 1;
+          const rowVisible = rankMatches && (!requireVwap || row.dataset.vwapSecured === "true");
+          row.hidden = !rowVisible;
+          if (rowVisible) {
+            sectionVisibleCount += 1;
+            visibleCount += 1;
+          }
+        });
+        section.hidden = sectionVisibleCount === 0;
+      });
+      technicalFilterCount.value = `${visibleCount} / ${totalCount}銘柄`;
+      technicalFilterCount.textContent = technicalFilterCount.value;
+    }
+
+    if (technicalRankFilter && technicalVwapFilter) {
+      technicalRankFilter.addEventListener("change", applyTechnicalSummaryFilters);
+      technicalVwapFilter.addEventListener("change", applyTechnicalSummaryFilters);
+      applyTechnicalSummaryFilters();
     }
 
     function setCopyButtonText(text) {

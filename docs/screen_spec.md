@@ -95,10 +95,10 @@
 機関投資サマリ
 時価総額：{market_cap_oku}億円（{market_cap_class}）
 流動性：出来高 {volume}（20日平均比 {volume_vs_avg20_pct}） 売買代金 {trading_value_oku}億円
-機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）　Technical：VWAP {○/×} / 25日線 {○/×}
+機関投資スコア：{score}/20点　Fundamental Score：{fundamental_score}点（{rank}）
 ```
 
-VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` を付ける。
+機関投資サマリには Technical のVWAP判定と25日線判定を表示しない。
 
 ## 7. キャッシュ表示
 
@@ -112,6 +112,10 @@ VWAP が日足参考値の場合、VWAP判定の後ろに `(日足参考値)` �
 - Web UI のボタン名は `サマリ表示` とする。`Fundamental` / `Technical` のどちらのモードでも利用できる。
 - Fundamental モードでは WatchList と株探HTMLフォルダを前提に Fundamental サマリを生成し、HTML 表として画面へ表示する。
 - Technical モードでは WatchList を前提に Technical サマリを生成し、ランク別の HTML 表として画面へ表示する。
+- Web UIでTechnicalサマリを表示した場合、機関投資サマリの右側にランキング選択と `VWAP確保のみ` のフィルタを表示する。
+- ランキングは `すべて` または1ランクを選択する。`VWAP確保のみ` は現在値がVWAP以上の行だけを対象とし、VWAPが欠損した行は除外する。
+- 2つのフィルタはAND条件で適用し、該当行がないランクセクションは非表示にする。US Market、Sector Breadth、取得失敗一覧は対象外とする。
+- フィルタは生成済みHTMLに対して適用し、市場データを再取得しない。
 - Tkinter の `サマリ出力` は、選択中タブに応じた Markdown ファイルを保存する。出力内容とファイル名は `docs/Summery_spec.md` を正とする。
 
 ## 9. 出力表示の共通規則

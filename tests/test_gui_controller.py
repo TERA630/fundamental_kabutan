@@ -369,4 +369,6 @@ def test_fetch_institutional_summary_text_builds_panel_without_kabutan(tmp_path:
     assert "売買代金 200.0億円" in text
     assert "機関投資スコア：10/20点" in text
     assert "Fundamental Score：N/A" in text
-    assert "Technical：VWAP ○ / 25日線 ×" in text
+    assert "Technical：" not in text
+    assert "VWAP" not in text
+    assert "25日線" not in text

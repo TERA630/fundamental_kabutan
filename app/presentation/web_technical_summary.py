@@ -46,6 +46,7 @@ def build_technical_summary_html(
         rows = [row for row in table.rows if row.rank == rank]
         if not rows:
             continue
+        sections.append(f'<section class="technical-rank-section" data-summary-rank="{rank}">')
         sections.append(f'<h3 class="summary-rank-heading">{rank} {escape(RANK_LABELS[rank])}</h3>')
         sections.append('<div class="table-scroll">')
         sections.append('<table class="fundamental-table summary-table technical-summary-table">')
@@ -58,6 +59,7 @@ def build_technical_summary_html(
         )
         sections.extend(_build_row_html(row, detail_url_builder=detail_url_builder) for row in rows)
         sections.append("</tbody></table></div>")
+        sections.append("</section>")
     sections.append(_build_skipped_html(table))
     sections.append("</section>")
     return "".join(sections)
@@ -146,7 +148,13 @@ def _build_row_html(row: TechnicalSummaryRow, *, detail_url_builder: DetailUrlBu
         _fmt_position(row.recent60_range_position),
     )
     cells = f"<td>{stock_cell}</td>" + "".join(f"<td>{escape(value)}</td>" for value in values[1:])
-    return f"<tr>{cells}</tr>"
+    return f'<tr data-vwap-secured="{_vwap_secured_value(row)}">{cells}</tr>'
+
+
+def _vwap_secured_value(row: TechnicalSummaryRow) -> str:
+    if row.vwap_diff_pct is None:
+        return "unknown"
+    return "true" if row.vwap_diff_pct >= 0 else "false"
 
 
 def _build_stock_link(

@@ -104,6 +104,38 @@ def test_index_renders_technical_output_as_pre_text_not_visible_textarea():
     assert 'formaction="/hybrid-summary"' not in html
 
 
+def test_index_renders_technical_summary_filters_only_with_technical_summary():
+    state = WebUiState()
+    state.mode = "technical"
+    state.fundamental_summary_html = (
+        '<section class="technical-summary-output">'
+        '<section class="technical-rank-section" data-summary-rank="A1">'
+        '<table><tbody><tr data-vwap-secured="true"><td>テスト</td></tr></tbody></table>'
+        "</section></section>"
+    )
+    client = create_app(state).test_client()
+
+    html = client.get("/").data.decode("utf-8")
+
+    assert 'id="technical-rank-filter"' in html
+    assert 'id="technical-vwap-filter"' in html
+    assert "VWAP確保のみ" in html
+    assert 'id="technical-filter-count"' in html
+    assert "applyTechnicalSummaryFilters" in html
+
+
+def test_index_hides_technical_summary_filters_for_fundamental_summary():
+    state = WebUiState()
+    state.mode = "fundamental"
+    state.fundamental_summary_html = "<section>FUNDAMENTAL SUMMARY</section>"
+    client = create_app(state).test_client()
+
+    html = client.get("/").data.decode("utf-8")
+
+    assert 'id="technical-rank-filter"' not in html
+    assert 'id="technical-vwap-filter"' not in html
+
+
 def test_web_ui_defaults_to_technical_mode():
     state = WebUiState()
     client = create_app(state).test_client()
