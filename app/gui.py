@@ -59,7 +59,6 @@ class FundamentalApp:
             on_open_kabutan_dir=self.open_kabutan_html_dir,
             on_build_kabutan_package=self.build_kabutan_html_package,
             on_summary=self.generate_summary,
-            on_hybrid_evaluation=self.generate_hybrid_evaluation,
             on_sector_breadth=self.generate_sector_breadth,
             on_tab_changed=self.on_tab_changed,
             on_refresh_technical_evaluation=self.refresh_technical_evaluation_choices,
@@ -268,29 +267,6 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
-    def _hybrid_evaluation_worker(
-        self,
-        name: str,
-        code4: str,
-        evaluation_at,
-        evaluation_label: str,
-        base_output: str,
-    ):
-        try:
-            output = self.controller.build_single_stock_hybrid_evaluation_output(
-                name=name,
-                code4=code4,
-                kabutan_html_dir=self.state.kabutan_html_dir,
-                evaluation_at=evaluation_at,
-            )
-            status = f"Hybrid評価を追加しました。 / 評価時点={evaluation_label}"
-            self.master.after(
-                0,
-                lambda: self._render_appended_output(base_output, output, status, "technical"),
-            )
-        except Exception as exc:
-            self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
-
     def _summary_worker(self, output_dir: Path, mode: str, evaluation_at=None, evaluation_label: str = "最新"):
         try:
             if mode == "technical":
@@ -396,29 +372,6 @@ class FundamentalApp:
         thread = threading.Thread(
             target=self._summary_worker,
             args=(output_dir, mode, evaluation_at, evaluation_label),
-            daemon=True,
-        )
-        thread.start()
-
-    def generate_hybrid_evaluation(self):
-        if self.state.is_fetching:
-            return
-
-        selected = self._require_selected_stock()
-        if selected is None:
-            return
-        if not self._require_kabutan_html_dir():
-            return
-
-        name, code4 = selected
-        self._sync_technical_evaluation_selection()
-        evaluation_at = self.state_manager.technical_evaluation_at()
-        evaluation_label = self.state_manager.technical_evaluation_label()
-        base_output = self.view.text_widget_for_mode("technical").get("1.0", tk.END).strip()
-        self.set_busy(True, f"Hybrid評価を作成中... / 評価時点={evaluation_label}")
-        thread = threading.Thread(
-            target=self._hybrid_evaluation_worker,
-            args=(name, code4, evaluation_at, evaluation_label, base_output),
             daemon=True,
         )
         thread.start()

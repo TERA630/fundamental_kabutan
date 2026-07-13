@@ -154,7 +154,7 @@ def classify_six_month_entry_guidance(
 
 D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
     "D1a": "25日線奪回待ち。D3化は反転観測",
-    "D1b": "25日線奪回待ち。深指値は原則不可",
+    "D1b": "25日線奪回待ち。新規は原則不可",
     "D1": "判定保留。新規不可",
     "D2": "支持線反発を観測。25日線奪回待ち",
     "D2弱": "支持線根拠が弱い。25日線奪回待ち",
@@ -185,7 +185,7 @@ class CollapseScoreBrief:
 _COLLAPSE_SCORE_BRIEF_TABLE = RangeTable[CollapseScoreBrief](
     bands=(
         RangeBand(5, CollapseScoreBrief("ほぼ触らない", "構造回復まで見送り")),
-        RangeBand(4, CollapseScoreBrief("原則回避", "新規買い回避。前場深押し指値は避ける")),
+        RangeBand(4, CollapseScoreBrief("原則回避", "新規買い回避")),
         RangeBand(2, CollapseScoreBrief("条件付き候補", "後場VWAP上維持・価格構造回復を確認")),
     ),
     default=CollapseScoreBrief("候補", "買い条件は別確認"),
@@ -273,39 +273,32 @@ class _CollapseRiskSignals:
 
 UPPER_STALL_WICK_RATIO = 0.45
 
-STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
+STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str] | None] = {
     "A1": (
-        "前場深押し○：支持線付近 {support_range}円で検討。約定後はVWAP回復・維持を確認。",
         "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。",
         "後場VWAP回復◎：後場VWAP上維持ならエントリー可。ホールド適性も高い。",
     ),
     "A2": (
-        "前場深押し△：支持線付近 {support_range}円で小さく検討。追随買いは避ける。",
         "前場VWAP回復○：VWAP近辺まで押した後、再回復＋維持ならエントリー可。",
         "後場VWAP回復○：後場VWAP上維持ならエントリー可。ただし高値追いは避ける。",
     ),
     "A1弱": (
-        "前場深押し○：支持線付近 {support_range}円で検討。VWAP回復・維持を確認。",
         "前場VWAP回復○：VWAP回復＋15分以上維持なら小さく検討可。",
         "後場VWAP回復○：後場VWAP上維持ならエントリー候補。支持線割れは見送り。",
     ),
     "B1": (
-        "前場深押し△：支持線付近 {nearest_support}円でのみ小さく検討。VWAP未回復なら撤退。",
         "前場VWAP回復△：VWAP回復＋維持でも新規は慎重。高値追いは避ける。",
         "後場VWAP回復△：後場VWAP上維持なら短期限定で検討可。持ち越しは慎重。",
     ),
     "B2": (
-        "前場深押し×：深押しに見えても崩れ初動の可能性が高い。",
         "前場VWAP回復×：VWAP回復だけでは新規不可。",
         "後場VWAP回復×：新規不可。保有中なら利確・逆指値管理を優先。",
     ),
     "C1": (
-        "前場深押し×：VWAP下では深押し指値を避ける。支持線割れの中腹をつかみやすい。",
         "前場VWAP回復△：VWAP回復＋15分以上維持なら検討可。慎重なら後場まで待つ。",
         "後場VWAP回復○：後場VWAP回復＋上維持＋安値切り上げがあればエントリー可。",
     ),
     "C2": (
-        "前場深押し×：崩れ条件あり。深押し指値は避け、支持線維持を確認する。",
         "前場VWAP回復×：VWAP回復だけでは根拠不足。安値切り上げと高値更新を確認する。",
         "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら崩れ条件の解消を待つ。",
     ),
@@ -313,7 +306,6 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
     "D2": None,
     "D3": None,
     "E": (
-        "前場深押し×：下降トレンド中の深押しは避ける。",
         "前場VWAP回復×：前場VWAP回復だけでは新規不可。だまし上げ警戒。",
         "後場VWAP回復△：後場VWAP回復＋上維持＋安値切り上げ＋出来高増加が揃えば小さく検討可。原則は25日線回復待ち。",
     ),
@@ -322,45 +314,28 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str, str] | None] = {
 def build_technical_strategy_lines(
     rank: TechnicalSummaryRank,
     *,
-    support_range: str = "N/A",
-    nearest_support: str = "N/A",
     detail_code: str | None = None,
-    support_entry_range: str = "N/A",
-    support_pullback_range: str = "N/A",
     vwap_recovery_range: str = "N/A",
-    vwap_pullback_range: str = "N/A",
-    risk_reward: str = "RR算出不可",
 ) -> tuple[str, ...]:
     if rank == "D1":
         return _build_d1_strategy_lines(
             detail_code=detail_code or "D1",
-            support_entry_range=support_entry_range,
-            nearest_support=nearest_support,
-            risk_reward=risk_reward,
         )
     if rank == "D2":
         prefix = "D2弱｜支持線根拠弱い｜" if detail_code == "D2弱" else ""
         return (
-            f"前場深押し×：{prefix}25日線下は優位性未確認。支持線 {support_entry_range} は観測用とし、新規は25日線奪回待ち。",
             f"前場VWAP回復△：VWAP回復帯 {vwap_recovery_range} と反転状態を確認するが、新規は25日線奪回待ち。",
-            "後場VWAP回復△：後場VWAP上維持でも反転観測に留め、持ち越し判断は25日線奪回後。",
+            f"後場VWAP回復△：{prefix}後場VWAP上維持でも反転観測に留め、持ち越し判断は25日線奪回後。",
         )
     if rank == "D3":
         return _build_d3_strategy_lines(
             detail_code=detail_code or "D3",
-            support_pullback_range=support_pullback_range,
             vwap_recovery_range=vwap_recovery_range,
-            vwap_pullback_range=vwap_pullback_range,
-            nearest_support=nearest_support,
-            risk_reward=risk_reward,
         )
     templates = STRATEGY_LINES[rank]
     if templates is None:
         return ("N/A（判定基準未設定）",)
-    return tuple(
-        template.format(support_range=support_range, nearest_support=nearest_support)
-        for template in templates
-    )
+    return templates
 
 
 def build_d_detail_headline(
@@ -408,28 +383,18 @@ def _append_dev25_risk_label(
 def _build_d1_strategy_lines(
     *,
     detail_code: str,
-    support_entry_range: str,
-    nearest_support: str,
-    risk_reward: str,
 ) -> tuple[str, ...]:
     if detail_code == "D1a":
         return (
-            f"前場深押し×：25日線下は優位性未確認。支持線帯 {support_entry_range} は観測用。",
             "前場VWAP回復△：VWAP回復とD3化は反転観測に留め、新規は25日線奪回待ち。",
             "後場VWAP回復△：後場VWAP上維持でも新規は見送り、25日線奪回を確認。",
         )
     if detail_code == "D1b":
-        if nearest_support == "N/A":
-            deep_order = "前場深押し×：支持線不明のため深指値不可。"
-        else:
-            deep_order = f"前場深押し×：支持線 {nearest_support}円は観測用。25日線まで遠く、奪回までは新規見送り。"
         return (
-            deep_order,
             "前場VWAP回復△：VWAP上でも反転確認中。新規は25日線奪回待ち。",
             "後場VWAP回復△：回復しても持ち越し判断は25日線奪回後。",
         )
     return (
-        "前場深押し×：ATR距離不明のため指値算出不可。",
         "前場VWAP回復△：D3条件を満たしても反転観測に留め、25日線奪回待ち。",
         "後場VWAP回復△：判定材料不足。新規は見送り。",
     )
@@ -438,30 +403,19 @@ def _build_d1_strategy_lines(
 def _build_d3_strategy_lines(
     *,
     detail_code: str,
-    support_pullback_range: str,
     vwap_recovery_range: str,
-    vwap_pullback_range: str,
-    nearest_support: str,
-    risk_reward: str,
 ) -> tuple[str, ...]:
     if detail_code == "D3強":
         return (
-            f"前場深押し×：反転観測は強いが25日線下。{vwap_pullback_range} または {support_pullback_range} は観測用。",
             "前場VWAP回復○：反転観測強。VWAP15分維持と出来高を確認し、新規は25日線奪回待ち。",
             "後場VWAP回復○：後場VWAP上維持でも、持ち越し判断は25日線奪回後。",
         )
     if detail_code == "D3弱":
-        if nearest_support == "N/A":
-            deep_order = "前場深押し×：支持線不明のため深指値不可。"
-        else:
-            deep_order = f"前場深押し×：支持線 {nearest_support}円は観測用。25日線奪回までは新規見送り。"
         return (
-            deep_order,
             "前場VWAP回復△：反転形はあるが弱い。25日線奪回まで監視継続。",
             "後場VWAP回復△：後場VWAP維持でも反転観測に留める。",
         )
     return (
-        f"前場深押し×：反転観測中だが25日線下。支持線帯 {support_pullback_range} は観測用。",
         f"前場VWAP回復○：反転観測。VWAP回復帯 {vwap_recovery_range} を維持しても新規は25日線奪回待ち。",
         "後場VWAP回復○：後場VWAP上維持は観測継続条件。持ち越し判断は25日線奪回後。",
     )
@@ -1431,7 +1385,7 @@ def build_dev25_risk_label(rank: TechnicalSummaryRank, dev25_pct: float) -> str 
         if dev25_pct >= -8:
             return "反転初動"
         if dev25_pct >= -15:
-            return "深押し反転"
+            return "大幅乖離からの反転"
         return "急落リバ・戻り売り警戒"
     return None
 

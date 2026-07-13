@@ -8,16 +8,11 @@ from typing import Callable
 
 from app.data.file_cache import FileCache
 from app.domain.builders.fundamental_summary import build_fundamental_summary_markdown
-from app.domain.builders.hybrid_evaluation_output import (
-    build_hybrid_evaluation_text,
-    build_hybrid_evaluation_unavailable_text,
-)
 from app.domain.builders.sector_breadth_output import build_single_stock_sector_breadth_text
 from app.domain.builders.technical_summary import build_technical_summary_markdown
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.fundamental_summary import FundamentalSummaryService
-from app.domain.usecases.hybrid_evaluation import HybridEvaluationService
 from app.domain.usecases.technical_summary import TechnicalSummaryService
 
 FUNDAMENTAL_SUMMARY_FILENAME_PREFIX = "fundamental_summary"
@@ -140,46 +135,6 @@ class SummaryWorkflow:
             sector_entries,
         )
         return build_single_stock_sector_breadth_text(table.sector_breadth, sectors)
-
-    def build_single_stock_hybrid_evaluation_output(
-        self,
-        *,
-        name: str,
-        code4: str,
-        kabutan_html_dir: Path | None = None,
-        evaluation_at: datetime | None = None,
-    ) -> str:
-        fundamental_row = FundamentalSummaryService(
-            self.build_fundamental_service(self.file_cache)
-        ).build_summary_row(
-            name=name,
-            code4=code4,
-            kabutan_html_dir=kabutan_html_dir,
-        )
-        if fundamental_row is None:
-            return build_hybrid_evaluation_unavailable_text(
-                name=name,
-                code4=code4,
-                reason="Fundamental総合スコア作成不可",
-            )
-
-        build_result = self.build_technical_summary_result
-        if evaluation_at is not None:
-            build_result = lambda name, code4: self.build_technical_summary_result(
-                name,
-                code4,
-                evaluation_at=evaluation_at,
-            )
-        technical_result = build_result(name, code4)
-        technical_row = TechnicalSummaryService(
-            build_result,
-            build_us_market_summary=None,
-        ).build_summary_row(technical_result)
-        evaluation = HybridEvaluationService().build_evaluation(
-            fundamental_row=fundamental_row,
-            technical_row=technical_row,
-        )
-        return build_hybrid_evaluation_text(evaluation)
 
     def build_summary_table_for_mode(
         self,

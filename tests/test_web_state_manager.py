@@ -14,7 +14,6 @@ class FakeController:
         self.fetch_call = None
         self.summary_call = None
         self.sector_output_call = None
-        self.hybrid_evaluation_call = None
 
     def save_watchlist_path_cache(self, path):
         self.saved_watchlist_path = path
@@ -36,11 +35,6 @@ class FakeController:
     def build_technical_sector_breadth_output(self, **kwargs):
         self.sector_output_call = kwargs
         return "SECTOR_OUTPUT"
-
-    def build_single_stock_hybrid_evaluation_output(self, **kwargs):
-        self.hybrid_evaluation_call = kwargs
-        return "HYBRID_EVALUATION"
-
 
 class FakeTechnicalTimestampController(FakeController):
     def fetch_technical_evaluation_timestamps(self, code4):
@@ -98,25 +92,6 @@ def test_technical_summary_uses_sector_watchlist_entries():
 
     assert controller.summary_call["mode"] == "technical"
     assert controller.summary_call["watchlist_entries"] == state.watchlist_with_sectors
-
-
-def test_hybrid_evaluation_uses_selected_stock_and_forced_technical_evaluation(tmp_path: Path):
-    controller = FakeController()
-    state = WebUiState(controller=controller)
-    state.mode = "fundamental"
-    state.watchlist = [("トヨタ", "7203")]
-    state.selected_label = "トヨタ (7203)"
-    state.kabutan_html_dir = tmp_path / "html"
-    state.technical_evaluation_date = "2026-05-29"
-    state.technical_evaluation_time = "09:10"
-    manager = WebUiStateManager(state)
-
-    assert manager.build_hybrid_evaluation_output_for_current_selection() == "HYBRID_EVALUATION"
-
-    assert controller.hybrid_evaluation_call["name"] == "トヨタ"
-    assert controller.hybrid_evaluation_call["code4"] == "7203"
-    assert controller.hybrid_evaluation_call["kabutan_html_dir"] == tmp_path / "html"
-    assert controller.hybrid_evaluation_call["evaluation_at"] == datetime(2026, 5, 29, 9, 10)
 
 
 def test_set_kabutan_html_dir_clears_package_cache(tmp_path: Path):

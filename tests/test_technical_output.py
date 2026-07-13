@@ -93,7 +93,8 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "崩れ 1/5：候補｜買い条件は別確認" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
-    assert "戦略判定：\n前場深押し○：支持線付近" in output
+    assert "戦略判定：\n前場VWAP回復◎：" in output
+    assert "前場深押し" not in output
     assert "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。" in output
     assert "後場VWAP回復◎：後場VWAP上維持ならエントリー可。" in output
     assert output.index("短評：A1 中期乖離帯｜やや過熱・他指標確認｜") < output.index("■モメンタム")
@@ -142,7 +143,7 @@ def test_build_technical_output_filters_strategy_by_evaluation_time():
     result = service.build_analysis_result(name="Sample", code4="1234")
 
     preopen = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 08:30").to_pydatetime()))
-    assert "前場深押し○：" in preopen
+    assert "前場深押し" not in preopen
     assert "前場VWAP回復◎：" in preopen
     assert "ホールド銘柄の指値売：" in preopen
     assert "後場VWAP回復◎：" not in preopen
@@ -298,7 +299,8 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
     assert "詳細：" not in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
-    assert "戦略判定：\n前場深押し×：反転観測は強いが25日線下。" in output
+    assert "戦略判定：\n前場VWAP回復○：反転観測強。" in output
+    assert "前場深押し" not in output
     assert "前場VWAP回復○：反転観測強。" in output
     assert "後場VWAP回復○：後場VWAP上維持でも、持ち越し判断は25日線奪回後。" in output
 
@@ -320,7 +322,7 @@ def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
     output = build_technical_output(result)
 
     assert "短評：D1 戻り途中｜25日線奪回待ち" in output
-    assert "前場深押し×：25日線下は優位性未確認。" in output
+    assert "前場深押し" not in output
     assert "前場VWAP回復△：VWAP回復とD3化は反転観測に留め" in output
 
 

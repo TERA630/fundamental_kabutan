@@ -292,29 +292,6 @@ class WebUiStateManager:
             evaluation_at=self.technical_evaluation_at(),
         )
 
-    def build_hybrid_evaluation_output_for_current_selection(self) -> str | None:
-        if not self.state.watchlist:
-            self.state.status = self.state.view_model.build_missing_stock_status()
-            self.state.fundamental_summary_html = ""
-            return None
-        selected = self.selected_stock()
-        if selected is None:
-            self.state.status = self.state.view_model.build_missing_stock_status()
-            self.state.fundamental_summary_html = ""
-            return None
-        self.ensure_kabutan_html_dir_for_fundamental()
-        if self.state.kabutan_html_dir is None:
-            self.state.status = self.state.view_model.build_kabutan_dir_restore_required_status()
-            self.state.fundamental_summary_html = ""
-            return None
-        name, code4 = selected
-        return self.state.controller.build_single_stock_hybrid_evaluation_output(
-            name=name,
-            code4=code4,
-            kabutan_html_dir=self.state.kabutan_html_dir,
-            evaluation_at=self.technical_evaluation_at(force=True),
-        )
-
     def _fetch_watchlist_entries_with_sectors(self, path: Path) -> list[WatchlistEntry]:
         fetch_with_sectors = getattr(self.state.controller, "fetch_watchlist_entries_with_sectors", None)
         if callable(fetch_with_sectors):

@@ -172,33 +172,6 @@ def create_app(state: WebUiState | None = None) -> Flask:
         finally:
             ui_state.market_data_operation_lock.release()
 
-    @app.post("/hybrid-evaluation")
-    def build_hybrid_evaluation() -> str:
-        if not ui_state.market_data_operation_lock.acquire(blocking=False):
-            ui_state.status = "市場データ取得中です。完了後に再実行してください。"
-            return _render(ui_state)
-        try:
-            state_manager.sync_form_selection(
-                request.form.get("selected_stock", ui_state.selected_label),
-                request.form.get("mode", ui_state.mode),
-                request.form.get("technical_evaluation_date"),
-                request.form.get("technical_evaluation_time"),
-            )
-            state_manager.refresh_technical_evaluation_choices(force=True)
-            try:
-                output = state_manager.build_hybrid_evaluation_output_for_current_selection()
-                if output is None:
-                    return _render(ui_state)
-                ui_state.output = _append_output(ui_state.output, output)
-                ui_state.mode = "technical"
-                ui_state.fundamental_summary_html = ""
-                ui_state.status = f"Hybrid評価を追加しました。 / 評価時点={state_manager.technical_evaluation_label(force=True)}"
-            except Exception as exc:
-                ui_state.status = f"{ui_state.view_model.build_fetch_failed_status()} {exc}"
-            return _render(ui_state)
-        finally:
-            ui_state.market_data_operation_lock.release()
-
     @app.post("/sector-breadth")
     def build_sector_breadth() -> str:
         if not ui_state.market_data_operation_lock.acquire(blocking=False):

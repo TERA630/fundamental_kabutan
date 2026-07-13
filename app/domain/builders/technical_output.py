@@ -14,7 +14,6 @@ from app.domain.policies.technical_summary import (
     build_technical_position_assessment,
     build_technical_short_comment,
     build_technical_strategy_lines,
-    build_nearby_support_lines,
 )
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult
 
@@ -401,45 +400,13 @@ def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:
     headline = _build_headline(result)
     if headline is None:
         return "戦略判定：\nN/A"
-    supports = build_nearby_support_lines(
-        latest=latest,
-        ma25=snapshot.moving_average.ma25,
-        previous_low=snapshot.previous_session.prev_low,
-        recent20_low=snapshot.breakline.recent20_low,
-        ma75=snapshot.moving_average.ma75,
-        recent60_low=snapshot.breakline.recent60_low,
-    )
-    support_prices = sorted(line.price for line in supports)
-    support_range = "〜".join(_fmt_price_compact(price) for price in support_prices) or "N/A"
-    nearest_support = _fmt_price_compact(supports[0].price) if supports else "N/A"
     detail_code = _strategy_detail_code(result, headline.rank)
     atr14 = snapshot.range.atr14
-    support_price = supports[0].price if supports else None
-    support_entry_range = _fmt_strategy_band(
-        support_price,
-        _offset_price(support_price, atr14, 0.15),
-    )
-    support_pullback_range = _fmt_strategy_band(
-        support_price,
-        _offset_price(support_price, atr14, 0.25),
-    )
     vwap_recovery_range = _fmt_strategy_band(vwap, _offset_price(vwap, atr14, 0.20))
-    vwap_pullback_range = _fmt_strategy_band(_offset_price(vwap, atr14, -0.25), vwap)
-    rr_entry_offset = 0.25 if headline.rank == "D3" else 0.15
-    rr_entry = _offset_price(support_price, atr14, rr_entry_offset)
-    rr_stop = _offset_price(support_price, atr14, -0.35)
-    rr_target = _nearest_target_above(rr_entry, _build_resistance_lines(result))
-    risk_reward = _fmt_risk_reward(_calculate_risk_reward(rr_entry, rr_stop, rr_target))
     strategy_lines = build_technical_strategy_lines(
         headline.rank,
-        support_range=support_range,
-        nearest_support=nearest_support,
         detail_code=detail_code,
-        support_entry_range=support_entry_range,
-        support_pullback_range=support_pullback_range,
         vwap_recovery_range=vwap_recovery_range,
-        vwap_pullback_range=vwap_pullback_range,
-        risk_reward=risk_reward,
     )
     strategy_lines = _filter_strategy_lines_for_time(strategy_lines, result)
     return "\n".join(("戦略判定：", *strategy_lines))
@@ -453,7 +420,6 @@ def _filter_strategy_lines_for_time(
     if phase is None or strategy_lines == ("N/A（判定基準未設定）",):
         return strategy_lines
 
-    deep = _line_starting_with(strategy_lines, "前場深押し")
     am_vwap = _line_starting_with(strategy_lines, "前場VWAP回復")
     pm_vwap = _line_starting_with(strategy_lines, "後場VWAP回復")
 
@@ -461,7 +427,6 @@ def _filter_strategy_lines_for_time(
         return tuple(
             line
             for line in (
-                deep,
                 am_vwap,
                 _format_hold_limit_sell_line(result),
             )
@@ -580,34 +545,6 @@ def _fmt_strategy_band(low: float | None, high: float | None) -> str:
     if low is None or high is None:
         return "指値算出不可"
     return f"{_fmt_price_compact(low)}〜{_fmt_price_compact(high)}円"
-
-
-def _nearest_target_above(
-    entry: float | None,
-    lines: tuple[TechnicalSummaryLine, ...],
-) -> float | None:
-    if entry is None:
-        return None
-    targets = [line.price for line in lines if line.price > entry]
-    return min(targets) if targets else None
-
-
-def _calculate_risk_reward(
-    entry: float | None,
-    stop: float | None,
-    target: float | None,
-) -> float | None:
-    if entry is None or stop is None or target is None:
-        return None
-    risk = entry - stop
-    reward = target - entry
-    if risk <= 0 or reward <= 0:
-        return None
-    return reward / risk
-
-
-def _fmt_risk_reward(value: float | None) -> str:
-    return "RR算出不可" if value is None else f"RR{value:.2f}"
 
 
 def _format_momentum(result: TechnicalAnalysisResult) -> str:

@@ -278,21 +278,6 @@ class AnalysisApplicationService:
             prebuilt_results=prebuilt_results,
         )
 
-    def build_single_stock_hybrid_evaluation_output(
-        self,
-        *,
-        name: str,
-        code4: str,
-        kabutan_html_dir: Path | None = None,
-        evaluation_at: datetime | None = None,
-    ) -> str:
-        return self.summary_workflow.build_single_stock_hybrid_evaluation_output(
-            name=name,
-            code4=code4,
-            kabutan_html_dir=kabutan_html_dir,
-            evaluation_at=evaluation_at,
-        )
-
     def build_summary_table_for_mode(
         self,
         *,

@@ -48,20 +48,15 @@ def _daily_history(rows: int = 70) -> pd.DataFrame:
     )
 
 
-def test_build_technical_strategy_lines_uses_rank_criteria_and_support_prices():
-    assert build_technical_strategy_lines("A1", support_range="97〜98")[0] == (
-        "前場深押し○：支持線付近 97〜98円で検討。約定後はVWAP回復・維持を確認。"
+def test_build_technical_strategy_lines_excludes_deep_pullback_entries():
+    assert build_technical_strategy_lines("A1") == (
+        "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。",
+        "後場VWAP回復◎：後場VWAP上維持ならエントリー可。ホールド適性も高い。",
     )
-    assert build_technical_strategy_lines("B1", nearest_support="98")[0] == (
-        "前場深押し△：支持線付近 98円でのみ小さく検討。VWAP未回復なら撤退。"
+    assert build_technical_strategy_lines("D3", detail_code="D3強") == (
+        "前場VWAP回復○：反転観測強。VWAP15分維持と出来高を確認し、新規は25日線奪回待ち。",
+        "後場VWAP回復○：後場VWAP上維持でも、持ち越し判断は25日線奪回後。",
     )
-    assert build_technical_strategy_lines(
-        "D3",
-        detail_code="D3強",
-        support_pullback_range="97〜98円",
-        vwap_pullback_range="99〜100円",
-        risk_reward="RR2.40",
-    )[0] == "前場深押し×：反転観測は強いが25日線下。99〜100円 または 97〜98円 は観測用。"
 
 
 def test_build_d_detail_headline_uses_detail_specific_main_judgement():
@@ -69,7 +64,7 @@ def test_build_d_detail_headline_uses_detail_specific_main_judgement():
         "D1a 戻り途中・25日線接近｜25日線奪回待ち。D3化は反転観測"
     )
     assert build_d_detail_headline("D1", ma25_distance_atr=2.01) == (
-        "D1b 戻り途中・25日線遠い｜25日線奪回待ち。深指値は原則不可"
+        "D1b 戻り途中・25日線遠い｜25日線奪回待ち。新規は原則不可"
     )
     assert build_d_detail_headline("D1", ma25_distance_atr=None) == (
         "D1 判定保留｜判定保留。新規不可"
@@ -95,42 +90,25 @@ def test_build_d_detail_headline_uses_detail_specific_main_judgement():
 
 
 def test_build_d_strategy_lines_cover_detail_classifications():
-    d1a = build_technical_strategy_lines(
-        "D1",
-        detail_code="D1a",
-        support_entry_range="97〜97.75円",
-        risk_reward="RR1.80",
-    )
-    assert d1a[0].startswith("前場深押し×：25日線下は優位性未確認")
-    assert "新規は25日線奪回待ち" in d1a[1]
+    d1a = build_technical_strategy_lines("D1", detail_code="D1a")
+    assert d1a[0].startswith("前場VWAP回復△：")
+    assert "新規は25日線奪回待ち" in d1a[0]
 
-    d1b = build_technical_strategy_lines(
-        "D1",
-        detail_code="D1b",
-        nearest_support="97",
-        risk_reward="RR2.10",
-    )
-    assert "25日線まで遠く、奪回までは新規見送り" in d1b[0]
+    d1b = build_technical_strategy_lines("D1", detail_code="D1b")
+    assert "新規は25日線奪回待ち" in d1b[0]
 
     d1_hold = build_technical_strategy_lines("D1", detail_code="D1")
-    assert d1_hold[0] == "前場深押し×：ATR距離不明のため指値算出不可。"
+    assert d1_hold[0].startswith("前場VWAP回復△：")
 
     d2 = build_technical_strategy_lines(
         "D2",
-        support_entry_range="97〜97.75円",
         vwap_recovery_range="100〜101円",
-        risk_reward="RR1.60",
     )
-    assert d2[1].startswith("前場VWAP回復△：")
-    assert "新規は25日線奪回待ち" in d2[1]
+    assert d2[0].startswith("前場VWAP回復△：")
+    assert "新規は25日線奪回待ち" in d2[0]
 
-    d3_weak = build_technical_strategy_lines(
-        "D3",
-        detail_code="D3弱",
-        nearest_support="97",
-        risk_reward="RR2.20",
-    )
-    assert "25日線奪回までは新規見送り" in d3_weak[0]
+    d3_weak = build_technical_strategy_lines("D3", detail_code="D3弱")
+    assert d3_weak[0].startswith("前場VWAP回復△：")
 
 
 def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
@@ -477,7 +455,7 @@ def test_collapse_score_brief_follows_practical_score_bands():
     assert build_collapse_score_brief(1).text == "候補｜買い条件は別確認"
     assert build_collapse_score_brief(2).text == "条件付き候補｜後場VWAP上維持・価格構造回復を確認"
     assert build_collapse_score_brief(3).text == "条件付き候補｜後場VWAP上維持・価格構造回復を確認"
-    assert build_collapse_score_brief(4).text == "原則回避｜新規買い回避。前場深押し指値は避ける"
+    assert build_collapse_score_brief(4).text == "原則回避｜新規買い回避"
     assert build_collapse_score_brief(5).text == "ほぼ触らない｜構造回復まで見送り"
     assert build_collapse_score_brief(None).text == "候補｜買い条件は別確認"
 
@@ -1172,7 +1150,7 @@ def test_technical_summary_html_does_not_render_headline_table():
                 recent60_range_position=0.75,
                 collapse_risk_score=2,
                 headline_comment="順張り可。過熱なし。",
-                next_action="深押し、VWAP回復、後場VWAP維持は可。追加買いは条件付き可。",
+                next_action="VWAP回復、後場VWAP維持は可。追加買いは条件付き可。",
             ),
         )
     )
@@ -1185,7 +1163,7 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "AIテスト(1234)" in html
     assert "崩れスコア" in html
     assert "6M評価" in html
-    assert "深押し、VWAP回復、後場VWAP維持は可。追加買いは条件付き可。" in html
+    assert "VWAP回復、後場VWAP維持は可。追加買いは条件付き可。" in html
     assert "前日VWAP維持" not in html
     assert "<td>2</td>" in html
     assert 'class="technical-rank-section" data-summary-rank="A1"' in html
