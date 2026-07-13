@@ -53,7 +53,7 @@ def build_technical_summary_html(
         sections.append(
             "<thead><tr>"
             "<th>銘柄</th><th>現在値</th><th>3日騰落</th><th>当日レンジ</th><th>VWAP</th>"
-            "<th>25ME dev</th><th>出来高比</th><th>崩れスコア</th>"
+            "<th>25ME dev</th><th>6M評価</th><th>出来高比</th><th>崩れスコア</th>"
             "<th>支持線</th><th>抵抗線</th><th>60D Pos</th>"
             "</tr></thead><tbody>"
         )
@@ -141,6 +141,7 @@ def _build_row_html(row: TechnicalSummaryRow, *, detail_url_builder: DetailUrlBu
         _fmt_day_range(row),
         _fmt_vwap(row),
         _fmt_dev25(row),
+        row.next_action or "N/A",
         _fmt_pct_unsigned(row.volume_vs_avg20_pct),
         _fmt_collapse_score(row.collapse_risk_score),
         _fmt_lines(row.support_lines),

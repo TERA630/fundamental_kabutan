@@ -25,6 +25,7 @@ from app.domain.policies.technical_summary import (
     build_technical_strategy_lines,
     build_volume_comment,
     classify_ma25_position_band,
+    classify_six_month_entry_guidance,
     classify_technical_summary_rank,
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
@@ -60,35 +61,33 @@ def test_build_technical_strategy_lines_uses_rank_criteria_and_support_prices():
         support_pullback_range="97〜98円",
         vwap_pullback_range="99〜100円",
         risk_reward="RR2.40",
-    )[0] == (
-        "前場深押し○：押し目待ちは 99〜100円 または 97〜98円。RR2.40が良好なら可。"
-    )
+    )[0] == "前場深押し×：反転観測は強いが25日線下。99〜100円 または 97〜98円 は観測用。"
 
 
 def test_build_d_detail_headline_uses_detail_specific_main_judgement():
     assert build_d_detail_headline("D1", ma25_distance_atr=2.0) == (
-        "D1a 戻り途中・25日線接近｜監視優先。D3化なら小さく可"
+        "D1a 戻り途中・25日線接近｜25日線奪回待ち。D3化は反転観測"
     )
     assert build_d_detail_headline("D1", ma25_distance_atr=2.01) == (
-        "D1b 戻り途中・25日線遠い｜監視優先。深指値は原則不可"
+        "D1b 戻り途中・25日線遠い｜25日線奪回待ち。深指値は原則不可"
     )
     assert build_d_detail_headline("D1", ma25_distance_atr=None) == (
         "D1 判定保留｜判定保留。新規不可"
     )
     assert build_d_detail_headline("D2") == (
-        "D2 底打ち候補｜支持線反発待ち｜支持線反発候補。原則VWAP回復待ち"
+        "D2 底打ち候補｜支持線反発待ち｜支持線反発を観測。25日線奪回待ち"
     )
     assert build_d_detail_headline("D2", d2_detail_code="D2弱") == (
-        "D2弱 底打ち候補・弱｜支持線根拠弱い｜支持線根拠が弱い。VWAP回復まで監視"
+        "D2弱 底打ち候補・弱｜支持線根拠弱い｜支持線根拠が弱い。25日線奪回待ち"
     )
     assert build_d_detail_headline("D3", volume_vs_avg20_pct=80) == (
-        "D3強｜VWAP維持・出来高伴う｜小さく可。D3内で最有力"
+        "D3強｜VWAP維持・出来高伴う｜反転観測強。25日線奪回待ち"
     )
     assert build_d_detail_headline("D3", volume_vs_avg20_pct=60) == (
-        "D3｜VWAP維持・出来高やや不足｜小さく可。出来高確認"
+        "D3｜VWAP維持・出来高やや不足｜反転観測。25日線奪回待ち"
     )
     assert build_d_detail_headline("D3", volume_vs_avg20_pct=59.9) == (
-        "D3弱｜反転形あるも出来高不足｜監視寄り。出来高不足"
+        "D3弱｜反転形あるも出来高不足｜反転観測弱。25日線奪回待ち"
     )
     assert build_d_detail_headline("D3", volume_vs_avg20_pct=80, dev25_pct=-3.0).endswith(
         "｜25日線奪回接近"
@@ -102,8 +101,8 @@ def test_build_d_strategy_lines_cover_detail_classifications():
         support_entry_range="97〜97.75円",
         risk_reward="RR1.80",
     )
-    assert d1a[0].startswith("前場深押し△：地合い良好なら 97〜97.75円")
-    assert "D3化なら小さく可" in d1a[1]
+    assert d1a[0].startswith("前場深押し×：25日線下は優位性未確認")
+    assert "新規は25日線奪回待ち" in d1a[1]
 
     d1b = build_technical_strategy_lines(
         "D1",
@@ -111,7 +110,7 @@ def test_build_d_strategy_lines_cover_detail_classifications():
         nearest_support="97",
         risk_reward="RR2.10",
     )
-    assert "RR2.0以上なら最小ロットのみ（RR2.10）" in d1b[0]
+    assert "25日線まで遠く、奪回までは新規見送り" in d1b[0]
 
     d1_hold = build_technical_strategy_lines("D1", detail_code="D1")
     assert d1_hold[0] == "前場深押し×：ATR距離不明のため指値算出不可。"
@@ -123,7 +122,7 @@ def test_build_d_strategy_lines_cover_detail_classifications():
         risk_reward="RR1.60",
     )
     assert d2[1].startswith("前場VWAP回復△：")
-    assert "D3化すれば○" in d2[1]
+    assert "新規は25日線奪回待ち" in d2[1]
 
     d3_weak = build_technical_strategy_lines(
         "D3",
@@ -131,7 +130,7 @@ def test_build_d_strategy_lines_cover_detail_classifications():
         nearest_support="97",
         risk_reward="RR2.20",
     )
-    assert "RR2.0以上で最小ロット（RR2.20）" in d3_weak[0]
+    assert "25日線奪回までは新規見送り" in d3_weak[0]
 
 
 def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
@@ -163,7 +162,7 @@ def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
     )
 
 
-def test_a2_label_describes_high_momentum():
+def test_a2_label_describes_high_deviation_and_missing_terminal_guidance():
     headline = build_technical_headline_summary(
         dev25_pct=8.5,
         latest=108.5,
@@ -171,8 +170,22 @@ def test_a2_label_describes_high_momentum():
     )
 
     assert headline.rank == "A2"
-    assert headline.rank_label == "高モメンタム"
-    assert headline.ma25_position_label == "高モメンタム帯"
+    assert headline.rank_label == "高乖離帯"
+    assert headline.ma25_position_label == "高乖離帯"
+    assert headline.next_action == "終端N/A・失速警戒"
+
+
+def test_b2_atr_override_keeps_extreme_deviation_rank_display():
+    headline = build_technical_headline_summary(
+        dev25_pct=10.0,
+        latest=110.0,
+        vwap=100.0,
+        ma25_distance_atr=3.01,
+    )
+
+    assert headline.rank == "B2"
+    assert headline.rank_label == "極端乖離帯"
+    assert headline.next_action == "過熱優先・新規見送り"
 
 
 def test_ma25_position_band_marks_overheat_without_changing_a2_rank():
@@ -184,28 +197,46 @@ def test_ma25_position_band_marks_overheat_without_changing_a2_rank():
     )
 
     assert headline.rank == "A2"
-    assert headline.ma25_position_label == "高モメンタム帯（過熱兆候あり）"
+    assert headline.ma25_position_label == "高乖離帯（他指標過熱）"
 
 
 def test_ma25_position_band_uses_revised_boundaries():
     assert classify_ma25_position_band(14).label == "極端乖離帯"
-    assert classify_ma25_position_band(10).label == "高収益・高リスク帯"
-    assert classify_ma25_position_band(8).label == "高モメンタム帯"
-    assert classify_ma25_position_band(6).label == "中期モメンタム帯"
-    assert classify_ma25_position_band(4).label == "初期逆行注意帯"
+    assert classify_ma25_position_band(10).label == "過熱帯"
+    assert classify_ma25_position_band(8).label == "高乖離帯"
+    assert classify_ma25_position_band(6).label == "中期乖離帯"
+    assert classify_ma25_position_band(4).label == "中間乖離帯"
     assert classify_ma25_position_band(2).label == "安定上昇帯"
-    assert classify_ma25_position_band(0).label == "25日線接近帯"
+    assert classify_ma25_position_band(0).label == "25日線接近"
     assert classify_ma25_position_band(-2).label == "25日線直下・統計的不利"
     assert classify_ma25_position_band(-2.001).label == "25日線下"
 
 
-def test_short_comment_warns_when_price_is_just_below_ma25():
+def test_short_comment_uses_new_rank_and_entry_guidance_format():
     comment = build_technical_short_comment(
         rank="D1",
-        ma25_position_label="25日線直下・統計的不利",
+        rank_label="戻り途中",
+        entry_guidance="25日線奪回待ち",
     )
 
-    assert "25日線奪回待ち。上値確認中。｜25日線直下・統計的不利｜" in comment
+    assert comment == "D1 戻り途中｜25日線奪回待ち｜5日線良好"
+
+
+def test_six_month_entry_guidance_uses_terminal_only_in_supported_bands():
+    assert classify_six_month_entry_guidance(-0.001, 0.90).recommendation == "25日線奪回待ち"
+    assert classify_six_month_entry_guidance(0.0, 0.90).recommendation == "方向確認・VWAP回復待ち"
+    assert classify_six_month_entry_guidance(2.0, 0.3999).recommendation == "上値失速・回復待ち"
+    assert classify_six_month_entry_guidance(2.0, 0.40).recommendation == "位置良好"
+    assert classify_six_month_entry_guidance(4.0, 0.10).recommendation == "先着拮抗・支持線確認"
+    assert classify_six_month_entry_guidance(6.0, 0.90).recommendation == "やや過熱・他指標確認"
+    assert classify_six_month_entry_guidance(8.0, 0.4999).recommendation == "過熱後半・失速警戒"
+    assert classify_six_month_entry_guidance(8.0, 0.50).recommendation == "高値維持・追値注意"
+    assert classify_six_month_entry_guidance(10.0, 0.90).recommendation == "過熱優先・新規見送り"
+
+
+def test_six_month_entry_guidance_handles_missing_terminal_conservatively():
+    assert classify_six_month_entry_guidance(3.0, None).recommendation == "終端N/A・回復確認待ち"
+    assert classify_six_month_entry_guidance(9.0, None).recommendation == "終端N/A・失速警戒"
 
 
 def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
@@ -409,7 +440,7 @@ def test_upper_price_stalling_uses_45_percent_wick_boundary():
     )
 
     assert below_boundary.rank == "A1"
-    assert below_boundary.collapse_state_label == "要確認"
+    assert below_boundary.collapse_state_label == "崩れ条件なし"
     assert at_boundary.rank == "C2"
     assert at_boundary.collapse_state_label == "崩れ警戒"
 
@@ -444,11 +475,10 @@ def test_volume_comment_parts_follow_boundaries():
 def test_collapse_score_brief_follows_practical_score_bands():
     assert build_collapse_score_brief(0).text == "候補｜買い条件は別確認"
     assert build_collapse_score_brief(1).text == "候補｜買い条件は別確認"
-    assert build_collapse_score_brief(2).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
-    assert build_collapse_score_brief(3).text == "条件付き候補｜後場VWAP上維持・終端60%以上を確認"
+    assert build_collapse_score_brief(2).text == "条件付き候補｜後場VWAP上維持・価格構造回復を確認"
+    assert build_collapse_score_brief(3).text == "条件付き候補｜後場VWAP上維持・価格構造回復を確認"
     assert build_collapse_score_brief(4).text == "原則回避｜新規買い回避。前場深押し指値は避ける"
-    assert build_collapse_score_brief(5).text == "かなり回避｜例外条件が揃う時だけ短期リバ検討"
-    assert build_collapse_score_brief(6).text == "ほぼ触らない｜構造回復まで見送り"
+    assert build_collapse_score_brief(5).text == "ほぼ触らない｜構造回復まで見送り"
     assert build_collapse_score_brief(None).text == "候補｜買い条件は別確認"
 
 
@@ -538,8 +568,8 @@ def test_d2_headline_uses_strong_comment_when_two_auxiliary_conditions_pass():
     )
 
     assert headline.rank == "D2"
-    assert headline.comment == "支持線反発待ち。"
-    assert headline.next_action == "まだ入らない。VWAP回復待ち。"
+    assert headline.comment == "件数不足・優位なし"
+    assert headline.next_action == "25日線奪回待ち"
 
 
 def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
@@ -559,8 +589,8 @@ def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
     )
 
     assert headline.rank == "D2"
-    assert headline.comment == "支持線反発待ち。"
-    assert headline.next_action == "まだ入らない。VWAP回復待ち。"
+    assert headline.comment == "件数不足・優位なし"
+    assert headline.next_action == "25日線奪回待ち"
 
 
 def test_d3_requires_vwap_maintenance_but_not_volume():
@@ -794,7 +824,7 @@ def test_position_assessment_scores_all_collapse_risk_conditions():
         headline_rank="E",
     )
 
-    assert assessment.collapse_risk_score == 6
+    assert assessment.collapse_risk_score == 5
     assert assessment.collapse_risk_level == "高"
     assert assessment.hold_judgement == "×"
     assert assessment.bottoming_start_established is False
@@ -974,14 +1004,15 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert table.rows[0].rank == "A1弱"
     assert table.rows[0].previous_vwap_maintained is False
     assert table.rows[0].collapse_risk_score == 0
-    assert table.rows[0].headline_comment == "中期上昇余地はあるが、短期下振れに注意。"
-    assert table.rows[0].ma25_position_label == "初期逆行注意帯"
-    assert "## A1弱 初期逆行注意" in markdown
+    assert table.rows[0].headline_comment == "全終端帯で先着率50%前後"
+    assert table.rows[0].ma25_position_label == "中間乖離帯"
+    assert table.rows[0].next_action == "先着拮抗・支持線確認"
+    assert "## A1弱 中間乖離帯" in markdown
     assert "## 冒頭短評" not in markdown
     assert "A1弱 初期逆行注意｜中期上昇余地はあるが、短期下振れに注意。" not in markdown
     assert "崩れスコア" in markdown
     assert "前日VWAP維持" not in markdown
-    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) / 初期逆行注意帯 | 120% | 0 |" in markdown
+    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) / 中間乖離帯 | 先着拮抗・支持線確認 | 120% | 0 |" in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown
@@ -1111,7 +1142,7 @@ def test_technical_summary_markdown_renders_sector_breadth_before_rank_tables():
 
     assert "## Sector Breadth" in markdown
     assert "| 半導体材料・装置 | 押し目買い優勢 | 2/3 67% | 65% | 3/3 100% | 2.0 | 68% | 中立〜やや強い / 反発中 |" in markdown
-    assert markdown.index("## Sector Breadth") < markdown.index("## A1 上昇優位")
+    assert markdown.index("## Sector Breadth") < markdown.index("## A1 25日線上昇帯")
 
 
 def test_technical_summary_html_does_not_render_headline_table():
@@ -1153,6 +1184,8 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "A1 位置良好｜順張り可。過熱なし。" not in html
     assert "AIテスト(1234)" in html
     assert "崩れスコア" in html
+    assert "6M評価" in html
+    assert "深押し、VWAP回復、後場VWAP維持は可。追加買いは条件付き可。" in html
     assert "前日VWAP維持" not in html
     assert "<td>2</td>" in html
     assert 'class="technical-rank-section" data-summary-rank="A1"' in html

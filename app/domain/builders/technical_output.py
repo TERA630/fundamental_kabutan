@@ -322,6 +322,8 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
     moving_average = result.snapshot.moving_average
     return "短評：" + build_technical_short_comment(
         rank=headline.rank,
+        rank_label=headline.rank_label,
+        entry_guidance=headline.next_action,
         ma25_position_label=headline.ma25_position_label,
         collapse_state_label=headline.collapse_state_label,
         c2_fall_reason=headline.c2_fall_reason,
@@ -341,7 +343,7 @@ def _format_position_assessment(result: TechnicalAnalysisResult) -> str:
     collapse_brief = build_collapse_score_brief(assessment.collapse_risk_score)
     collapse_reason = f"｜{assessment.collapse_risk_reason}" if assessment.collapse_risk_reason else ""
     lines = [
-        f"崩れ {assessment.collapse_risk_score}/6：{collapse_brief.text}{collapse_reason}",
+        f"崩れ {assessment.collapse_risk_score}/5：{collapse_brief.text}{collapse_reason}",
     ]
     if latest < ma25:
         established = "成立" if assessment.bottoming_start_established else "未成立"

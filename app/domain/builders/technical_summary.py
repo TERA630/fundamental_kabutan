@@ -25,8 +25,8 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
             [
                 f"## {rank} {RANK_LABELS[rank]}",
                 "",
-                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 出来高比 | 崩れスコア | 支持線 | 抵抗線 | 60日レンジ |",
-                "|---|---:|---:|---:|---:|---:|---:|---|---|---|---:|",
+                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 6M評価 | 出来高比 | 崩れスコア | 支持線 | 抵抗線 | 60日レンジ |",
+                "|---|---:|---:|---:|---:|---:|---|---:|---|---|---|---:|",
             ]
         )
         lines.extend(_format_row(row) for row in rows)
@@ -99,6 +99,7 @@ def _format_row(row: TechnicalSummaryRow) -> str:
         f"| {_fmt_day_range(row)} "
         f"| {_fmt_vwap(row)} "
         f"| {_fmt_dev25(row)} "
+        f"| {row.next_action or 'N/A'} "
         f"| {_fmt_pct_unsigned(row.volume_vs_avg20_pct)} "
         f"| {_fmt_collapse_score(row.collapse_risk_score)} "
         f"| {_fmt_lines(row.support_lines)} "

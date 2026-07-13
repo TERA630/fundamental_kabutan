@@ -88,16 +88,16 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "抵抗余地：" not in output
     assert "RSI：5分N/A / 時間N/A" in output
     assert "RSI総合：N/A" in output
-    assert "短評：A1 上昇優位 中期モメンタム帯｜" in output
+    assert "短評：A1 中期乖離帯｜やや過熱・他指標確認｜" in output
     assert "｜5日線良好" in output
-    assert "崩れ 1/6：候補｜買い条件は別確認" in output
+    assert "崩れ 1/5：候補｜買い条件は別確認" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
     assert "戦略判定：\n前場深押し○：支持線付近" in output
     assert "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。" in output
     assert "後場VWAP回復◎：後場VWAP上維持ならエントリー可。" in output
-    assert output.index("短評：A1 上昇優位 中期モメンタム帯｜") < output.index("■モメンタム")
-    assert output.index("崩れ 1/6：候補｜買い条件は別確認") < output.index("■モメンタム")
+    assert output.index("短評：A1 中期乖離帯｜やや過熱・他指標確認｜") < output.index("■モメンタム")
+    assert output.index("崩れ 1/5：候補｜買い条件は別確認") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
     assert "3日高値更新：〇〇〇" in output
@@ -203,7 +203,7 @@ def test_build_technical_output_appends_three_axis_collapse_reason():
 
     output = build_technical_output(result)
 
-    assert "短評：C2 崩れ警戒 監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
+    assert "短評：C2 崩れ警戒｜監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
     assert "｜下行初動：5日線下向き＋25日線下向き" in output
 
 
@@ -294,13 +294,13 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
 
     output = build_technical_output(result)
 
-    assert "短評：D3 底打ち初動 VWAP回復。安値切り上げ・反転確認。" in output
+    assert "短評：D3 反転観測｜25日線奪回待ち" in output
     assert "詳細：" not in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
-    assert "戦略判定：\n前場深押し○：押し目待ちは" in output
-    assert "前場VWAP回復◎：最有力。VWAP15分維持＋出来高80%以上で小さく可。" in output
-    assert "後場VWAP回復◎：後場VWAP上維持なら持ち越し候補。" in output
+    assert "戦略判定：\n前場深押し×：反転観測は強いが25日線下。" in output
+    assert "前場VWAP回復○：反転観測強。" in output
+    assert "後場VWAP回復○：後場VWAP上維持でも、持ち越し判断は25日線奪回後。" in output
 
 
 def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
@@ -319,9 +319,9 @@ def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
 
     output = build_technical_output(result)
 
-    assert "短評：D1 戻り途中 25日線奪回待ち。上値確認中。" in output
-    assert "前場深押し△：地合い良好なら" in output
-    assert "前場VWAP回復△：VWAP回復だけでは不可。" in output
+    assert "短評：D1 戻り途中｜25日線奪回待ち" in output
+    assert "前場深押し×：25日線下は優位性未確認。" in output
+    assert "前場VWAP回復△：VWAP回復とD3化は反転観測に留め" in output
 
 
 def test_build_technical_output_uses_d2_headline_and_recovery_stage():
@@ -337,9 +337,9 @@ def test_build_technical_output_uses_d2_headline_and_recovery_stage():
 
     output = build_technical_output(result)
 
-    assert "短評：D2 底打ち候補 支持線反発待ち。" in output
-    assert "前場VWAP回復△：VWAP15分維持なら試し玉候補" in output
-    assert "D3化すれば○" in output
+    assert "短評：D2 支持線反発候補｜25日線奪回待ち" in output
+    assert "前場VWAP回復△：VWAP回復帯" in output
+    assert "新規は25日線奪回待ち" in output
 
 
 def test_build_technical_output_marks_previous_session_intraday_na_when_missing():
