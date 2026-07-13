@@ -80,6 +80,18 @@ class GuiStateManager:
             self.state.technical_evaluation_time_choices = []
             self.state.technical_evaluation_time_choices_by_date = {}
             return
+        fetch_dates = getattr(self.controller, "fetch_technical_evaluation_dates", None)
+        if callable(fetch_dates):
+            dates = [value.isoformat() for value in fetch_dates(selected[1])]
+            self.state.technical_evaluation_date_choices = dates
+            if self.state.technical_evaluation_date not in dates:
+                self.state.technical_evaluation_date = ""
+                self.state.technical_evaluation_time = ""
+            self.state.technical_evaluation_time_choices = []
+            self.state.technical_evaluation_time_choices_by_date = {}
+            if self.state.technical_evaluation_date:
+                self.load_technical_times_for_selected_date(selected_label)
+            return
         fetch_timestamps = getattr(self.controller, "fetch_technical_evaluation_timestamps", None)
         if not callable(fetch_timestamps):
             return
@@ -110,6 +122,28 @@ class GuiStateManager:
         if self.state.technical_evaluation_time and self.state.technical_evaluation_time not in valid_times:
             self.state.technical_evaluation_time = ""
             self.state.technical_evaluation_time_is_latest = False
+
+    def load_technical_times_for_selected_date(self, selected_label: str) -> None:
+        selected = self.selected_stock(selected_label)
+        date_text = self.state.technical_evaluation_date
+        if selected is None or not date_text:
+            self.state.technical_evaluation_time_choices = []
+            self.state.technical_evaluation_time_choices_by_date = {}
+            return
+        fetch_timestamps = getattr(self.controller, "fetch_technical_evaluation_timestamps", None)
+        if not callable(fetch_timestamps):
+            return
+        evaluation_date = datetime.fromisoformat(date_text).date()
+        timestamps = fetch_timestamps(selected[1], evaluation_date)
+        times = sorted(
+            {
+                value.strftime("%H:%M")
+                for value in timestamps
+                if value.date() == evaluation_date
+            }
+        )
+        self.state.technical_evaluation_time_choices_by_date = {date_text: times}
+        self.state.technical_evaluation_time_choices = times
 
     def set_technical_evaluation_selection(self, *, date_text: str, time_text: str) -> None:
         self.state.technical_evaluation_date = "" if date_text == "最新" else date_text.strip()

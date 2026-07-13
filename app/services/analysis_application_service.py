@@ -97,7 +97,18 @@ class AnalysisApplicationService:
             build_us_market_summary=build_default_us_market_summary_service().build_summary_table,
         )
 
-    def fetch_market_data_bundle(self, code4: str, *, use_memory_cache: bool = True) -> MarketDataBundle:
+    def fetch_market_data_bundle(
+        self,
+        code4: str,
+        *,
+        use_memory_cache: bool = True,
+        evaluation_at: datetime | None = None,
+    ) -> MarketDataBundle:
+        if evaluation_at is not None:
+            return self.build_market_data_service(self.file_cache).fetch_bundle(
+                code4,
+                evaluation_date=evaluation_at.date(),
+            )
         cached = self._market_data_bundle_cache.get(code4)
         if use_memory_cache and cached is not None:
             return cached
@@ -338,8 +349,23 @@ class AnalysisApplicationService:
             evaluation_at=evaluation_at,
         )
 
-    def fetch_technical_evaluation_timestamps(self, code4: str) -> tuple[datetime, ...]:
-        bundle = self.fetch_market_data_bundle(code4, use_memory_cache=False)
+    def fetch_technical_evaluation_dates(self, code4: str) -> tuple[date, ...]:
+        service = self.build_market_data_service(self.file_cache)
+        return service.fetch_evaluation_dates(code4)
+
+    def fetch_technical_evaluation_timestamps(
+        self,
+        code4: str,
+        evaluation_date: date | None = None,
+    ) -> tuple[datetime, ...]:
+        if evaluation_date is not None:
+            service = self.build_market_data_service(self.file_cache)
+            history = service.fetch_historical_intraday_history_cached(code4, evaluation_date)
+            return build_intraday_evaluation_timestamps(history)
+        bundle = self.fetch_market_data_bundle(
+            code4,
+            use_memory_cache=False,
+        )
         return build_intraday_evaluation_timestamps(bundle.intraday_history)
 
     def fetch_institutional_summary_text(

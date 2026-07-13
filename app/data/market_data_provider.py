@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import pandas as pd
@@ -143,14 +144,45 @@ def fetch_yfinance_symbol_daily_history(symbol: str, *, period: str = "4mo", int
         return empty_history()
 
 
-def fetch_yfinance_intraday_history(code4: str, *, period: str = "60d", interval: str = "5m") -> pd.DataFrame:
+def fetch_yfinance_intraday_history(code4: str, *, period: str = "1mo", interval: str = "5m") -> pd.DataFrame:
     if yf is None:
         return empty_history()
     try:
         history = yf.download(f"{code4}.T", period=period, interval=interval, auto_adjust=False, progress=False)
+        return _tail_intraday_sessions(normalize_history_frame(history), sessions=20)
+    except Exception:
+        return empty_history()
+
+
+def fetch_yfinance_historical_intraday_history(
+    code4: str,
+    _evaluation_date: date,
+    *,
+    interval: str = "5m",
+) -> pd.DataFrame:
+    """Fetch the extended window only when a historical date is selected."""
+
+    if yf is None:
+        return empty_history()
+    try:
+        history = yf.download(
+            f"{code4}.T",
+            period="60d",
+            interval=interval,
+            auto_adjust=False,
+            progress=False,
+        )
         return normalize_history_frame(history)
     except Exception:
         return empty_history()
+
+
+def _tail_intraday_sessions(frame: pd.DataFrame, *, sessions: int) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    session_dates = pd.Index(pd.DatetimeIndex(frame.index).date).unique()
+    selected_dates = set(session_dates[-sessions:])
+    return frame[pd.Index(pd.DatetimeIndex(frame.index).date).isin(selected_dates)]
 
 
 def fetch_yfinance_vwap_snapshot(code4: str, *, daily_history: pd.DataFrame | None = None, interval: str = "5m") -> dict[str, float | str | None]:
@@ -175,6 +207,7 @@ __all__ = [
     "fetch_yfinance_daily_history",
     "fetch_yfinance_symbol_daily_history",
     "fetch_yfinance_intraday_history",
+    "fetch_yfinance_historical_intraday_history",
     "fetch_yfinance_analyst_estimates",
     "fetch_yfinance_market_snapshot",
     "fetch_yfinance_snapshot",

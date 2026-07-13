@@ -192,6 +192,8 @@ class FundamentalApp:
 
     def on_technical_evaluation_date_changed(self, _event=None) -> None:
         self._sync_technical_evaluation_selection()
+        if self.state.technical_evaluation_date:
+            self.state_manager.load_technical_times_for_selected_date(self.stock_var.get())
         self.state_manager.update_technical_time_choices_for_selected_date()
         self._apply_technical_evaluation_choices()
 

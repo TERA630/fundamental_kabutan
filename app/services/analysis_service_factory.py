@@ -7,6 +7,7 @@ from app.data.kabutan_repository import KabutanForecastRepository
 from app.data.market_data_provider import (
     fetch_yfinance_analyst_estimates,
     fetch_yfinance_daily_history,
+    fetch_yfinance_historical_intraday_history,
     fetch_yfinance_intraday_history,
     fetch_yfinance_market_snapshot,
     fetch_yfinance_symbol_daily_history,
@@ -49,6 +50,7 @@ def build_default_market_data_service(file_cache: FileCache) -> MarketDataServic
         file_cache=file_cache,
         fetch_daily_history=fetch_yfinance_daily_history,
         fetch_intraday_history=fetch_yfinance_intraday_history,
+        fetch_historical_intraday_history=fetch_yfinance_historical_intraday_history,
         fetch_market_snapshot=fetch_yfinance_market_snapshot,
     )
 

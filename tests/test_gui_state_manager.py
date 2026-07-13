@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.usecases.kabutan_html_dir import ResolvedKabutanHtmlDir
@@ -101,6 +101,41 @@ def test_refresh_technical_evaluation_choices_groups_times_by_date(tmp_path: Pat
         "2026-05-28": ["09:00", "09:05"],
         "2026-05-29": ["09:10"],
     }
+
+
+def test_selected_historical_date_loads_intraday_times_on_demand(tmp_path: Path):
+    class OnDemandController(FakeController):
+        def __init__(self):
+            super().__init__()
+            self.timestamp_calls = []
+
+        def fetch_technical_evaluation_dates(self, code4):
+            assert code4 == "7203"
+            return (date(2026, 5, 29), date(2026, 5, 28))
+
+        def fetch_technical_evaluation_timestamps(self, code4, evaluation_date):
+            self.timestamp_calls.append((code4, evaluation_date))
+            return (
+                datetime(2026, 5, 28, 9, 0),
+                datetime(2026, 5, 28, 14, 0),
+                datetime(2026, 5, 29, 9, 0),
+            )
+
+    controller = OnDemandController()
+    state = GuiState()
+    manager = build_manager(controller, state)
+    manager.load_watchlist(tmp_path / "watchlist.md")
+
+    manager.refresh_technical_evaluation_choices("トヨタ (7203)")
+    assert state.technical_evaluation_date_choices == ["2026-05-29", "2026-05-28"]
+    assert controller.timestamp_calls == []
+
+    manager.set_technical_evaluation_selection(date_text="2026-05-28", time_text="最新")
+    manager.load_technical_times_for_selected_date("トヨタ (7203)")
+    manager.update_technical_time_choices_for_selected_date()
+
+    assert controller.timestamp_calls == [("7203", date(2026, 5, 28))]
+    assert state.technical_evaluation_time_choices == ["09:00", "14:00"]
 
 
 def test_technical_evaluation_at_uses_valid_gui_selection(tmp_path: Path):

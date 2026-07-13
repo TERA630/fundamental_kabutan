@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from datetime import date
 
 from app.data import market_data_provider as provider
 from app.domain.policies.market_history import build_intraday_evaluation_timestamps
@@ -23,7 +24,7 @@ def test_technical_cache_keys_and_ttls():
     assert provider.TECH_DAILY_HISTORY_TTL_SEC == 12 * 60 * 60
     assert provider.TECH_INTRADAY_HISTORY_TTL_SEC == 5 * 60
     assert provider.build_technical_daily_history_cache_key("7203") == "tech_daily_7203_4mo_1d"
-    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_60d_5m_jst"
+    assert provider.build_technical_intraday_history_cache_key("7203") == "tech_intraday_7203_1mo_5m_jst"
 
 
 def test_fetch_yfinance_daily_history_uses_ticker_history(monkeypatch):
@@ -58,7 +59,7 @@ def test_fetch_yfinance_intraday_history_normalizes_download_multiindex(monkeypa
         @staticmethod
         def download(symbol, *, period, interval, auto_adjust, progress):
             assert symbol == "7203.T"
-            assert period == "60d"
+            assert period == "1mo"
             assert interval == "5m"
             assert auto_adjust is False
             assert progress is False
@@ -87,6 +88,43 @@ def test_fetch_yfinance_intraday_history_converts_utc_index_to_jst(monkeypatch):
 
     assert out.index[0] == pd.Timestamp("2026-05-29 09:00")
     assert out.index.tz is None
+
+
+def test_fetch_yfinance_intraday_history_keeps_latest_20_sessions(monkeypatch):
+    frames = []
+    for value in pd.date_range("2026-04-01", periods=25, freq="B"):
+        frame = _history()
+        frame.index = pd.date_range(value.replace(hour=9), periods=3, freq="5min")
+        frames.append(frame)
+
+    class FakeYf:
+        @staticmethod
+        def download(*_args, **_kwargs):
+            return pd.concat(frames)
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    out = provider.fetch_yfinance_intraday_history("7203")
+
+    assert len(pd.Index(out.index.date).unique()) == 20
+    assert out.index[0].date() == pd.Timestamp("2026-04-08").date()
+
+
+def test_fetch_historical_intraday_uses_60_days_only_on_demand(monkeypatch):
+    calls = []
+
+    class FakeYf:
+        @staticmethod
+        def download(symbol, **kwargs):
+            calls.append((symbol, kwargs))
+            return _history()
+
+    monkeypatch.setattr(provider, "yf", FakeYf)
+
+    out = provider.fetch_yfinance_historical_intraday_history("7203", date(2026, 5, 29))
+
+    assert len(out) == 3
+    assert calls[0][1]["period"] == "60d"
 
 
 def test_build_market_snapshot_from_daily_history_uses_latest_close():

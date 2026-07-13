@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import date
 
 from app.domain.models.market_data import MarketSnapshot
 from app.domain.usecases.market_data import (
@@ -117,7 +118,7 @@ def test_market_data_service_retries_and_discards_mixed_symbol_intraday_history(
 
     assert calls["intraday"] == 2
     assert bundle.intraday_history.empty
-    intraday_payload = cache.store["tech_intraday_7203_60d_5m_jst"]
+    intraday_payload = cache.store["tech_intraday_7203_1mo_5m_jst"]
     assert intraday_payload["code4"] == "7203"
     assert intraday_payload["kind"] == "technical_intraday_5m"
     assert intraday_payload["data"] == []
@@ -153,3 +154,46 @@ def test_market_data_service_replaces_legacy_history_cache_without_metadata():
 
 def test_market_snapshot_cache_ttl_matches_existing_yfinance_ttl():
     assert MARKET_SNAPSHOT_TTL_SEC == 12 * 60 * 60
+
+
+def test_market_data_service_fetches_historical_intraday_only_for_selected_date():
+    cache = InMemoryCache()
+    calls = {"current": 0, "historical": 0}
+
+    def fetch_current(_code4):
+        calls["current"] += 1
+        return _history(2)
+
+    def fetch_historical(_code4, _evaluation_date):
+        calls["historical"] += 1
+        return _history(3)
+
+    service = MarketDataService(
+        file_cache=cache,
+        fetch_daily_history=lambda _code4: _history(40),
+        fetch_intraday_history=fetch_current,
+        fetch_historical_intraday_history=fetch_historical,
+        fetch_market_snapshot=lambda _code4, **_kwargs: MarketSnapshot.empty(),
+    )
+
+    service.fetch_bundle("7203")
+    historical = service.fetch_bundle("7203", evaluation_date=date(2026, 5, 29))
+    service.fetch_bundle("7203", evaluation_date=date(2026, 5, 28))
+
+    assert calls == {"current": 1, "historical": 1}
+    assert len(historical.intraday_history) == 3
+    assert "tech_intraday_7203_historical_60d_5m_jst" in cache.store
+
+
+def test_market_data_service_builds_evaluation_dates_from_daily_history():
+    service = MarketDataService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _history(50),
+        fetch_intraday_history=lambda _code4: _history(2),
+        fetch_market_snapshot=lambda _code4, **_kwargs: MarketSnapshot.empty(),
+    )
+
+    dates = service.fetch_evaluation_dates("7203", calendar_days=10)
+
+    assert dates[0] == pd.Timestamp(_history(50).index[-1]).date()
+    assert all((dates[0] - value).days < 10 for value in dates)

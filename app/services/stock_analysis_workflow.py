@@ -20,7 +20,13 @@ from app.services.institutional_summary_service import InstitutionalSummaryServi
 
 
 class FetchMarketDataBundle(Protocol):
-    def __call__(self, code4: str, *, use_memory_cache: bool = True) -> MarketDataBundle: ...
+    def __call__(
+        self,
+        code4: str,
+        *,
+        use_memory_cache: bool = True,
+        evaluation_at: datetime | None = None,
+    ) -> MarketDataBundle: ...
 
 
 @dataclass(frozen=True)
@@ -76,10 +82,14 @@ class StockAnalysisWorkflow:
         evaluation_at: datetime | None = None,
     ):
         if self.uses_default_technical_service:
-            bundle = self.fetch_market_data_bundle(
-                code4,
-                use_memory_cache=evaluation_at is not None,
-            )
+            if evaluation_at is None:
+                bundle = self.fetch_market_data_bundle(code4, use_memory_cache=False)
+            else:
+                bundle = self.fetch_market_data_bundle(
+                    code4,
+                    use_memory_cache=True,
+                    evaluation_at=evaluation_at,
+                )
             return TechnicalAnalysisService.build_analysis_result_from_bundle(
                 name=name,
                 bundle=bundle,

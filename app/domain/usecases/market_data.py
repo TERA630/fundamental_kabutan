@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any, Mapping, Protocol
 
 import pandas as pd
@@ -10,6 +11,7 @@ from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 from app.domain.policies.market_history import (
     TECH_DAILY_HISTORY_TTL_SEC,
     TECH_INTRADAY_HISTORY_TTL_SEC,
+    build_historical_intraday_history_cache_key,
     build_technical_daily_history_cache_key,
     build_technical_intraday_history_cache_key,
 )
@@ -35,6 +37,10 @@ class DailyHistoryProvider(Protocol):
 
 class IntradayHistoryProvider(Protocol):
     def __call__(self, code4: str) -> pd.DataFrame: ...
+
+
+class HistoricalIntradayHistoryProvider(Protocol):
+    def __call__(self, code4: str, evaluation_date: date) -> pd.DataFrame: ...
 
 
 class MarketSnapshotProvider(Protocol):
@@ -64,6 +70,7 @@ class MarketDataService:
         file_cache: MarketDataCachePort,
         fetch_daily_history: DailyHistoryProvider | None = None,
         fetch_intraday_history: IntradayHistoryProvider | None = None,
+        fetch_historical_intraday_history: HistoricalIntradayHistoryProvider | None = None,
         fetch_market_snapshot: MarketSnapshotProvider | None = None,
     ):
         self.file_cache = file_cache
@@ -71,11 +78,16 @@ class MarketDataService:
             raise ValueError("MarketDataService requires market data providers")
         self.fetch_daily_history = fetch_daily_history
         self.fetch_intraday_history = fetch_intraday_history
+        self.fetch_historical_intraday_history = fetch_historical_intraday_history
         self.fetch_market_snapshot = fetch_market_snapshot
 
-    def fetch_bundle(self, code4: str) -> MarketDataBundle:
+    def fetch_bundle(self, code4: str, *, evaluation_date: date | None = None) -> MarketDataBundle:
         daily_history = self.fetch_daily_history_cached(code4)
-        intraday_history = self.fetch_intraday_history_cached(code4, daily_history=daily_history)
+        intraday_history = (
+            self.fetch_historical_intraday_history_cached(code4, evaluation_date)
+            if evaluation_date is not None
+            else self.fetch_intraday_history_cached(code4, daily_history=daily_history)
+        )
         snapshot = self.fetch_market_snapshot_cached(code4, daily_history=daily_history)
         return MarketDataBundle(
             code4=code4,
@@ -83,6 +95,41 @@ class MarketDataService:
             intraday_history=intraday_history,
             snapshot=snapshot,
         )
+
+    def fetch_evaluation_dates(self, code4: str, *, calendar_days: int = 60) -> tuple[date, ...]:
+        daily = self.fetch_daily_history_cached(code4)
+        if daily.empty:
+            return ()
+        latest_date = pd.Timestamp(daily.index[-1]).date()
+        earliest_date = latest_date - timedelta(days=calendar_days - 1)
+        dates = {
+            pd.Timestamp(value).date()
+            for value in daily.index
+            if earliest_date <= pd.Timestamp(value).date() <= latest_date
+        }
+        return tuple(sorted(dates, reverse=True))
+
+    def fetch_historical_intraday_history_cached(self, code4: str, evaluation_date: date) -> pd.DataFrame:
+        if self.fetch_historical_intraday_history is None:
+            return pd.DataFrame()
+        key = build_historical_intraday_history_cache_key(code4)
+        cached = dataframe_from_cache_payload(
+            self.file_cache.get(key, TECH_INTRADAY_HISTORY_TTL_SEC),
+            code4=code4,
+            kind="technical_intraday_5m_historical",
+        )
+        if cached is not None:
+            return cached
+        frame = self.fetch_historical_intraday_history(code4, evaluation_date)
+        self.file_cache.set(
+            key,
+            dataframe_to_cache_payload(
+                frame,
+                code4=code4,
+                kind="technical_intraday_5m_historical",
+            ),
+        )
+        return frame
 
     def fetch_daily_history_cached(self, code4: str) -> pd.DataFrame:
         key = build_technical_daily_history_cache_key(code4)

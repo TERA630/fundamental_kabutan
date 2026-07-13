@@ -359,6 +359,42 @@ class WebUiStateManager:
             self.state.technical_evaluation_time_choices = []
             self.state.technical_evaluation_time_choices_by_date = {}
             return
+        fetch_dates = getattr(self.state.controller, "fetch_technical_evaluation_dates", None)
+        if callable(fetch_dates):
+            try:
+                dates = [value.isoformat() for value in fetch_dates(selected[1])]
+            except Exception:
+                return
+            self.state.technical_evaluation_date_choices = dates
+            if self.state.technical_evaluation_date not in dates:
+                self.state.technical_evaluation_date = ""
+                self.state.technical_evaluation_time = ""
+            self.state.technical_evaluation_time_choices = []
+            self.state.technical_evaluation_time_choices_by_date = {}
+            if not self.state.technical_evaluation_date:
+                return
+            fetch_timestamps = getattr(self.state.controller, "fetch_technical_evaluation_timestamps", None)
+            if not callable(fetch_timestamps):
+                return
+            evaluation_date = datetime.fromisoformat(self.state.technical_evaluation_date).date()
+            try:
+                timestamps = fetch_timestamps(selected[1], evaluation_date)
+            except Exception:
+                return
+            times = sorted(
+                {
+                    value.strftime("%H:%M")
+                    for value in timestamps
+                    if value.date() == evaluation_date
+                }
+            )
+            self.state.technical_evaluation_time_choices = times
+            self.state.technical_evaluation_time_choices_by_date = {
+                self.state.technical_evaluation_date: times
+            }
+            if self.state.technical_evaluation_time not in times:
+                self.state.technical_evaluation_time = ""
+            return
         fetch_timestamps = getattr(self.state.controller, "fetch_technical_evaluation_timestamps", None)
         if not callable(fetch_timestamps):
             return

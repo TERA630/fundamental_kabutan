@@ -18,8 +18,12 @@ def build_technical_daily_history_cache_key(code4: str, *, period: str = "4mo", 
     return f"tech_daily_{code4}_{period}_{interval}"
 
 
-def build_technical_intraday_history_cache_key(code4: str, *, period: str = "60d", interval: str = "5m") -> str:
+def build_technical_intraday_history_cache_key(code4: str, *, period: str = "1mo", interval: str = "5m") -> str:
     return f"tech_intraday_{code4}_{period}_{interval}_jst"
+
+
+def build_historical_intraday_history_cache_key(code4: str, *, interval: str = "5m") -> str:
+    return f"tech_intraday_{code4}_historical_60d_{interval}_jst"
 
 
 def empty_history() -> pd.DataFrame:
@@ -356,6 +360,7 @@ __all__ = [
     "TECH_INTRADAY_HISTORY_TTL_SEC",
     "build_daily_reference_vwap_snapshot",
     "build_intraday_evaluation_timestamps",
+    "build_historical_intraday_history_cache_key",
     "build_intraday_vwap_snapshot",
     "build_market_snapshot_from_daily_history",
     "build_previous_session_intraday_snapshot",
