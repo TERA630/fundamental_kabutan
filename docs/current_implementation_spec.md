@@ -64,6 +64,7 @@ Domain Policy は原則として純粋関数にする。表示用の `N/A` 文�
 | `QuarterlyActual` / `QuarterlyMetricRow` | 四半期実績と表示用メトリクス |
 | `MarketSnapshot` | 株価、時価総額、PER、PBR、業種、配当関連 |
 | `MarketDataBundle` | 日足、5分足、市況スナップショットをまとめたDTO |
+| `ManualTechnicalQuote` | 単一銘柄の再解析だけに適用する手入力の当日現在値、高値、安値、VWAP、反映時刻 |
 | `TechnicalSnapshot` | Technical表示に必要な価格、移動平均、レンジ、前日評価、節目 |
 | `CfScoringInput` / `CfScoringResult` | rankCF の入力と結果 |
 | `InstitutionalSummary` | 固定パネル用の機関投資サマリ |

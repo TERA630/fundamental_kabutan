@@ -8,6 +8,7 @@ from typing import Any, Callable, Protocol
 
 import pandas as pd
 
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.models.rsi_analysis import RsiAnalysis
 from app.domain.models.technical_snapshot import TechnicalSnapshot
@@ -129,6 +130,7 @@ class TechnicalAnalysisService:
         name: str,
         code4: str,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> TechnicalAnalysisResult:
         daily_history = self.fetch_daily_history_cached(code4)
         intraday_history = self.fetch_intraday_history_cached(code4, daily_history=daily_history)
@@ -138,6 +140,7 @@ class TechnicalAnalysisService:
             daily_history=daily_history,
             intraday_history=intraday_history,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         )
 
     @staticmethod
@@ -146,6 +149,7 @@ class TechnicalAnalysisService:
         name: str,
         bundle: MarketDataBundle,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> TechnicalAnalysisResult:
         return TechnicalAnalysisService.build_analysis_result_from_histories(
             name=name,
@@ -153,6 +157,7 @@ class TechnicalAnalysisService:
             daily_history=bundle.daily_history,
             intraday_history=bundle.intraday_history,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         )
 
     @staticmethod
@@ -163,26 +168,42 @@ class TechnicalAnalysisService:
         daily_history: pd.DataFrame,
         intraday_history: pd.DataFrame,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> TechnicalAnalysisResult:
+        if manual_quote is not None and evaluation_at is not None:
+            raise ValueError("手入力値は過去の評価時点には適用できません。評価時点を最新にしてください。")
         daily_history, intraday_history = slice_technical_histories_for_evaluation(
             daily_history,
             intraday_history,
             evaluation_at,
         )
+        if manual_quote is not None:
+            daily_history = _apply_manual_quote_to_daily_history(
+                daily_history,
+                intraday_history,
+                manual_quote,
+            )
         snapshot = build_technical_snapshot(daily_history)
         vwap_snapshot = (
             build_intraday_vwap_snapshot(intraday_history)
             if not intraday_history.empty
             else build_daily_reference_vwap_snapshot(daily_history)
         )
+        if manual_quote is not None:
+            vwap_snapshot = _apply_manual_quote_to_vwap_snapshot(vwap_snapshot, manual_quote)
         previous_intraday_snapshot = build_previous_session_intraday_snapshot(daily_history, intraday_history)
         rsi_analysis = build_rsi_analysis(intraday_history)
-        evaluation_price, evaluation_price_source, evaluation_price_timestamp = _build_evaluation_price(
-            daily_history=daily_history,
-            intraday_history=intraday_history,
-            snapshot=snapshot,
-            vwap_snapshot=vwap_snapshot,
-        )
+        if manual_quote is None:
+            evaluation_price, evaluation_price_source, evaluation_price_timestamp = _build_evaluation_price(
+                daily_history=daily_history,
+                intraday_history=intraday_history,
+                snapshot=snapshot,
+                vwap_snapshot=vwap_snapshot,
+            )
+        else:
+            evaluation_price = manual_quote.latest
+            evaluation_price_source = "manual"
+            evaluation_price_timestamp = _format_manual_quote_timestamp(manual_quote)
         return TechnicalAnalysisResult(
             name=name,
             code4=code4,
@@ -236,6 +257,79 @@ class TechnicalAnalysisService:
                 dataframe_to_cache_payload(frame, code4=code4, kind="technical_intraday_5m"),
             )
             return frame
+
+
+def _apply_manual_quote_to_daily_history(
+    daily_history: pd.DataFrame,
+    intraday_history: pd.DataFrame,
+    quote: ManualTechnicalQuote,
+) -> pd.DataFrame:
+    daily = normalize_history_frame(daily_history)
+    if daily.empty:
+        raise ValueError("手入力値を反映するための日足データがありません。")
+
+    target_date = quote.observed_at.date()
+    positions = [position for position, value in enumerate(daily.index) if pd.Timestamp(value).date() == target_date]
+    if positions:
+        if positions[-1] != len(daily) - 1:
+            raise ValueError("手入力日は最新の日足日付と一致していません。")
+        result = daily.copy()
+        target_position = positions[-1]
+    else:
+        if pd.Timestamp(daily.index[-1]).date() > target_date:
+            raise ValueError("手入力日は最新の日足日付より前です。")
+        intraday = normalize_history_frame(intraday_history)
+        target_session = intraday[
+            pd.Series(intraday.index.date, index=intraday.index) == target_date
+        ]
+        if target_session.empty:
+            raise ValueError(
+                "手入力日のyFinance日足・5分足がありません。市場データを取得してから再実行してください。"
+            )
+        result = daily[pd.Series(daily.index.date, index=daily.index) < target_date].copy()
+        result.loc[pd.Timestamp(target_date), :] = {
+            "Open": _as_float(target_session.iloc[0]["Open"]),
+            "High": quote.high,
+            "Low": quote.low,
+            "Close": quote.latest,
+            "Volume": _as_float(target_session["Volume"].sum()),
+        }
+        target_position = len(result) - 1
+
+    open_value = _as_float(result.iloc[target_position]["Open"])
+    if open_value is not None and not quote.low <= open_value <= quote.high:
+        raise ValueError("当日高値・安値にはyFinanceの当日始値も含まれるように入力してください。")
+
+    result.iloc[target_position, result.columns.get_loc("High")] = quote.high
+    result.iloc[target_position, result.columns.get_loc("Low")] = quote.low
+    result.iloc[target_position, result.columns.get_loc("Close")] = quote.latest
+    return result
+
+
+def _apply_manual_quote_to_vwap_snapshot(
+    vwap_snapshot: dict[str, float | str | bool | int | None],
+    quote: ManualTechnicalQuote,
+) -> dict[str, float | str | bool | int | None]:
+    timestamp = _format_manual_quote_timestamp(quote)
+    result = dict(vwap_snapshot)
+    result.update(
+        {
+            "latest": quote.latest,
+            "high": quote.high,
+            "low": quote.low,
+            "vwap": quote.vwap,
+            "latest_bar_time": quote.observed_at.strftime("%H:%M"),
+            "latest_price_source": "manual",
+            "latest_price_timestamp": timestamp,
+            "vwap_timestamp": timestamp,
+            "manual_override": True,
+        }
+    )
+    return result
+
+
+def _format_manual_quote_timestamp(quote: ManualTechnicalQuote) -> str:
+    return quote.observed_at.strftime("%Y-%m-%d %H:%M")
 
 
 def _as_optional_str(value: Any) -> str | None:

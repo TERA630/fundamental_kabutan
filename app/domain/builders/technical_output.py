@@ -111,10 +111,15 @@ def _format_opening_summary(result: TechnicalAnalysisResult) -> str:
     vwap = _as_float(vwap_snapshot.get("vwap"))
     vwap_diff = latest - vwap if latest is not None and vwap is not None else None
     vwap_diff_atr = _safe_div(vwap_diff, snapshot.range.atr14)
-    vwap_source_suffix = " (日足参考値)" if vwap_snapshot.get("vwap_source") == "日足参考値" else ""
+    if vwap_snapshot.get("manual_override") is True:
+        vwap_source_suffix = " (手入力)"
+    elif vwap_snapshot.get("vwap_source") == "日足参考値":
+        vwap_source_suffix = " (日足参考値)"
+    else:
+        vwap_source_suffix = ""
     volume_vs_avg20_pct = _ratio_pct(_evaluation_volume(result), snapshot.price.volume_avg20)
     lines = [
-        f"取得時刻：{_fmt_text(result.evaluation_price_timestamp)}",
+        _format_evaluation_timestamp(result),
         f"【銘柄】{result.name} ({result.code4})",
         f"　株価：{_fmt_price_current(latest)}円（前日比{_fmt_price_signed(_price_change(result))}円：{_fmt_pct(_price_change_pct(result))}）（終端位置{_fmt_position_pct(_range_position(latest, _evaluation_low(result), _evaluation_high(result)))}）"
         f" | 出来高：20日平均比 {_fmt_pct_unsigned_no_decimal(volume_vs_avg20_pct)} / 前日比{_fmt_pct_ratio_no_decimal(snapshot.price.volume_vs_previous_pct)}",
@@ -662,6 +667,13 @@ def _evaluation_intraday_field(
         if value is not None:
             return value
     return daily_value
+
+
+def _format_evaluation_timestamp(result: TechnicalAnalysisResult) -> str:
+    timestamp = _fmt_text(result.evaluation_price_timestamp)
+    if result.vwap_snapshot.get("manual_override") is True:
+        return f"取得時刻：{timestamp}（手入力：現在値・高値・安値・VWAP）"
+    return f"取得時刻：{timestamp}"
 
 
 def _evaluation_dev25_pct(result: TechnicalAnalysisResult) -> float | None:

@@ -143,6 +143,8 @@ def test_web_ui_defaults_to_technical_mode():
 
     assert state.mode == "technical"
     assert 'name="mode" value="technical" checked' in html
+    assert "<title>エントリー評価V9</title>" in html
+    assert "<h1>エントリー評価V9</h1>" in html
 
 
 def test_web_summary_rejects_a_second_market_data_operation():

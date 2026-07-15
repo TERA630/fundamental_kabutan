@@ -8,6 +8,7 @@ from app.domain.usecases.technical_analysis import (
     dataframe_from_cache_payload,
     dataframe_to_cache_payload,
 )
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.domain.models.market_data import MarketDataBundle, MarketSnapshot
 
 
@@ -239,6 +240,113 @@ def test_build_analysis_result_from_market_data_bundle():
     assert result.three_session_momentum.sessions[-1].session_date == "2026-04-07"
     assert result.vwap_snapshot["vwap_source"] == "本日5分足"
     assert result.previous_intraday_snapshot["prev_pm_vwap_maintained"] is True
+
+
+def test_build_analysis_result_applies_manual_quote_without_mutating_source_history():
+    daily = _daily_history()
+    original_daily = daily.copy(deep=True)
+    quote = ManualTechnicalQuote(
+        latest=172.0,
+        high=174.0,
+        low=165.0,
+        vwap=170.5,
+        observed_at=datetime(2026, 4, 8, 14, 32),
+    )
+
+    result = TechnicalAnalysisService.build_analysis_result_from_histories(
+        name="Sample",
+        code4="1234",
+        daily_history=daily,
+        intraday_history=_intraday_history(),
+        manual_quote=quote,
+    )
+
+    assert result.snapshot.price.latest == 172.0
+    assert result.snapshot.price.high == 174.0
+    assert result.snapshot.price.low == 165.0
+    assert result.snapshot.price.volume == original_daily.iloc[-1]["Volume"]
+    assert result.evaluation_price == 172.0
+    assert result.evaluation_price_source == "manual"
+    assert result.evaluation_price_timestamp == "2026-04-08 14:32"
+    assert result.vwap_snapshot["vwap"] == 170.5
+    assert result.vwap_snapshot["manual_override"] is True
+    pd.testing.assert_frame_equal(daily, original_daily)
+
+
+def test_build_analysis_result_rejects_manual_quote_for_historical_evaluation():
+    quote = ManualTechnicalQuote(
+        latest=172.0,
+        high=174.0,
+        low=165.0,
+        vwap=170.5,
+        observed_at=datetime(2026, 4, 8, 14, 32),
+    )
+
+    with pytest.raises(ValueError, match="評価時点を最新"):
+        TechnicalAnalysisService.build_analysis_result_from_histories(
+            name="Sample",
+            code4="1234",
+            daily_history=_daily_history(),
+            intraday_history=_intraday_history(),
+            evaluation_at=datetime(2026, 4, 8, 14, 30),
+            manual_quote=quote,
+        )
+
+
+def test_build_analysis_result_appends_manual_current_day_from_intraday_when_daily_is_delayed():
+    daily = _daily_history()
+    intraday = pd.DataFrame(
+        {
+            "Open": [170.0, 172.0],
+            "High": [172.5, 173.5],
+            "Low": [169.5, 171.5],
+            "Close": [172.0, 173.0],
+            "Volume": [1000.0, 2000.0],
+        },
+        index=pd.to_datetime(["2026-04-09 09:00", "2026-04-09 09:05"]),
+    )
+    quote = ManualTechnicalQuote(
+        latest=174.0,
+        high=175.0,
+        low=169.0,
+        vwap=172.5,
+        observed_at=datetime(2026, 4, 9, 9, 7),
+    )
+
+    result = TechnicalAnalysisService.build_analysis_result_from_histories(
+        name="Sample",
+        code4="1234",
+        daily_history=daily,
+        intraday_history=intraday,
+        manual_quote=quote,
+    )
+
+    assert result.snapshot.price.open == 170.0
+    assert result.snapshot.price.high == 175.0
+    assert result.snapshot.price.low == 169.0
+    assert result.snapshot.price.close == 174.0
+    assert result.snapshot.price.volume == 3000.0
+    assert result.snapshot.price.prev_close == 169.0
+
+
+@pytest.mark.parametrize(
+    ("latest", "high", "low", "vwap", "message"),
+    [
+        (175.0, 174.0, 165.0, 170.0, "当日現在値"),
+        (170.0, 174.0, 165.0, 180.0, "当日VWAP"),
+        (170.0, 164.0, 165.0, 165.0, "当日安値"),
+        (0.0, 174.0, 165.0, 170.0, "0より大きい"),
+    ],
+)
+def test_manual_technical_quote_validates_price_relationships(latest, high, low, vwap, message):
+    with pytest.raises(ValueError, match=message):
+        ManualTechnicalQuote(
+            latest=latest,
+            high=high,
+            low=low,
+            vwap=vwap,
+            observed_at=datetime(2026, 4, 8, 14, 32),
+        )
 
 
 def test_build_three_session_momentum_from_daily_history():

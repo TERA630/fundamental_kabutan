@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from app.data.file_cache import FileCache
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.models.watchlist import WatchlistEntry
 from app.domain.policies.market_history import build_intraday_evaluation_timestamps
@@ -314,11 +315,13 @@ class AnalysisApplicationService:
         name: str,
         code4: str,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> str:
         return self.stock_analysis_workflow.fetch_technical_output(
             name=name,
             code4=code4,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         )
 
     def fetch_technical_output_result(
@@ -327,11 +330,13 @@ class AnalysisApplicationService:
         name: str,
         code4: str,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ):
         return self.stock_analysis_workflow.fetch_technical_output_result(
             name=name,
             code4=code4,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         )
 
     def fetch_technical_evaluation_dates(self, code4: str) -> tuple[date, ...]:

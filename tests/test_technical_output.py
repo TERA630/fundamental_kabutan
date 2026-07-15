@@ -1,7 +1,9 @@
 from dataclasses import replace
+from datetime import datetime
 from types import SimpleNamespace
 
 from app.domain.builders.technical_output import _build_resistance_lines, build_technical_output
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.domain.models.rsi_analysis import RsiAnalysis, RsiDivergence, RsiSignal
 from app.domain.usecases.technical_analysis import TechnicalAnalysisService
 import pandas as pd
@@ -132,6 +134,34 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "■流れ" not in output
     assert "トレンド：" not in output
     assert output.index("■重要価格") < output.index("■前日評価")
+
+
+def test_build_technical_output_marks_manually_supplied_prices():
+    service = TechnicalAnalysisService(
+        file_cache=InMemoryCache(),
+        fetch_daily_history=lambda _code4: _daily_history(),
+        fetch_intraday_history=lambda _code4: _intraday_history(),
+    )
+    result = service.build_analysis_result(
+        name="Sample",
+        code4="1234",
+        manual_quote=ManualTechnicalQuote(
+            latest=172.0,
+            high=174.0,
+            low=165.0,
+            vwap=170.5,
+            observed_at=datetime(2026, 4, 8, 14, 32),
+        ),
+    )
+
+    output = build_technical_output(result)
+
+    assert output.startswith(
+        "取得時刻：2026-04-08 14:32（手入力：現在値・高値・安値・VWAP）\n"
+    )
+    assert "VWAP+1.50円/" in output
+    assert "(手入力)" in output
+    assert "O 168.00　H 174.00　L 165.00　C 172.00" in output
 
 
 def test_build_technical_output_filters_strategy_by_evaluation_time():

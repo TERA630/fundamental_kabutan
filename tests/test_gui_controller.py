@@ -6,6 +6,8 @@ import zipfile
 import pandas as pd
 
 from app.data.file_cache import FileCache
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
+from app.gui import _parse_manual_price
 from app.services.analysis_application_service import (
     AnalysisApplicationService,
     build_fundamental_summary_filename,
@@ -303,6 +305,41 @@ def test_default_controller_bypasses_memory_cache_for_latest_technical_output(tm
     assert first == "TECH"
     assert second == "TECH"
     assert calls["bundle"] == 2
+
+
+def test_default_controller_reanalyzes_with_manual_technical_quote(tmp_path: Path):
+    class DummyMarketDataService:
+        def fetch_bundle(self, code4):
+            return MarketDataBundle(
+                code4=code4,
+                daily_history=_daily_history(),
+                intraday_history=_intraday_history(),
+                snapshot=MarketSnapshot(price=169.0),
+            )
+
+    controller = AnalysisApplicationService(
+        file_cache=FileCache(base_dir=tmp_path / "cache"),
+        build_market_data_service=lambda _cache: DummyMarketDataService(),
+    )
+    detail = controller.fetch_technical_output_result(
+        name="トヨタ",
+        code4="7203",
+        manual_quote=ManualTechnicalQuote(
+            latest=172.0,
+            high=174.0,
+            low=165.0,
+            vwap=170.5,
+            observed_at=datetime(2026, 4, 8, 14, 32),
+        ),
+    )
+
+    assert detail.analysis_result.evaluation_price == 172.0
+    assert detail.analysis_result.vwap_snapshot["vwap"] == 170.5
+    assert "手入力：現在値・高値・安値・VWAP" in detail.output
+
+
+def test_parse_manual_price_accepts_commas_and_full_width_numbers():
+    assert _parse_manual_price("１，２３４．５", "当日現在値") == 1234.5
 
 
 def test_default_controller_bypasses_memory_cache_for_technical_timestamp_choices(tmp_path: Path):

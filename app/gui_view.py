@@ -35,6 +35,7 @@ class FundamentalView:
         on_open,
         on_select,
         on_fetch,
+        on_manual_technical_quote,
         on_copy,
         on_save,
         on_open_kabutan_dir,
@@ -68,9 +69,15 @@ class FundamentalView:
         self.stock_combo = ttk.Combobox(control, textvariable=self.stock_var, state="readonly", width=42)
         self.stock_combo.pack(side="left", padx=(8, 12))
         self.stock_combo.bind("<<ComboboxSelected>>", on_select)
-        ttk.Label(control, text="株価: yFinance固定").pack(side="left", padx=(0, 12))
+        ttk.Label(control, text="株価: yFinance＋手入力").pack(side="left", padx=(0, 12))
         self.fetch_button = ttk.Button(control, text="取得", command=on_fetch)
         self.fetch_button.pack(side="left", padx=(0, 6))
+        self.manual_technical_quote_button = ttk.Button(
+            control,
+            text="最新値手入力",
+            command=on_manual_technical_quote,
+        )
+        self.manual_technical_quote_button.pack(side="left", padx=(0, 6))
         self.sector_breadth_button = ttk.Button(control, text="地合評価", command=on_sector_breadth)
         self.sector_breadth_button.pack(side="left", padx=(0, 6))
         self.summary_button = ttk.Button(control, text="サマリ出力", command=on_summary)
@@ -140,6 +147,62 @@ class FundamentalView:
     def set_stock_choices(self, values: list[str]) -> None:
         self.stock_combo["values"] = values
 
+    def open_manual_technical_quote_dialog(self, stock_label: str, on_apply) -> None:
+        dialog = tk.Toplevel(self.master)
+        dialog.title("最新値手入力")
+        dialog.transient(self.master)
+        dialog.resizable(False, False)
+
+        body = ttk.Frame(dialog, padding=14)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text=stock_label, font=("Yu Gothic UI", 11, "bold")).grid(
+            row=0,
+            column=0,
+            columnspan=2,
+            sticky="w",
+            pady=(0, 10),
+        )
+
+        fields = (
+            ("latest", "当日現在値"),
+            ("high", "当日高値"),
+            ("low", "当日安値"),
+            ("vwap", "当日VWAP"),
+        )
+        variables: dict[str, tk.StringVar] = {}
+        first_entry = None
+        for row, (key, label) in enumerate(fields, start=1):
+            ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
+            variable = tk.StringVar()
+            variables[key] = variable
+            entry = ttk.Entry(body, textvariable=variable, width=18, justify="right")
+            entry.grid(row=row, column=1, sticky="ew", pady=4)
+            if first_entry is None:
+                first_entry = entry
+
+        ttk.Label(
+            body,
+            text="出来高・5分足RSI・前後場VWAPなどはyFinance値を使用します。",
+            foreground="#555555",
+        ).grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 4))
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(8, 0))
+
+        def apply_values(_event=None):
+            values = {key: variable.get() for key, variable in variables.items()}
+            if on_apply(values, dialog):
+                dialog.destroy()
+
+        ttk.Button(buttons, text="キャンセル", command=dialog.destroy).pack(side="left", padx=(0, 6))
+        ttk.Button(buttons, text="反映して再解析", command=apply_values).pack(side="left")
+        dialog.bind("<Return>", apply_values)
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+        dialog.grab_set()
+        if first_entry is not None:
+            first_entry.focus_set()
+
     def set_busy(self, busy: bool, status: str | None = None) -> None:
         state = "disabled" if busy else "normal"
         readonly_state = "disabled" if busy else "readonly"
@@ -147,6 +210,7 @@ class FundamentalView:
         self.open_kabutan_dir_button.configure(state=state)
         self.kabutan_package_button.configure(state=state)
         self.fetch_button.configure(state=state)
+        self.manual_technical_quote_button.configure(state=state)
         self.sector_breadth_button.configure(state=state)
         self.summary_button.configure(state=state)
         self.copy_button.configure(state=state)

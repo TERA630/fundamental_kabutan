@@ -9,6 +9,7 @@ from typing import Callable, Protocol
 
 from app.data.file_cache import FileCache
 from app.domain.builders.technical_output import build_technical_output
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.domain.models.market_data import MarketDataBundle
 from app.domain.usecases.fundamental_analysis import FundamentalAnalysisService
 from app.domain.usecases.technical_analysis import TechnicalAnalysisResult, TechnicalAnalysisService
@@ -69,6 +70,7 @@ class StockAnalysisWorkflow:
         code4: str,
         *,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ):
         if self.uses_default_technical_service:
             if evaluation_at is None:
@@ -83,11 +85,17 @@ class StockAnalysisWorkflow:
                 name=name,
                 bundle=bundle,
                 evaluation_at=evaluation_at,
+                manual_quote=manual_quote,
             )
         service = self.build_technical_service(self.file_cache)
-        if evaluation_at is None:
+        if evaluation_at is None and manual_quote is None:
             return service.build_analysis_result(name=name, code4=code4)
-        return service.build_analysis_result(name=name, code4=code4, evaluation_at=evaluation_at)
+        return service.build_analysis_result(
+            name=name,
+            code4=code4,
+            evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
+        )
 
     def fetch_technical_output(
         self,
@@ -95,11 +103,13 @@ class StockAnalysisWorkflow:
         name: str,
         code4: str,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> str:
         return self.fetch_technical_output_result(
             name=name,
             code4=code4,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         ).output
 
     def fetch_technical_output_result(
@@ -108,11 +118,13 @@ class StockAnalysisWorkflow:
         name: str,
         code4: str,
         evaluation_at: datetime | None = None,
+        manual_quote: ManualTechnicalQuote | None = None,
     ) -> TechnicalOutputResult:
         result = self.build_technical_summary_result(
             name=name,
             code4=code4,
             evaluation_at=evaluation_at,
+            manual_quote=manual_quote,
         )
         return TechnicalOutputResult(output=build_technical_output(result), analysis_result=result)
 

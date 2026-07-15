@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import threading
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
+from app.domain.models.manual_technical_quote import ManualTechnicalQuote
 from app.gui_state import GuiState
 from app.gui_state_manager import GuiStateManager
 from app.gui_view import FundamentalView
@@ -20,7 +22,7 @@ class FundamentalApp:
 
     def __init__(self, master: tk.Tk):
         self.master = master
-        self.master.title("ファンダメンタル評価 v8（株探/yFinanceベース）")
+        self.master.title("エントリー評価V9")
         self.master.geometry("1040x820")
 
         self.state = GuiState()
@@ -54,6 +56,7 @@ class FundamentalApp:
             on_open=self.open_watchlist,
             on_select=self.on_stock_selected,
             on_fetch=self.generate_text,
+            on_manual_technical_quote=self.open_manual_technical_quote_input,
             on_copy=self.copy_text,
             on_save=self.save_text,
             on_open_kabutan_dir=self.open_kabutan_html_dir,
@@ -236,6 +239,34 @@ class FundamentalApp:
         except Exception as exc:
             self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
 
+    def _manual_technical_fetch_worker(
+        self,
+        name: str,
+        code4: str,
+        manual_quote: ManualTechnicalQuote,
+    ):
+        try:
+            detail = self.controller.fetch_technical_output_result(
+                name=name,
+                code4=code4,
+                manual_quote=manual_quote,
+            )
+            summary = self.controller.fetch_institutional_summary_text(
+                name=name,
+                code4=code4,
+                kabutan_html_dir=self.state.kabutan_html_dir,
+            )
+            status = (
+                f"{name}({code4}) を手入力値で再解析しました。"
+                f" / 反映時刻={manual_quote.observed_at:%Y-%m-%d %H:%M}"
+            )
+            self.master.after(
+                0,
+                lambda: self._render_output_with_summary(detail.output, summary, status, "technical"),
+            )
+        except Exception as exc:
+            self.master.after(0, lambda msg=str(exc): self._handle_fetch_error(msg))
+
     def _sector_breadth_worker(
         self,
         name: str,
@@ -333,6 +364,56 @@ class FundamentalApp:
             daemon=True,
         )
         thread.start()
+
+    def _start_manual_technical_fetch_thread(
+        self,
+        name: str,
+        code4: str,
+        manual_quote: ManualTechnicalQuote,
+    ) -> None:
+        self.technical_evaluation_date_var.set("最新")
+        self.technical_evaluation_time_var.set("最新")
+        self._sync_technical_evaluation_selection()
+        self.set_busy(True, f"{name}({code4}) を手入力値で再解析中...")
+        thread = threading.Thread(
+            target=self._manual_technical_fetch_worker,
+            args=(name, code4, manual_quote),
+            daemon=True,
+        )
+        thread.start()
+
+    def open_manual_technical_quote_input(self) -> None:
+        if self.state.is_fetching:
+            return
+        if self.view.current_mode() != "technical":
+            self.status_var.set("最新値手入力はTechnicalタブで使用してください。")
+            return
+
+        selected = self._require_selected_stock()
+        if selected is None:
+            return
+        name, code4 = selected
+
+        def apply_values(values: dict[str, str], dialog: tk.Toplevel) -> bool:
+            try:
+                quote = ManualTechnicalQuote(
+                    latest=_parse_manual_price(values.get("latest", ""), "当日現在値"),
+                    high=_parse_manual_price(values.get("high", ""), "当日高値"),
+                    low=_parse_manual_price(values.get("low", ""), "当日安値"),
+                    vwap=_parse_manual_price(values.get("vwap", ""), "当日VWAP"),
+                    observed_at=datetime.now(),
+                )
+            except ValueError as exc:
+                messagebox.showerror("入力値エラー", str(exc), parent=dialog)
+                return False
+
+            self._start_manual_technical_fetch_thread(name, code4, quote)
+            return True
+
+        self.view.open_manual_technical_quote_dialog(
+            f"{name} ({code4})",
+            apply_values,
+        )
 
     def generate_text(self):
         if self.state.is_fetching:
@@ -446,6 +527,17 @@ class FundamentalApp:
             self.status_var.set(self.view_model.build_save_failed_status())
             return
         self.status_var.set(self.view_model.build_saved_status(path))
+
+
+def _parse_manual_price(value: str, label: str) -> float:
+    translation = str.maketrans("０１２３４５６７８９．－＋，", "0123456789.-+,")
+    normalized = value.translate(translation).replace(",", "").strip()
+    if not normalized:
+        raise ValueError(f"{label}を入力してください。")
+    try:
+        return float(normalized)
+    except ValueError as exc:
+        raise ValueError(f"{label}は数値で入力してください。") from exc
 
 
 __all__ = ["FundamentalApp"]
