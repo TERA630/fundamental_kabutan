@@ -90,16 +90,16 @@ def test_build_technical_output_contains_summary_and_sections():
     assert "抵抗余地：" not in output
     assert "RSI：5分N/A / 時間N/A" in output
     assert "RSI総合：N/A" in output
-    assert "短評：A1 中期乖離帯｜やや過熱・他指標確認｜" in output
+    assert "短評：A1弱 上方乖離｜要確認｜中央値マイナス｜押し目確認｜" in output
     assert "｜5日線良好" in output
     assert "崩れ 1/5：候補｜買い条件は別確認" in output
     assert "底打ち初動判定：" not in output
     assert "ホールド判定：○" in output
-    assert "戦略判定：\n前場VWAP回復◎：" in output
+    assert "戦略判定：\n前場VWAP回復○：" in output
     assert "前場深押し" not in output
-    assert "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。" in output
-    assert "後場VWAP回復◎：後場VWAP上維持ならエントリー可。" in output
-    assert output.index("短評：A1 中期乖離帯｜やや過熱・他指標確認｜") < output.index("■モメンタム")
+    assert "前場VWAP回復○：VWAP回復＋15分以上維持なら小さく検討可。" in output
+    assert "後場VWAP回復○：後場VWAP上維持ならエントリー候補。" in output
+    assert output.index("短評：A1弱 上方乖離｜要確認｜中央値マイナス｜押し目確認｜") < output.index("■モメンタム")
     assert output.index("崩れ 1/5：候補｜買い条件は別確認") < output.index("■モメンタム")
     assert output.index("ホールド判定：○") < output.index("戦略判定：") < output.index("■モメンタム")
     assert "■モメンタム" in output
@@ -174,18 +174,18 @@ def test_build_technical_output_filters_strategy_by_evaluation_time():
 
     preopen = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 08:30").to_pydatetime()))
     assert "前場深押し" not in preopen
-    assert "前場VWAP回復◎：" in preopen
+    assert "前場VWAP回復○：" in preopen
     assert "ホールド銘柄の指値売：" in preopen
-    assert "後場VWAP回復◎：" not in preopen
+    assert "後場VWAP回復○：" not in preopen
 
     am = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 09:10").to_pydatetime()))
     assert "前場深押し" not in am
-    assert "前場VWAP回復◎：" in am
+    assert "前場VWAP回復○：" in am
     assert "後場VWAP回復" not in am
 
     lunch = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 11:45").to_pydatetime()))
     assert "前場VWAP回復" not in lunch
-    assert "後場VWAP回復◎：" in lunch
+    assert "後場VWAP回復○：" in lunch
 
     pm = build_technical_output(replace(result, evaluation_at=pd.Timestamp("2026-04-08 13:00").to_pydatetime()))
     assert "後場VWAP維持/利確/持ち越し判定：" in pm
@@ -234,7 +234,7 @@ def test_build_technical_output_appends_three_axis_collapse_reason():
 
     output = build_technical_output(result)
 
-    assert "短評：C2 崩れ警戒｜監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
+    assert "短評：A1弱 上方乖離｜崩れ警戒｜監視のみ｜下行初動：5日線下向き＋25日線下向き" in output
     assert "｜下行初動：5日線下向き＋25日線下向き" in output
 
 
@@ -325,7 +325,7 @@ def test_build_technical_output_shows_bottoming_start_only_below_ma25():
 
     output = build_technical_output(result)
 
-    assert "短評：D3 反転観測｜25日線奪回待ち" in output
+    assert "短評：C1 奪回待ち｜反転確認｜25日線奪回確認まで見送り" in output
     assert "詳細：" not in output
     assert "底打ち初動判定：成立" in output
     assert "ホールド判定：△" in output
@@ -351,7 +351,7 @@ def test_build_technical_output_uses_d1a_detail_headline_and_strategy():
 
     output = build_technical_output(result)
 
-    assert "短評：D1 戻り途中｜25日線奪回待ち" in output
+    assert "短評：D1 反転初動候補・検証不足｜VWAP回復・確認不足｜件数不足｜25日線奪回待ち" in output
     assert "前場深押し" not in output
     assert "前場VWAP回復△：VWAP回復とD3化は反転観測に留め" in output
 
@@ -369,7 +369,7 @@ def test_build_technical_output_uses_d2_headline_and_recovery_stage():
 
     output = build_technical_output(result)
 
-    assert "短評：D2 支持線反発候補｜25日線奪回待ち" in output
+    assert "短評：E 25日線下｜支持線反発候補｜反転確認まで見送り" in output
     assert "前場VWAP回復△：VWAP回復帯" in output
     assert "新規は25日線奪回待ち" in output
 

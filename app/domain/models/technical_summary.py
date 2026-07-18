@@ -9,16 +9,23 @@ from app.domain.models.sector_breadth import SectorBreadthTable
 from app.domain.models.signal_atom import SignalAtom
 from app.domain.models.us_market_summary import UsMarketSummaryTable
 
-TechnicalSummaryRank = Literal["B2", "B1", "A2", "A1", "A1弱", "C2", "C1", "D1", "D2", "D3", "E"]
+TechnicalSummaryRank = Literal["B2", "B1", "A2", "A1", "A1弱", "C1", "D1", "E"]
+CollapseStateCode = Literal["none", "attention", "mild", "collapse"]
+ReversalStateCode = Literal[
+    "not_applicable",
+    "vwap_recovered_unconfirmed",
+    "support_bounce_candidate",
+    "reversal_confirmed",
+    "reversal_unconfirmed",
+]
 Ma25PositionBandCode = Literal[
     "extreme",
-    "high_risk",
-    "high_momentum",
-    "medium_momentum",
-    "initial_pullback_risk",
-    "stable",
-    "near_ma25",
-    "just_below",
+    "late_overheat",
+    "overheat_selection",
+    "upper_deviation",
+    "good_position",
+    "reclaim_wait",
+    "reversal_candidate",
     "below",
 ]
 CollapseRiskLevel = Literal["低", "中", "高"]
@@ -33,7 +40,10 @@ class TechnicalHeadlineSummary:
     next_action: str
     ma25_position_label: str = ""
     collapse_state_label: str | None = "崩れ条件なし"
-    c2_fall_reason: str | None = None
+    collapse_state_code: CollapseStateCode = "none"
+    reversal_state_label: str | None = None
+    reversal_state_code: ReversalStateCode = "not_applicable"
+    collapse_reason: str | None = None
 
     @property
     def text(self) -> str:
@@ -81,6 +91,8 @@ class TechnicalSummaryRow:
     resistance_lines: tuple[TechnicalSummaryLine, ...]
     recent60_range_position: float | None
     ma25_position_label: str = ""
+    collapse_state_label: str | None = None
+    reversal_state_label: str | None = None
     collapse_risk_score: int | None = None
     headline_comment: str = ""
     next_action: str = ""
@@ -107,9 +119,11 @@ class TechnicalSummaryTable:
 
 
 __all__ = [
+    "CollapseStateCode",
     "CollapseRiskLevel",
     "HoldJudgement",
     "Ma25PositionBandCode",
+    "ReversalStateCode",
     "SkippedTechnicalSummaryStock",
     "SectorBreadthTable",
     "TechnicalHeadlineSummary",

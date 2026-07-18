@@ -7,7 +7,9 @@ from typing import Literal
 
 from app.domain.models.signal_atom import SignalAtom, score_signal_atoms
 from app.domain.models.technical_summary import (
+    CollapseStateCode,
     Ma25PositionBandCode,
+    ReversalStateCode,
     TechnicalHeadlineSummary,
     TechnicalPositionAssessment,
     TechnicalSummaryLine,
@@ -16,30 +18,24 @@ from app.domain.models.technical_summary import (
 from app.domain.policies.range_table import RangeBand, RangeTable
 
 RANK_LABELS: dict[TechnicalSummaryRank, str] = {
-    "B2": "極端乖離帯",
-    "B1": "過熱帯",
-    "A2": "高乖離帯",
-    "A1": "25日線上昇帯",
-    "A1弱": "中間乖離帯",
-    "C2": "崩れ警戒",
-    "C1": "25日線接近",
-    "D1": "戻り途中",
-    "D2": "支持線反発候補",
-    "D3": "反転観測",
-    "E": "下落トレンド",
+    "B2": "極端過熱",
+    "B1": "過熱後半",
+    "A2": "過熱選別",
+    "A1": "位置良好",
+    "A1弱": "上方乖離",
+    "C1": "奪回待ち",
+    "D1": "反転初動候補・検証不足",
+    "E": "25日線下",
 }
 
 RANK_ORDER: tuple[TechnicalSummaryRank, ...] = (
-    "B2",
-    "B1",
-    "A2",
     "A1",
     "A1弱",
-    "C2",
+    "A2",
     "C1",
     "D1",
-    "D2",
-    "D3",
+    "B1",
+    "B2",
     "E",
 )
 
@@ -49,11 +45,8 @@ HEADLINE_COMMENTS: dict[TechnicalSummaryRank, str] = {
     "A2": "高モメンタム。上昇継続を確認。",
     "A1": "順張り候補。位置良好。",
     "A1弱": "中期上昇余地はあるが、短期下振れに注意。",
-    "C2": "25日線割れ警戒。買いは待ち。",
     "C1": "方向未確定。",
     "D1": "25日線奪回待ち。上値確認中。",
-    "D2": "支持線反発待ち。",
-    "D3": "VWAP回復。安値切り上げ・反転確認。",
     "E": "買い見送り。反転確認待ち。",
 }
 
@@ -64,32 +57,71 @@ SINGLE_STOCK_POSITION_DESCRIPTIONS: dict[TechnicalSummaryRank, str] = {
     "A1": "安定上昇または中期モメンタムの買い候補",
     "A1弱": "中期上昇余地はあるが、初期逆行に注意。",
     "C1": "方向未確定",
-    "C2": "監視のみ",
     "D1": HEADLINE_COMMENTS["D1"],
-    "D2": HEADLINE_COMMENTS["D2"],
-    "D3": HEADLINE_COMMENTS["D3"],
     "E": HEADLINE_COMMENTS["E"],
 }
 
 @dataclass(frozen=True)
 class Ma25PositionBand:
     code: Ma25PositionBandCode
+    rank: TechnicalSummaryRank
     label: str
     comment: str
+    recommendation: str
+    effect: Literal["positive", "negative", "neutral", "unavailable"]
 
 
 _MA25_POSITION_BAND_TABLE = RangeTable[Ma25PositionBand](
     bands=(
-        RangeBand(14, Ma25PositionBand("extreme", "極端乖離帯", "上値余地より逆行リスクを優先。")),
-        RangeBand(10, Ma25PositionBand("high_risk", "過熱帯", "終端位置による改善なし。")),
-        RangeBand(8, Ma25PositionBand("high_momentum", "高乖離帯", "終端50%を境に6M評価を分ける。")),
-        RangeBand(6, Ma25PositionBand("medium_momentum", "中期乖離帯", "終端が高くても改善なし。")),
-        RangeBand(4, Ma25PositionBand("initial_pullback_risk", "中間乖離帯", "全終端帯で先着率50%前後。")),
-        RangeBand(2, Ma25PositionBand("stable", "安定上昇帯", "終端40%を境に6M評価を分ける。")),
-        RangeBand(0, Ma25PositionBand("near_ma25", "25日線接近", "終端が高くても改善小。")),
-        RangeBand(-2, Ma25PositionBand("just_below", "25日線直下・統計的不利", "25日線直下は統計的に不利。反転確認を優先。")),
+        RangeBand(
+            12,
+            Ma25PositionBand(
+                "extreme", "B2", "極端過熱", "極端過熱", "新規買い見送り・利確優先", "negative"
+            ),
+        ),
+        RangeBand(
+            10,
+            Ma25PositionBand(
+                "late_overheat", "B1", "過熱後半", "過熱後半", "過熱後半｜新規買い見送り", "negative"
+            ),
+        ),
+        RangeBand(
+            8,
+            Ma25PositionBand(
+                "overheat_selection", "A2", "過熱選別", "過熱帯", "過熱帯｜追いかけ禁止", "negative"
+            ),
+        ),
+        RangeBand(
+            4,
+            Ma25PositionBand(
+                "upper_deviation", "A1弱", "上方乖離", "中央値マイナス", "中央値マイナス｜押し目確認", "neutral"
+            ),
+        ),
+        RangeBand(
+            0,
+            Ma25PositionBand(
+                "good_position", "A1", "位置良好", "位置良好", "位置良好｜エントリー優先帯", "positive"
+            ),
+        ),
+        RangeBand(
+            -2,
+            Ma25PositionBand(
+                "reclaim_wait", "C1", "奪回待ち", "25日線直下", "25日線奪回確認まで見送り", "neutral"
+            ),
+        ),
+        RangeBand(
+            -4,
+            Ma25PositionBand(
+                "reversal_candidate",
+                "D1",
+                "反転初動候補・検証不足",
+                "件数不足",
+                "件数不足｜25日線奪回待ち",
+                "unavailable",
+            ),
+        ),
     ),
-    default=Ma25PositionBand("below", "25日線下", "25日線奪回または反転確認を優先。"),
+    default=Ma25PositionBand("below", "E", "25日線下", "反転未確認", "反転確認まで見送り", "neutral"),
 )
 
 
@@ -98,59 +130,25 @@ def classify_ma25_position_band(dev25_pct: float) -> Ma25PositionBand:
 
 
 @dataclass(frozen=True)
-class SixMonthEntryGuidance:
-    """Six-month backtest guidance, separate from the technical state rank."""
+class BacktestEntryGuidance:
+    """One-year backtest guidance, separate from the technical state rank."""
 
     position_label: str
     observation: str
     recommendation: str
-    terminal_effect: Literal["positive", "negative", "neutral", "unavailable"]
+    effect: Literal["positive", "negative", "neutral", "unavailable"]
 
 
-_SIX_MONTH_POSITION_TABLE = RangeTable[str](
-    bands=(
-        RangeBand(14, "extreme"),
-        RangeBand(10, "overheated"),
-        RangeBand(8, "high_deviation"),
-        RangeBand(6, "medium_deviation"),
-        RangeBand(4, "middle_deviation"),
-        RangeBand(2, "stable"),
-        RangeBand(0, "near_ma25"),
-    ),
-    default="below_ma25",
-)
+def classify_backtest_entry_guidance(dev25_pct: float) -> BacktestEntryGuidance:
+    """Classify entry guidance from the latest one-year backtest bands."""
 
-
-def classify_six_month_entry_guidance(
-    dev25_pct: float,
-    day_close_position: float | None,
-) -> SixMonthEntryGuidance:
-    """Classify entry guidance from the six-month backtest matrix."""
-
-    band = _SIX_MONTH_POSITION_TABLE.resolve(dev25_pct)
-    if band == "below_ma25":
-        return SixMonthEntryGuidance("25日線下", "件数不足・優位なし", "25日線奪回待ち", "neutral")
-    if band == "near_ma25":
-        return SixMonthEntryGuidance("25日線接近", "終端が高くても改善小", "方向確認・VWAP回復待ち", "neutral")
-    if band == "stable":
-        if day_close_position is None:
-            return SixMonthEntryGuidance("安定上昇帯", "終端位置を判定できない", "終端N/A・回復確認待ち", "unavailable")
-        if day_close_position < 0.40:
-            return SixMonthEntryGuidance("安定上昇帯", "先着率やや低下", "上値失速・回復待ち", "negative")
-        return SixMonthEntryGuidance("安定上昇帯", "先着率やや良好", "位置良好", "positive")
-    if band == "middle_deviation":
-        return SixMonthEntryGuidance("中間乖離帯", "全終端帯で先着率50%前後", "先着拮抗・支持線確認", "neutral")
-    if band == "medium_deviation":
-        return SixMonthEntryGuidance("中期乖離帯", "終端が高くても改善なし", "やや過熱・他指標確認", "neutral")
-    if band == "high_deviation":
-        if day_close_position is None:
-            return SixMonthEntryGuidance("高乖離帯", "終端位置を判定できない", "終端N/A・失速警戒", "unavailable")
-        if day_close_position < 0.50:
-            return SixMonthEntryGuidance("高乖離帯", "-3%先着警戒", "過熱後半・失速警戒", "negative")
-        return SixMonthEntryGuidance("高乖離帯", "先着率改善傾向", "高値維持・追値注意", "positive")
-    if band == "overheated":
-        return SixMonthEntryGuidance("過熱帯", "終端位置による改善なし", "過熱優先・新規見送り", "neutral")
-    return SixMonthEntryGuidance("極端乖離帯", "終端位置による改善なし", "過熱優先・新規見送り", "neutral")
+    band = classify_ma25_position_band(dev25_pct)
+    return BacktestEntryGuidance(
+        position_label=band.label,
+        observation=band.comment,
+        recommendation=band.recommendation,
+        effect=band.effect,
+    )
 
 D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
     "D1a": "25日線奪回待ち。D3化は反転観測",
@@ -165,11 +163,19 @@ D_DETAIL_MAIN_JUDGEMENTS: dict[str, str] = {
 
 
 @dataclass(frozen=True)
-class _RankingCollapseAssessment:
+class CollapseStateAssessment:
     score: int
+    code: CollapseStateCode
     label: str
-    c2_fall: bool
-    c2_fall_reason: str | None
+    is_alert: bool
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class ReversalStateAssessment:
+    code: ReversalStateCode
+    label: str | None
+    legacy_detail_rank: str | None = None
 
 
 @dataclass(frozen=True)
@@ -298,48 +304,54 @@ STRATEGY_LINES: dict[TechnicalSummaryRank, tuple[str, str] | None] = {
         "前場VWAP回復△：VWAP回復＋15分以上維持なら検討可。慎重なら後場まで待つ。",
         "後場VWAP回復○：後場VWAP回復＋上維持＋安値切り上げがあればエントリー可。",
     ),
-    "C2": (
-        "前場VWAP回復×：VWAP回復だけでは根拠不足。安値切り上げと高値更新を確認する。",
-        "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら崩れ条件の解消を待つ。",
-    ),
     "D1": None,
-    "D2": None,
-    "D3": None,
     "E": (
         "前場VWAP回復×：前場VWAP回復だけでは新規不可。だまし上げ警戒。",
         "後場VWAP回復△：後場VWAP回復＋上維持＋安値切り上げ＋出来高増加が揃えば小さく検討可。原則は25日線回復待ち。",
     ),
 }
 
+COLLAPSE_STRATEGY_LINES = (
+    "前場VWAP回復×：VWAP回復だけでは根拠不足。安値切り上げと高値更新を確認する。",
+    "後場VWAP回復△：後場VWAP上維持＋安値切り上げなら小さく検討可。慎重なら崩れ条件の解消を待つ。",
+)
+
 def build_technical_strategy_lines(
     rank: TechnicalSummaryRank,
     *,
+    reversal_state_code: ReversalStateCode = "not_applicable",
+    collapse_alert: bool = False,
     detail_code: str | None = None,
     vwap_recovery_range: str = "N/A",
 ) -> tuple[str, ...]:
-    if rank == "D1":
+    if collapse_alert:
+        return COLLAPSE_STRATEGY_LINES
+    if reversal_state_code == "vwap_recovered_unconfirmed" or (
+        rank == "D1" and reversal_state_code == "not_applicable"
+    ):
         return _build_d1_strategy_lines(
             detail_code=detail_code or "D1",
         )
-    if rank == "D2":
+    if reversal_state_code == "support_bounce_candidate":
         prefix = "D2弱｜支持線根拠弱い｜" if detail_code == "D2弱" else ""
         return (
             f"前場VWAP回復△：VWAP回復帯 {vwap_recovery_range} と反転状態を確認するが、新規は25日線奪回待ち。",
             f"後場VWAP回復△：{prefix}後場VWAP上維持でも反転観測に留め、持ち越し判断は25日線奪回後。",
         )
-    if rank == "D3":
+    if reversal_state_code == "reversal_confirmed":
         return _build_d3_strategy_lines(
             detail_code=detail_code or "D3",
             vwap_recovery_range=vwap_recovery_range,
         )
-    templates = STRATEGY_LINES[rank]
+    strategy_rank = "E" if reversal_state_code == "reversal_unconfirmed" else rank
+    templates = STRATEGY_LINES[strategy_rank]
     if templates is None:
         return ("N/A（判定基準未設定）",)
     return templates
 
 
 def build_d_detail_headline(
-    rank: TechnicalSummaryRank,
+    rank: str,
     *,
     ma25_distance_atr: float | None = None,
     volume_vs_avg20_pct: float | None = None,
@@ -421,21 +433,23 @@ def _build_d3_strategy_lines(
     )
 
 
-def classify_technical_summary_rank(
+def classify_position_rank(dev25_pct: float) -> TechnicalSummaryRank:
+    """Classify the primary rank solely from the one-year MA25 position band."""
+
+    return classify_ma25_position_band(dev25_pct).rank
+
+
+def classify_technical_summary_rank(*, dev25_pct: float, **_: object) -> TechnicalSummaryRank:
+    """Compatibility wrapper for callers migrating to ``classify_position_rank``."""
+
+    return classify_position_rank(dev25_pct)
+
+
+def evaluate_reversal_state(
     *,
     dev25_pct: float,
     latest: float,
     vwap: float,
-    ma25_distance_atr: float | None = None,
-    ma5: float | None = None,
-    ma5_prev1: float | None = None,
-    ma5_slope: float | None = None,
-    ma5_slope_prev: float | None = None,
-    ma5_slope_3d_ago: float | None = None,
-    ma25: float | None = None,
-    ma25_prev5: float | None = None,
-    rsi14: float | None = None,
-    three_session_change_pct: float | None = None,
     high_breakout_count: int | None = None,
     low_higher_count: int | None = None,
     day_close_position: float | None = None,
@@ -444,70 +458,31 @@ def classify_technical_summary_rank(
     day_low: float | None = None,
     atr14: float | None = None,
     volume_vs_avg20_pct: float | None = None,
-    recent60_range_position: float | None = None,
+    rsi14: float | None = None,
     previous_low: float | None = None,
     recent20_low: float | None = None,
     ma75: float | None = None,
     recent60_low: float | None = None,
     vwap_maintained_15m: bool | None = None,
     low_highers: tuple[bool | None, ...] = (),
-    high_breakouts: tuple[bool | None, ...] = (),
-) -> TechnicalSummaryRank:
-    vwap_up = latest > vwap
-    close_position_pct = _position_pct(day_close_position)
-
-    if dev25_pct >= 14 or (dev25_pct >= 10 and _gt(ma25_distance_atr, 3.0)):
-        return "B2"
-
-    if 10 <= dev25_pct < 14:
-        return "B1"
+) -> ReversalStateAssessment:
+    """Evaluate below-MA25 price action without changing the primary position rank."""
 
     if dev25_pct >= 0:
-        collapse_assessment = _evaluate_above_ma25_ranking_collapse(
-            latest=latest,
-            vwap=vwap,
-            ma5=ma5,
-            ma5_prev1=ma5_prev1,
-            ma5_slope=ma5_slope,
-            ma5_slope_prev=ma5_slope_prev,
-            ma5_slope_3d_ago=ma5_slope_3d_ago,
-            ma25=ma25,
-            ma25_prev5=ma25_prev5,
-            atr14=atr14,
-            day_open=day_open,
-            day_high=day_high,
-            day_low=day_low,
-            day_close_position=day_close_position,
-            volume_vs_avg20_pct=volume_vs_avg20_pct,
-            high_breakout_count=high_breakout_count,
-            low_higher_count=low_higher_count,
-            high_breakouts=high_breakouts,
-            low_highers=low_highers,
-            previous_low=previous_low,
-            recent20_low=recent20_low,
-            ma75=ma75,
-            recent60_low=recent60_low,
-        )
-        if collapse_assessment.c2_fall:
-            return "C2"
-        if dev25_pct >= 8:
-            return "A2"
-        if dev25_pct >= 6:
-            return "A1"
-        if dev25_pct >= 4:
-            return "A1弱"
-        if dev25_pct >= 2:
-            return "A1"
-        return "C1"
+        return ReversalStateAssessment("not_applicable", None)
 
-    if vwap_up:
+    if latest > vwap:
         if (
             _gte(low_higher_count, 2)
-            and _gte(close_position_pct, 60)
+            and _gte(_position_pct(day_close_position), 60)
             and vwap_maintained_15m is True
         ):
-            return "D3"
-        return "D1"
+            return ReversalStateAssessment("reversal_confirmed", "反転確認", "D3")
+        return ReversalStateAssessment(
+            "vwap_recovered_unconfirmed",
+            "VWAP回復・確認不足",
+            "D1",
+        )
 
     d2_evaluation = _evaluate_d2_bottoming_candidate(
         latest=latest,
@@ -525,11 +500,13 @@ def classify_technical_summary_rank(
         recent60_low=recent60_low,
         low_highers=low_highers,
     )
-    if d2_evaluation == "exclude":
-        return "E"
     if d2_evaluation in {"strong", "weak"}:
-        return "D2"
-    return "E"
+        return ReversalStateAssessment(
+            "support_bounce_candidate",
+            "支持線反発候補",
+            "D2弱" if d2_evaluation == "weak" else "D2",
+        )
+    return ReversalStateAssessment("reversal_unconfirmed", "反転未確認", "E")
 
 
 def build_technical_headline_summary(
@@ -564,21 +541,12 @@ def build_technical_headline_summary(
     low_highers: tuple[bool | None, ...] = (),
     high_breakouts: tuple[bool | None, ...] = (),
 ) -> TechnicalHeadlineSummary:
-    rank = classify_technical_summary_rank(
+    rank = classify_position_rank(dev25_pct)
+    reversal_state = evaluate_reversal_state(
         dev25_pct=dev25_pct,
         latest=latest,
         vwap=vwap,
-        ma25_distance_atr=ma25_distance_atr,
-        ma5=ma5,
-        ma5_prev1=ma5_prev1,
-        ma5_slope=ma5_slope,
-        ma5_slope_prev=ma5_slope_prev,
-        ma5_slope_3d_ago=ma5_slope_3d_ago,
-        ma25=ma25,
-        ma25_prev5=ma25_prev5,
         rsi14=rsi14,
-        three_session_change_pct=three_session_change_pct,
-        high_breakout_count=high_breakout_count,
         low_higher_count=low_higher_count,
         day_close_position=day_close_position,
         day_open=day_open,
@@ -586,16 +554,14 @@ def build_technical_headline_summary(
         day_low=day_low,
         atr14=atr14,
         volume_vs_avg20_pct=volume_vs_avg20_pct,
-        recent60_range_position=recent60_range_position,
         previous_low=previous_low,
         recent20_low=recent20_low,
         ma75=ma75,
         recent60_low=recent60_low,
         vwap_maintained_15m=vwap_maintained_15m,
         low_highers=low_highers,
-        high_breakouts=high_breakouts,
     )
-    guidance = classify_six_month_entry_guidance(dev25_pct, day_close_position)
+    guidance = classify_backtest_entry_guidance(dev25_pct)
     overheated = _has_b1_overheat_condition(
         three_session_change_pct=three_session_change_pct,
         recent60_range_position=recent60_range_position,
@@ -604,13 +570,14 @@ def build_technical_headline_summary(
     position_label = guidance.position_label
     if 8 <= dev25_pct < 10 and overheated:
         position_label += "（他指標過熱）"
-    rank_label = _build_rank_display_label(rank, position_label)
+    rank_label = position_label
     comment = guidance.observation
     next_action = guidance.recommendation
     collapse_state_label = None
-    c2_fall_reason = None
+    collapse_state_code: CollapseStateCode = "none"
+    collapse_reason = None
     if dev25_pct >= 0:
-        collapse_assessment = _evaluate_above_ma25_ranking_collapse(
+        collapse_assessment = evaluate_collapse_state(
             latest=latest,
             vwap=vwap,
             ma5=ma5,
@@ -636,10 +603,9 @@ def build_technical_headline_summary(
             recent60_low=recent60_low,
         )
         collapse_state_label = collapse_assessment.label
-        if rank == "C2":
-            c2_fall_reason = collapse_assessment.c2_fall_reason
-            rank_label = RANK_LABELS[rank]
-            comment = HEADLINE_COMMENTS[rank]
+        collapse_state_code = collapse_assessment.code
+        if collapse_assessment.is_alert:
+            collapse_reason = collapse_assessment.reason
             next_action = "監視のみ"
     return TechnicalHeadlineSummary(
         rank=rank,
@@ -648,14 +614,11 @@ def build_technical_headline_summary(
         next_action=next_action,
         ma25_position_label=position_label,
         collapse_state_label=collapse_state_label,
-        c2_fall_reason=c2_fall_reason,
+        collapse_state_code=collapse_state_code,
+        reversal_state_label=reversal_state.label,
+        reversal_state_code=reversal_state.code,
+        collapse_reason=collapse_reason,
     )
-
-
-def _build_rank_display_label(rank: TechnicalSummaryRank, position_label: str) -> str:
-    if rank in {"A2", "A1", "A1弱", "C1"}:
-        return position_label
-    return RANK_LABELS[rank]
 
 
 def build_technical_position_assessment(
@@ -682,6 +645,7 @@ def build_technical_position_assessment(
     ma75: float | None,
     recent60_low: float | None,
     headline_rank: TechnicalSummaryRank,
+    reversal_state_code: ReversalStateCode = "not_applicable",
 ) -> TechnicalPositionAssessment:
     """Score collapse risk and derive the single-stock hold judgement."""
     all_low_highers_failed = _all_false(low_highers)
@@ -739,7 +703,7 @@ def build_technical_position_assessment(
 
     # 表示ラベルをランク別に決定
     def _collapse_label_for(rank: TechnicalSummaryRank, s: int) -> str:
-        primary_set = {"A1", "A1弱", "A2", "B1", "B2", "D2", "D3", "E"}
+        primary_set = {"A1", "A1弱", "A2", "B1", "B2", "E"}
         if rank in primary_set:
             if s <= 1:
                 return "崩れ軽微"
@@ -752,12 +716,6 @@ def build_technical_position_assessment(
             if s <= 3:
                 return "VWAP回復待ち"
             return "押し目ではなく崩れ警戒"
-        if rank == "C2":
-            if s <= 1:
-                return "軽度崩れ"
-            if s <= 3:
-                return "崩れ警戒"
-            return "買い不可"
         if rank == "D1":
             if s <= 1:
                 return "戻り良好"
@@ -778,7 +736,9 @@ def build_technical_position_assessment(
         collapse_risk_level=level,
         collapse_risk_label=collapse_label,
         hold_judgement=hold,
-        bottoming_start_established=latest < ma25 and headline_rank == "D3",
+        bottoming_start_established=(
+            latest < ma25 and reversal_state_code == "reversal_confirmed"
+        ),
         collapse_risk_reason=risk.collapse_risk_reason,
         collapse_risk_signals=risk.atoms,
     )
@@ -790,12 +750,13 @@ def build_collapse_score_brief(score: int | None) -> CollapseScoreBrief:
 
 def build_technical_short_comment(
     *,
-    rank: TechnicalSummaryRank,
+    rank: str,
     rank_label: str | None = None,
     entry_guidance: str | None = None,
     ma25_position_label: str | None = None,
     collapse_state_label: str | None = None,
-    c2_fall_reason: str | None = None,
+    reversal_state_label: str | None = None,
+    collapse_reason: str | None = None,
     ma5_slope: float | None = None,
     ma5_slope_prev: float | None = None,
     ma5_slope_3d_ago: float | None = None,
@@ -805,18 +766,18 @@ def build_technical_short_comment(
         ma5_slope_prev=ma5_slope_prev,
         ma5_slope_3d_ago=ma5_slope_3d_ago,
     )
-    c2_reason_part = _format_c2_reason_part(rank, c2_fall_reason)
     display_label = rank_label or RANK_LABELS[rank]
     guidance = entry_guidance or SINGLE_STOCK_POSITION_DESCRIPTIONS[rank]
-    return f"{rank} {display_label}｜{guidance}{c2_reason_part}｜{ma5_comment}"
-
-
-def _format_c2_reason_part(rank: TechnicalSummaryRank, c2_fall_reason: str | None) -> str:
-    if rank != "C2" or not c2_fall_reason:
-        return ""
-    if "：" in c2_fall_reason:
-        return f"｜{c2_fall_reason}"
-    return f"｜C2陥落トリガー：{c2_fall_reason}"
+    parts = [f"{rank} {display_label}"]
+    if collapse_state_label not in {None, "崩れ条件なし"}:
+        parts.append(collapse_state_label)
+    if reversal_state_label:
+        parts.append(reversal_state_label)
+    parts.append(guidance)
+    if collapse_reason:
+        parts.append(collapse_reason)
+    parts.append(ma5_comment)
+    return "｜".join(parts)
 
 
 def build_ma5_slope_short_comment(
@@ -1068,9 +1029,8 @@ def _score_collapse_risk(
             SignalAtom("vwap_clear_break", vwap_clear_break),
             SignalAtom("low_higher_failed", low_higher_failed, points=1),
             SignalAtom("high_breakout_failed", high_breakout_failed, points=1),
-            # The six-month backtest found no broad terminal-position edge.
-            # Keep the atom for T1/T3 interaction diagnostics, but do not add
-            # it to the standalone collapse score.
+            # Terminal position remains an interaction diagnostic for T1/T3,
+            # but is not scored as a standalone collapse signal.
             SignalAtom("close_position_low", close_position_low),
             SignalAtom("volume_bearish_or_stalling", volume_bearish_or_stalling, points=1),
             SignalAtom("support_far", support_far, points=1),
@@ -1092,7 +1052,7 @@ def _score_collapse_risk(
     )
 
 
-def _evaluate_above_ma25_ranking_collapse(
+def evaluate_collapse_state(
     *,
     latest: float,
     vwap: float,
@@ -1117,7 +1077,7 @@ def _evaluate_above_ma25_ranking_collapse(
     recent20_low: float | None,
     ma75: float | None,
     recent60_low: float | None,
-) -> _RankingCollapseAssessment:
+) -> CollapseStateAssessment:
     risk = _score_collapse_risk(
         latest=latest,
         vwap=vwap,
@@ -1143,21 +1103,26 @@ def _evaluate_above_ma25_ranking_collapse(
         ma75=ma75,
         recent60_low=recent60_low,
     )
-    c2_fall_reason = risk.collapse_risk_reason
-    c2_fall = c2_fall_reason is not None
-    if c2_fall:
+    reason = risk.collapse_risk_reason
+    is_alert = reason is not None
+    if is_alert:
+        code: CollapseStateCode = "collapse"
         label = "崩れ警戒"
     elif risk.score >= 2:
+        code = "mild"
         label = "軽度警戒"
     elif risk.score >= 1:
+        code = "attention"
         label = "要確認"
     else:
+        code = "none"
         label = "崩れ条件なし"
-    return _RankingCollapseAssessment(
+    return CollapseStateAssessment(
         score=risk.score,
+        code=code,
         label=label,
-        c2_fall=c2_fall,
-        c2_fall_reason=c2_fall_reason,
+        is_alert=is_alert,
+        reason=reason,
     )
 
 
@@ -1372,7 +1337,7 @@ def build_d3_detail(
     return "D3弱", "反転形あるも出来高不足"
 
 
-def build_dev25_risk_label(rank: TechnicalSummaryRank, dev25_pct: float) -> str | None:
+def build_dev25_risk_label(rank: str, dev25_pct: float) -> str | None:
     if rank == "D2":
         if dev25_pct >= -8:
             return "浅押し反発候補"
@@ -1496,7 +1461,9 @@ __all__ = [
     "RANK_LABELS",
     "RANK_ORDER",
     "SINGLE_STOCK_POSITION_DESCRIPTIONS",
-    "SixMonthEntryGuidance",
+    "BacktestEntryGuidance",
+    "CollapseStateAssessment",
+    "ReversalStateAssessment",
     "build_collapse_score_brief",
     "build_d1_detail",
     "build_d2_detail",
@@ -1512,6 +1479,9 @@ __all__ = [
     "build_nearby_resistance_lines",
     "build_nearby_support_lines",
     "classify_ma25_position_band",
-    "classify_six_month_entry_guidance",
+    "classify_backtest_entry_guidance",
+    "classify_position_rank",
     "classify_technical_summary_rank",
+    "evaluate_collapse_state",
+    "evaluate_reversal_state",
 ]

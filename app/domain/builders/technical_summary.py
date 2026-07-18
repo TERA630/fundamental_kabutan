@@ -25,8 +25,8 @@ def build_technical_summary_markdown(table: TechnicalSummaryTable) -> str:
             [
                 f"## {rank} {RANK_LABELS[rank]}",
                 "",
-                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | 6M評価 | 出来高比 | 崩れスコア | 支持線 | 抵抗線 | 60日レンジ |",
-                "|---|---:|---:|---:|---:|---:|---|---:|---|---|---|---:|",
+                "| 銘柄 | 現在値 | 3日騰落 | 当日レンジ | VWAP | 25ME dev | テクニカル状態 | 1Y位置評価 | 出来高比 | 崩れスコア | 支持線 | 抵抗線 | 60日レンジ |",
+                "|---|---:|---:|---:|---:|---:|---|---|---:|---|---|---|---:|",
             ]
         )
         lines.extend(_format_row(row) for row in rows)
@@ -99,6 +99,7 @@ def _format_row(row: TechnicalSummaryRow) -> str:
         f"| {_fmt_day_range(row)} "
         f"| {_fmt_vwap(row)} "
         f"| {_fmt_dev25(row)} "
+        f"| {_fmt_technical_state(row)} "
         f"| {row.next_action or 'N/A'} "
         f"| {_fmt_pct_unsigned(row.volume_vs_avg20_pct)} "
         f"| {_fmt_collapse_score(row.collapse_risk_score)} "
@@ -119,6 +120,15 @@ def _fmt_day_range(row: TechnicalSummaryRow) -> str:
 def _fmt_dev25(row: TechnicalSummaryRow) -> str:
     position = f" / {row.ma25_position_label}" if row.ma25_position_label else ""
     return f"{_fmt_pct(row.dev25_pct)}({_fmt_atr(row.ma25_distance_atr)}){position}"
+
+
+def _fmt_technical_state(row: TechnicalSummaryRow) -> str:
+    labels = []
+    if row.collapse_state_label not in {None, "崩れ条件なし"}:
+        labels.append(row.collapse_state_label)
+    if row.reversal_state_label:
+        labels.append(row.reversal_state_label)
+    return " / ".join(labels) if labels else "N/A"
 
 
 def _fmt_vwap(row: TechnicalSummaryRow) -> str:

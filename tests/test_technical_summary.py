@@ -25,8 +25,10 @@ from app.domain.policies.technical_summary import (
     build_technical_strategy_lines,
     build_volume_comment,
     classify_ma25_position_band,
-    classify_six_month_entry_guidance,
+    classify_backtest_entry_guidance,
+    classify_position_rank,
     classify_technical_summary_rank,
+    evaluate_reversal_state,
 )
 from app.presentation.web_technical_summary import build_technical_summary_html
 from app.domain.usecases.technical_summary import TechnicalSummaryService
@@ -53,7 +55,11 @@ def test_build_technical_strategy_lines_excludes_deep_pullback_entries():
         "前場VWAP回復◎：VWAP回復＋15分以上維持ならエントリー可。",
         "後場VWAP回復◎：後場VWAP上維持ならエントリー可。ホールド適性も高い。",
     )
-    assert build_technical_strategy_lines("D3", detail_code="D3強") == (
+    assert build_technical_strategy_lines(
+        "D1",
+        reversal_state_code="reversal_confirmed",
+        detail_code="D3強",
+    ) == (
         "前場VWAP回復○：反転観測強。VWAP15分維持と出来高を確認し、新規は25日線奪回待ち。",
         "後場VWAP回復○：後場VWAP上維持でも、持ち越し判断は25日線奪回後。",
     )
@@ -101,46 +107,35 @@ def test_build_d_strategy_lines_cover_detail_classifications():
     assert d1_hold[0].startswith("前場VWAP回復△：")
 
     d2 = build_technical_strategy_lines(
-        "D2",
+        "E",
+        reversal_state_code="support_bounce_candidate",
         vwap_recovery_range="100〜101円",
     )
     assert d2[0].startswith("前場VWAP回復△：")
     assert "新規は25日線奪回待ち" in d2[0]
 
-    d3_weak = build_technical_strategy_lines("D3", detail_code="D3弱")
+    d3_weak = build_technical_strategy_lines(
+        "D1",
+        reversal_state_code="reversal_confirmed",
+        detail_code="D3弱",
+    )
     assert d3_weak[0].startswith("前場VWAP回復△：")
 
 
 def test_classify_technical_summary_rank_uses_new_ma25_deviation_bands():
-    assert classify_technical_summary_rank(dev25_pct=14.0, latest=114, vwap=100) == "B2"
-    assert classify_technical_summary_rank(dev25_pct=13.999, latest=114, vwap=100) == "B1"
-    assert classify_technical_summary_rank(dev25_pct=10.0, latest=110, vwap=100) == "B1"
-    assert classify_technical_summary_rank(dev25_pct=8.0, latest=108, vwap=100) == "A2"
-    assert classify_technical_summary_rank(dev25_pct=6.0, latest=106, vwap=100) == "A1"
-    assert classify_technical_summary_rank(dev25_pct=4.0, latest=104, vwap=100) == "A1弱"
-    assert classify_technical_summary_rank(dev25_pct=2.0, latest=102, vwap=100) == "A1"
-    assert classify_technical_summary_rank(dev25_pct=0.0, latest=100, vwap=100) == "C1"
-    assert (
-        classify_technical_summary_rank(
-            dev25_pct=8.5,
-            latest=108.5,
-            vwap=100,
-            recent60_range_position=0.85,
-        )
-        == "A2"
-    )
-    assert (
-        classify_technical_summary_rank(
-            dev25_pct=10.0,
-            latest=110.0,
-            vwap=100.0,
-            ma25_distance_atr=3.01,
-        )
-        == "B2"
-    )
+    assert classify_position_rank(12.0) == "B2"
+    assert classify_position_rank(11.999) == "B1"
+    assert classify_position_rank(10.0) == "B1"
+    assert classify_position_rank(8.0) == "A2"
+    assert classify_position_rank(4.0) == "A1弱"
+    assert classify_position_rank(0.0) == "A1"
+    assert classify_position_rank(-2.0) == "C1"
+    assert classify_position_rank(-4.0) == "D1"
+    assert classify_position_rank(-4.001) == "E"
+    assert classify_technical_summary_rank(dev25_pct=10.0, ma25_distance_atr=3.01) == "B1"
 
 
-def test_a2_label_describes_high_deviation_and_missing_terminal_guidance():
+def test_a2_label_uses_one_year_overheat_selection_guidance():
     headline = build_technical_headline_summary(
         dev25_pct=8.5,
         latest=108.5,
@@ -148,12 +143,12 @@ def test_a2_label_describes_high_deviation_and_missing_terminal_guidance():
     )
 
     assert headline.rank == "A2"
-    assert headline.rank_label == "高乖離帯"
-    assert headline.ma25_position_label == "高乖離帯"
-    assert headline.next_action == "終端N/A・失速警戒"
+    assert headline.rank_label == "過熱選別"
+    assert headline.ma25_position_label == "過熱選別"
+    assert headline.next_action == "過熱帯｜追いかけ禁止"
 
 
-def test_b2_atr_override_keeps_extreme_deviation_rank_display():
+def test_ma25_distance_atr_no_longer_overrides_position_rank():
     headline = build_technical_headline_summary(
         dev25_pct=10.0,
         latest=110.0,
@@ -161,9 +156,9 @@ def test_b2_atr_override_keeps_extreme_deviation_rank_display():
         ma25_distance_atr=3.01,
     )
 
-    assert headline.rank == "B2"
-    assert headline.rank_label == "極端乖離帯"
-    assert headline.next_action == "過熱優先・新規見送り"
+    assert headline.rank == "B1"
+    assert headline.rank_label == "過熱後半"
+    assert headline.next_action == "過熱後半｜新規買い見送り"
 
 
 def test_ma25_position_band_marks_overheat_without_changing_a2_rank():
@@ -175,19 +170,24 @@ def test_ma25_position_band_marks_overheat_without_changing_a2_rank():
     )
 
     assert headline.rank == "A2"
-    assert headline.ma25_position_label == "高乖離帯（他指標過熱）"
+    assert headline.ma25_position_label == "過熱選別（他指標過熱）"
 
 
 def test_ma25_position_band_uses_revised_boundaries():
-    assert classify_ma25_position_band(14).label == "極端乖離帯"
-    assert classify_ma25_position_band(10).label == "過熱帯"
-    assert classify_ma25_position_band(8).label == "高乖離帯"
-    assert classify_ma25_position_band(6).label == "中期乖離帯"
-    assert classify_ma25_position_band(4).label == "中間乖離帯"
-    assert classify_ma25_position_band(2).label == "安定上昇帯"
-    assert classify_ma25_position_band(0).label == "25日線接近"
-    assert classify_ma25_position_band(-2).label == "25日線直下・統計的不利"
-    assert classify_ma25_position_band(-2.001).label == "25日線下"
+    assert classify_ma25_position_band(12).label == "極端過熱"
+    assert classify_ma25_position_band(11.999).label == "過熱後半"
+    assert classify_ma25_position_band(10).label == "過熱後半"
+    assert classify_ma25_position_band(9.999).label == "過熱選別"
+    assert classify_ma25_position_band(8).label == "過熱選別"
+    assert classify_ma25_position_band(7.999).label == "上方乖離"
+    assert classify_ma25_position_band(4).label == "上方乖離"
+    assert classify_ma25_position_band(3.999).label == "位置良好"
+    assert classify_ma25_position_band(0).label == "位置良好"
+    assert classify_ma25_position_band(-0.001).label == "奪回待ち"
+    assert classify_ma25_position_band(-2).label == "奪回待ち"
+    assert classify_ma25_position_band(-2.001).label == "反転初動候補・検証不足"
+    assert classify_ma25_position_band(-4).label == "反転初動候補・検証不足"
+    assert classify_ma25_position_band(-4.001).label == "25日線下"
 
 
 def test_short_comment_uses_new_rank_and_entry_guidance_format():
@@ -200,31 +200,22 @@ def test_short_comment_uses_new_rank_and_entry_guidance_format():
     assert comment == "D1 戻り途中｜25日線奪回待ち｜5日線良好"
 
 
-def test_six_month_entry_guidance_uses_terminal_only_in_supported_bands():
-    assert classify_six_month_entry_guidance(-0.001, 0.90).recommendation == "25日線奪回待ち"
-    assert classify_six_month_entry_guidance(0.0, 0.90).recommendation == "方向確認・VWAP回復待ち"
-    assert classify_six_month_entry_guidance(2.0, 0.3999).recommendation == "上値失速・回復待ち"
-    assert classify_six_month_entry_guidance(2.0, 0.40).recommendation == "位置良好"
-    assert classify_six_month_entry_guidance(4.0, 0.10).recommendation == "先着拮抗・支持線確認"
-    assert classify_six_month_entry_guidance(6.0, 0.90).recommendation == "やや過熱・他指標確認"
-    assert classify_six_month_entry_guidance(8.0, 0.4999).recommendation == "過熱後半・失速警戒"
-    assert classify_six_month_entry_guidance(8.0, 0.50).recommendation == "高値維持・追値注意"
-    assert classify_six_month_entry_guidance(10.0, 0.90).recommendation == "過熱優先・新規見送り"
-
-
-def test_six_month_entry_guidance_handles_missing_terminal_conservatively():
-    assert classify_six_month_entry_guidance(3.0, None).recommendation == "終端N/A・回復確認待ち"
-    assert classify_six_month_entry_guidance(9.0, None).recommendation == "終端N/A・失速警戒"
+def test_one_year_entry_guidance_uses_ma25_deviation_only():
+    assert classify_backtest_entry_guidance(-4.001).recommendation == "反転確認まで見送り"
+    assert classify_backtest_entry_guidance(-4.0).recommendation == "件数不足｜25日線奪回待ち"
+    assert classify_backtest_entry_guidance(-2.001).recommendation == "件数不足｜25日線奪回待ち"
+    assert classify_backtest_entry_guidance(-2.0).recommendation == "25日線奪回確認まで見送り"
+    assert classify_backtest_entry_guidance(0.0).recommendation == "位置良好｜エントリー優先帯"
+    assert classify_backtest_entry_guidance(4.0).recommendation == "中央値マイナス｜押し目確認"
+    assert classify_backtest_entry_guidance(8.0).recommendation == "過熱帯｜追いかけ禁止"
+    assert classify_backtest_entry_guidance(10.0).recommendation == "過熱後半｜新規買い見送り"
+    assert classify_backtest_entry_guidance(12.0).recommendation == "新規買い見送り・利確優先"
 
 
 def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
     assert (
-        classify_technical_summary_rank(
-            dev25_pct=6.0,
-            latest=106.0,
-            vwap=107.0,
-        )
-        == "A1"
+        classify_position_rank(6.0)
+        == "A1弱"
     )
 
     headline = build_technical_headline_summary(
@@ -233,7 +224,7 @@ def test_light_above_ma25_collapse_conditions_keep_base_rank_with_labels():
         vwap=107.0,
     )
 
-    assert headline.rank == "A1"
+    assert headline.rank == "A1弱"
     assert headline.collapse_state_label == "要確認"
 
 
@@ -248,7 +239,7 @@ def test_two_point_above_ma25_collapse_conditions_keep_base_rank_as_check_needed
         low_higher_count=3,
     )
 
-    assert headline.rank == "A1"
+    assert headline.rank == "A1弱"
     assert headline.collapse_state_label == "軽度警戒"
 
 
@@ -263,11 +254,11 @@ def test_three_point_above_ma25_collapse_conditions_keep_base_rank():
         low_higher_count=0,
     )
 
-    assert headline.rank == "A1"
+    assert headline.rank == "A1弱"
     assert headline.collapse_state_label == "軽度警戒"
 
 
-def test_mid_score_with_bad_price_structure_falls_to_c2():
+def test_mid_score_with_bad_price_structure_sets_collapse_state():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
         latest=106.0,
@@ -281,11 +272,13 @@ def test_mid_score_with_bad_price_structure_falls_to_c2():
         high_breakout_count=0,
     )
 
-    assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "構造崩れ：25日線下向き＋崩れスコア中以上＋価格構造悪化"
+    assert headline.rank == "A1弱"
+    assert headline.collapse_state_code == "collapse"
+    assert headline.next_action == "監視のみ"
+    assert headline.collapse_reason == "構造崩れ：25日線下向き＋崩れスコア中以上＋価格構造悪化"
 
 
-def test_high_score_falls_to_c2_even_without_immediate_trigger():
+def test_high_score_sets_collapse_state_without_replacing_rank():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
         latest=106.0,
@@ -307,8 +300,9 @@ def test_high_score_falls_to_c2_even_without_immediate_trigger():
         high_breakout_count=0,
     )
 
-    assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "高リスク：崩れスコア高リスク"
+    assert headline.rank == "A1弱"
+    assert headline.collapse_state_code == "collapse"
+    assert headline.collapse_reason == "高リスク：崩れスコア高リスク"
 
 
 def test_ma5_score_two_points_only_keeps_base_rank():
@@ -319,23 +313,22 @@ def test_ma5_score_two_points_only_keeps_base_rank():
         ma5_slope=0.0,
     )
 
-    assert headline.rank == "A1"
+    assert headline.rank == "A1弱"
     assert headline.collapse_state_label == "崩れ条件なし"
 
 
-def test_ma5_score_with_price_structure_falls_to_c2():
-    assert (
-        classify_technical_summary_rank(
-            dev25_pct=6.0,
-            latest=106.0,
-            vwap=107.0,
-            ma5_slope=0.0,
-        )
-        == "C2"
+def test_ma5_score_with_price_structure_sets_collapse_state():
+    headline = build_technical_headline_summary(
+        dev25_pct=6.0,
+        latest=106.0,
+        vwap=107.0,
+        ma5_slope=0.0,
     )
+    assert headline.rank == "A1弱"
+    assert headline.collapse_state_code == "collapse"
 
 
-def test_ma5_and_ma25_down_falls_to_c2_as_downtrend_start():
+def test_ma5_and_ma25_down_sets_collapse_state_as_downtrend_start():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
         latest=106.0,
@@ -345,11 +338,12 @@ def test_ma5_and_ma25_down_falls_to_c2_as_downtrend_start():
         ma5_slope=0.0,
     )
 
-    assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "下行初動：5日線下向き＋25日線下向き"
+    assert headline.rank == "A1弱"
+    assert headline.collapse_state_code == "collapse"
+    assert headline.collapse_reason == "下行初動：5日線下向き＋25日線下向き"
 
 
-def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
+def test_strong_collapse_condition_overrides_action_not_rank():
     headline = build_technical_headline_summary(
         dev25_pct=6.0,
         latest=106.0,
@@ -358,19 +352,21 @@ def test_strong_collapse_condition_falls_to_c2_even_with_two_points():
         day_close_position=0.3,
     )
 
-    assert headline.rank == "C2"
-    assert headline.c2_fall_reason == "即時崩れ：VWAP明確割れ＋終端位置低下"
+    assert headline.rank == "A1弱"
+    assert headline.next_action == "監視のみ"
+    assert headline.collapse_reason == "即時崩れ：VWAP明確割れ＋終端位置低下"
 
 
-def test_c2_short_comment_shows_fall_reason():
+def test_collapse_short_comment_shows_state_and_reason():
     comment = build_technical_short_comment(
-        rank="C2",
+        rank="A1",
+        rank_label="位置良好",
+        entry_guidance="監視のみ",
         collapse_state_label="崩れ警戒",
-        c2_fall_reason="VWAP明確割れ＋終端位置低下",
+        collapse_reason="VWAP明確割れ＋終端位置低下",
     )
 
-    assert "C2陥落トリガー：VWAP明確割れ＋終端位置低下" in comment
-    assert "C2 崩れ警戒 陥落トリガー" not in comment
+    assert comment == "A1 位置良好｜崩れ警戒｜監視のみ｜VWAP明確割れ＋終端位置低下｜5日線良好"
 
 
 def test_b_ranks_keep_rank_even_when_collapse_condition_is_strong():
@@ -417,9 +413,9 @@ def test_upper_price_stalling_uses_45_percent_wick_boundary():
         volume_vs_avg20_pct=120.0,
     )
 
-    assert below_boundary.rank == "A1"
+    assert below_boundary.rank == "A1弱"
     assert below_boundary.collapse_state_label == "崩れ条件なし"
-    assert at_boundary.rank == "C2"
+    assert at_boundary.rank == "A1弱"
     assert at_boundary.collapse_state_label == "崩れ警戒"
 
 
@@ -437,8 +433,10 @@ def test_below_ma25_headline_omits_ranking_collapse_label():
 
     assert d_headline.rank == "D1"
     assert d_headline.collapse_state_label is None
-    assert e_headline.rank == "E"
+    assert e_headline.rank == "D1"
     assert e_headline.collapse_state_label is None
+    assert d_headline.reversal_state_label == "VWAP回復・確認不足"
+    assert e_headline.reversal_state_label == "反転未確認"
 
 
 def test_volume_comment_parts_follow_boundaries():
@@ -489,29 +487,26 @@ def test_ma5_slope_short_comment_follows_score_details():
 
 
 def test_classify_technical_summary_rank_covers_c_and_e_cases():
-    assert classify_technical_summary_rank(dev25_pct=1.0, latest=101, vwap=100) == "C1"
+    assert classify_technical_summary_rank(dev25_pct=1.0, latest=101, vwap=100) == "A1"
     assert classify_technical_summary_rank(dev25_pct=3.0, latest=103, vwap=100) == "A1"
     assert classify_technical_summary_rank(dev25_pct=-3.0, latest=105, vwap=100) == "D1"
-    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100) == "E"
+    assert classify_technical_summary_rank(dev25_pct=-3.0, latest=95, vwap=100) == "D1"
 
 
-def test_classify_technical_summary_rank_covers_bottoming_start():
-    assert (
-        classify_technical_summary_rank(
-            dev25_pct=-3.0,
-            latest=105,
-            vwap=100,
-            high_breakout_count=1,
-            low_higher_count=2,
-            day_close_position=0.65,
-            vwap_maintained_15m=True,
-        )
-        == "D3"
+def test_reversal_state_covers_bottoming_start():
+    state = evaluate_reversal_state(
+        dev25_pct=-3.0,
+        latest=105,
+        vwap=100,
+        low_higher_count=2,
+        day_close_position=0.65,
+        vwap_maintained_15m=True,
     )
+    assert state.code == "reversal_confirmed"
 
 
 def test_d2_bottoming_candidate_requires_support_rebound_and_vwap_proximity():
-    rank = classify_technical_summary_rank(
+    state = evaluate_reversal_state(
         dev25_pct=-6.0,
         latest=99.0,
         vwap=100.0,
@@ -526,7 +521,7 @@ def test_d2_bottoming_candidate_requires_support_rebound_and_vwap_proximity():
         previous_low=98.0,
     )
 
-    assert rank == "D2"
+    assert state.code == "support_bounce_candidate"
 
 
 def test_d2_headline_uses_strong_comment_when_two_auxiliary_conditions_pass():
@@ -545,9 +540,10 @@ def test_d2_headline_uses_strong_comment_when_two_auxiliary_conditions_pass():
         previous_low=98.0,
     )
 
-    assert headline.rank == "D2"
-    assert headline.comment == "件数不足・優位なし"
-    assert headline.next_action == "25日線奪回待ち"
+    assert headline.rank == "E"
+    assert headline.reversal_state_label == "支持線反発候補"
+    assert headline.comment == "反転未確認"
+    assert headline.next_action == "反転確認まで見送り"
 
 
 def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
@@ -566,9 +562,10 @@ def test_d2_headline_uses_weak_comment_even_without_auxiliary_conditions():
         previous_low=98.0,
     )
 
-    assert headline.rank == "D2"
-    assert headline.comment == "件数不足・優位なし"
-    assert headline.next_action == "25日線奪回待ち"
+    assert headline.rank == "E"
+    assert headline.reversal_state_label == "支持線反発候補"
+    assert headline.comment == "反転未確認"
+    assert headline.next_action == "反転確認まで見送り"
 
 
 def test_d3_requires_vwap_maintenance_but_not_volume():
@@ -581,30 +578,23 @@ def test_d3_requires_vwap_maintenance_but_not_volume():
         day_close_position=0.65,
     )
 
-    assert classify_technical_summary_rank(**base, vwap_maintained_15m=False) == "D1"
-    assert (
-        classify_technical_summary_rank(
-            **base,
-            vwap_maintained_15m=True,
-            volume_vs_avg20_pct=40.0,
-        )
-        == "D3"
-    )
+    assert evaluate_reversal_state(**base, vwap_maintained_15m=False).code == "vwap_recovered_unconfirmed"
+    assert evaluate_reversal_state(
+        **base,
+        vwap_maintained_15m=True,
+        volume_vs_avg20_pct=40.0,
+    ).code == "reversal_confirmed"
 
 
 def test_d3_does_not_require_high_breakout_and_promotes_strong_detail():
-    assert (
-        classify_technical_summary_rank(
-            dev25_pct=-12.0,
-            latest=105.0,
-            vwap=100.0,
-            high_breakout_count=0,
-            low_higher_count=2,
-            day_close_position=0.65,
-            vwap_maintained_15m=True,
-        )
-        == "D3"
-    )
+    assert evaluate_reversal_state(
+        dev25_pct=-12.0,
+        latest=105.0,
+        vwap=100.0,
+        low_higher_count=2,
+        day_close_position=0.65,
+        vwap_maintained_15m=True,
+    ).code == "reversal_confirmed"
     assert build_d3_detail(
         volume_vs_avg20_pct=40.0,
         high_breakout_count=1,
@@ -643,28 +633,28 @@ def test_d2_excludes_clear_support_break_and_missing_direct_support():
         low_higher_count=1,
     )
     assert (
-        classify_technical_summary_rank(
+        evaluate_reversal_state(
             **common,
             latest=97.0,
             day_low=96.0,
             previous_low=98.0,
         )
-        == "E"
+        .code == "reversal_unconfirmed"
     )
     assert (
-        classify_technical_summary_rank(
+        evaluate_reversal_state(
             **common,
             latest=99.0,
             day_low=98.8,
             previous_low=95.0,
         )
-        == "E"
+        .code == "reversal_unconfirmed"
     )
 
 
 def test_d2_exclusion_falls_to_downtrend():
     assert (
-        classify_technical_summary_rank(
+        evaluate_reversal_state(
             dev25_pct=-6.0,
             latest=97.8,
             vwap=100.0,
@@ -678,7 +668,7 @@ def test_d2_exclusion_falls_to_downtrend():
             low_higher_count=1,
             previous_low=98.0,
         )
-        == "E"
+        .code == "reversal_unconfirmed"
     )
 
 
@@ -696,8 +686,8 @@ def test_d2_requires_point_one_atr_rebound_above_support():
         low_higher_count=1,
         previous_low=98.0,
     )
-    assert classify_technical_summary_rank(**common, latest=98.19) == "E"
-    assert classify_technical_summary_rank(**common, latest=98.20) == "D2"
+    assert evaluate_reversal_state(**common, latest=98.19).code == "reversal_unconfirmed"
+    assert evaluate_reversal_state(**common, latest=98.20).code == "support_bounce_candidate"
 
 
 def test_d2_weak_detail_for_standalone_previous_low_lower_lows_and_moderate_bearish():
@@ -740,7 +730,7 @@ def test_d2_weak_detail_for_standalone_previous_low_lower_lows_and_moderate_bear
 
 def test_d2_big_bearish_volume_above_150_falls_to_downtrend():
     assert (
-        classify_technical_summary_rank(
+        evaluate_reversal_state(
             dev25_pct=-6.0,
             latest=98.0,
             vwap=100.0,
@@ -755,7 +745,7 @@ def test_d2_big_bearish_volume_above_150_falls_to_downtrend():
             previous_low=97.8,
             recent20_low=97.9,
         )
-        == "E"
+        .code == "reversal_unconfirmed"
     )
 
 
@@ -931,7 +921,8 @@ def test_position_assessment_marks_d3_below_ma25_as_bottoming_start():
         recent20_low=95.0,
         ma75=90.0,
         recent60_low=80.0,
-        headline_rank="D3",
+        headline_rank="E",
+        reversal_state_code="reversal_confirmed",
     )
 
     assert assessment.bottoming_start_established is True
@@ -982,15 +973,15 @@ def test_technical_summary_service_builds_row_and_markdown():
     assert table.rows[0].rank == "A1弱"
     assert table.rows[0].previous_vwap_maintained is False
     assert table.rows[0].collapse_risk_score == 0
-    assert table.rows[0].headline_comment == "全終端帯で先着率50%前後"
-    assert table.rows[0].ma25_position_label == "中間乖離帯"
-    assert table.rows[0].next_action == "先着拮抗・支持線確認"
-    assert "## A1弱 中間乖離帯" in markdown
+    assert table.rows[0].headline_comment == "中央値マイナス"
+    assert table.rows[0].ma25_position_label == "上方乖離"
+    assert table.rows[0].next_action == "中央値マイナス｜押し目確認"
+    assert "## A1弱 上方乖離" in markdown
     assert "## 冒頭短評" not in markdown
     assert "A1弱 初期逆行注意｜中期上昇余地はあるが、短期下振れに注意。" not in markdown
     assert "崩れスコア" in markdown
     assert "前日VWAP維持" not in markdown
-    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) / 中間乖離帯 | 先着拮抗・支持線確認 | 120% | 0 |" in markdown
+    assert "| AIテスト(1234) | 105円(+1.9%) | -2.5% | 100-108円(終端:62%:値幅N/A) | 102円(+2.9%) | +5.0%(N/A) / 上方乖離 | N/A | 中央値マイナス｜押し目確認 | 120% | 0 |" in markdown
     assert "25ME dev" in markdown
     assert "102円(+2.9%)" in markdown
     assert "AIテスト(1234)" in markdown
@@ -1001,8 +992,8 @@ def test_technical_summary_service_sorts_above_ma25_ranks_by_collapse_score():
         "1111": _summary_row(name="Score3", code4="1111", rank="A1", collapse_risk_score=3),
         "2222": _summary_row(name="Score1A", code4="2222", rank="A1", collapse_risk_score=1),
         "3333": _summary_row(name="Score1B", code4="3333", rank="A1", collapse_risk_score=1),
-        "4444": _summary_row(name="C2Score2", code4="4444", rank="C2", collapse_risk_score=2),
-        "5555": _summary_row(name="C2Score0", code4="5555", rank="C2", collapse_risk_score=0),
+        "4444": _summary_row(name="B1Score2", code4="4444", rank="B1", collapse_risk_score=2),
+        "5555": _summary_row(name="B1Score0", code4="5555", rank="B1", collapse_risk_score=0),
     }
 
     class RowSortingService(TechnicalSummaryService):
@@ -1015,13 +1006,13 @@ def test_technical_summary_service_sorts_above_ma25_ranks_by_collapse_score():
             ("Score3", "1111"),
             ("Score1A", "2222"),
             ("Score1B", "3333"),
-            ("C2Score2", "4444"),
-            ("C2Score0", "5555"),
+            ("B1Score2", "4444"),
+            ("B1Score0", "5555"),
         ]
     )
 
     assert [row.code4 for row in table.rows if row.rank == "A1"] == ["2222", "3333", "1111"]
-    assert [row.code4 for row in table.rows if row.rank == "C2"] == ["5555", "4444"]
+    assert [row.code4 for row in table.rows if row.rank == "B1"] == ["5555", "4444"]
 
 
 def test_technical_summary_service_builds_sector_breadth_from_watchlist_entries():
@@ -1120,7 +1111,7 @@ def test_technical_summary_markdown_renders_sector_breadth_before_rank_tables():
 
     assert "## Sector Breadth" in markdown
     assert "| 半導体材料・装置 | 押し目買い優勢 | 2/3 67% | 65% | 3/3 100% | 2.0 | 68% | 中立〜やや強い / 反発中 |" in markdown
-    assert markdown.index("## Sector Breadth") < markdown.index("## A1 25日線上昇帯")
+    assert markdown.index("## Sector Breadth") < markdown.index("## A1 位置良好")
 
 
 def test_technical_summary_html_does_not_render_headline_table():
@@ -1162,7 +1153,7 @@ def test_technical_summary_html_does_not_render_headline_table():
     assert "A1 位置良好｜順張り可。過熱なし。" not in html
     assert "AIテスト(1234)" in html
     assert "崩れスコア" in html
-    assert "6M評価" in html
+    assert "1Y位置評価" in html
     assert "VWAP回復、後場VWAP維持は可。追加買いは条件付き可。" in html
     assert "前日VWAP維持" not in html
     assert "<td>2</td>" in html

@@ -330,7 +330,8 @@ def _format_headline_summary(result: TechnicalAnalysisResult) -> str:
         entry_guidance=headline.next_action,
         ma25_position_label=headline.ma25_position_label,
         collapse_state_label=headline.collapse_state_label,
-        c2_fall_reason=headline.c2_fall_reason,
+        reversal_state_label=headline.reversal_state_label,
+        collapse_reason=headline.collapse_reason,
         ma5_slope=getattr(moving_average, "ma5_slope", None),
         ma5_slope_prev=getattr(moving_average, "ma5_slope_prev", None),
         ma5_slope_3d_ago=getattr(moving_average, "ma5_slope_3d_ago", None),
@@ -391,6 +392,7 @@ def _build_position_assessment(result: TechnicalAnalysisResult):
         ma75=snapshot.moving_average.ma75,
         recent60_low=snapshot.breakline.recent60_low,
         headline_rank=headline.rank,
+        reversal_state_code=headline.reversal_state_code,
     )
 
 
@@ -405,11 +407,13 @@ def _format_strategy_assessment(result: TechnicalAnalysisResult) -> str:
     headline = _build_headline(result)
     if headline is None:
         return "戦略判定：\nN/A"
-    detail_code = _strategy_detail_code(result, headline.rank)
+    detail_code = _strategy_detail_code(result, headline.reversal_state_code)
     atr14 = snapshot.range.atr14
     vwap_recovery_range = _fmt_strategy_band(vwap, _offset_price(vwap, atr14, 0.20))
     strategy_lines = build_technical_strategy_lines(
         headline.rank,
+        reversal_state_code=headline.reversal_state_code,
+        collapse_alert=headline.collapse_state_code == "collapse",
         detail_code=detail_code,
         vwap_recovery_range=vwap_recovery_range,
     )
@@ -495,10 +499,10 @@ def _time_from_timestamp_text(value: str | None) -> time | None:
         return None
 
 
-def _strategy_detail_code(result: TechnicalAnalysisResult, rank: str) -> str | None:
-    if rank == "D1":
+def _strategy_detail_code(result: TechnicalAnalysisResult, reversal_state_code: str) -> str | None:
+    if reversal_state_code == "vwap_recovered_unconfirmed":
         return build_d1_detail(ma25_distance_atr=_evaluation_ma25_distance_atr(result))[0]
-    if rank == "D3":
+    if reversal_state_code == "reversal_confirmed":
         sessions = result.three_session_momentum.sessions
         return build_d3_detail(
             volume_vs_avg20_pct=_ratio_pct(
@@ -512,7 +516,7 @@ def _strategy_detail_code(result: TechnicalAnalysisResult, rank: str) -> str | N
                 _evaluation_high(result),
             ),
         )[0]
-    if rank == "D2":
+    if reversal_state_code == "support_bounce_candidate":
         sessions = result.three_session_momentum.sessions
         return build_d2_detail(
             latest=_evaluation_price(result) or 0.0,

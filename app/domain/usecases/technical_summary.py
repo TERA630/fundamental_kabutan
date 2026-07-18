@@ -145,6 +145,7 @@ class TechnicalSummaryService:
             ma75=moving_average.ma75,
             recent60_low=breakline.recent60_low,
             headline_rank=headline.rank,
+            reversal_state_code=headline.reversal_state_code,
         )
         return TechnicalSummaryRow(
             name=result.name,
@@ -195,6 +196,8 @@ class TechnicalSummaryService:
             ),
             recent60_range_position=breakline.recent60_range_position,
             ma25_position_label=headline.ma25_position_label,
+            collapse_state_label=headline.collapse_state_label,
+            reversal_state_label=headline.reversal_state_label,
             collapse_risk_score=position_assessment.collapse_risk_score,
             headline_comment=headline.comment,
             next_action=headline.next_action,
@@ -295,7 +298,6 @@ def _volume_spike_bearish(
     return volume_vs_avg20_pct >= 150 and latest < day_open
 
 
-_COLLAPSE_SCORE_SORT_RANKS = frozenset(("B2", "B1", "A2", "A1", "A1弱", "C2", "C1"))
 _RANK_ORDER_INDEX = {rank: index for index, rank in enumerate(RANK_ORDER)}
 
 
@@ -311,9 +313,7 @@ def _sort_rows_by_rank_and_collapse_score(rows: list[TechnicalSummaryRow]) -> tu
         original_index, row = item
         score = row.collapse_risk_score if row.collapse_risk_score is not None else 10**9
         rank_index = _RANK_ORDER_INDEX.get(row.rank, len(RANK_ORDER))
-        if row.rank in _COLLAPSE_SCORE_SORT_RANKS:
-            return (rank_index, score, original_index)
-        return (rank_index, original_index, original_index)
+        return (rank_index, score, original_index)
 
     return tuple(row for _, row in sorted(enumerate(rows), key=sort_key))
 

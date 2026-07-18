@@ -19,6 +19,7 @@ from app.domain.builders.technical_summary import (
     _fmt_pct_unsigned,
     _fmt_position,
     _fmt_rsi,
+    _fmt_technical_state,
     _fmt_vwap,
 )
 from app.domain.models.sector_breadth import SectorBreadthRow, SectorBreadthTable
@@ -53,7 +54,7 @@ def build_technical_summary_html(
         sections.append(
             "<thead><tr>"
             "<th>銘柄</th><th>現在値</th><th>3日騰落</th><th>当日レンジ</th><th>VWAP</th>"
-            "<th>25ME dev</th><th>6M評価</th><th>出来高比</th><th>崩れスコア</th>"
+            "<th>25ME dev</th><th>テクニカル状態</th><th>1Y位置評価</th><th>出来高比</th><th>崩れスコア</th>"
             "<th>支持線</th><th>抵抗線</th><th>60D Pos</th>"
             "</tr></thead><tbody>"
         )
@@ -141,6 +142,7 @@ def _build_row_html(row: TechnicalSummaryRow, *, detail_url_builder: DetailUrlBu
         _fmt_day_range(row),
         _fmt_vwap(row),
         _fmt_dev25(row),
+        _fmt_technical_state(row),
         row.next_action or "N/A",
         _fmt_pct_unsigned(row.volume_vs_avg20_pct),
         _fmt_collapse_score(row.collapse_risk_score),
